@@ -1,0 +1,22 @@
+# Binaries
+/bin/
+/server
+*.exe
+
+# SQLite databases
+*.db
+*.db-journal
+
+# Environment
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

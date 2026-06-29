@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    image: flight-tracker:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - flight-data:/data
+    environment:
+      DATABASE_DRIVER: sqlite
+      DATABASE_URL: file:/data/flight-tracker.db
+      MIGRATIONS_PATH: /migrations/sqlite
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/migrate/Dockerfile
+    image: flight-tracker-migrate:latest
+    volumes:
+      - flight-data:/data
+    environment:
+      MIGRATIONS_PATH: /migrations/sqlite
+      DATABASE_URL: sqlite3:///data/flight-tracker.db
+
+volumes:
+  flight-data:
