@@ -22,6 +22,7 @@ type Server struct {
 func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog.Logger) *Server {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s, worker)
+	flights := handlers.NewFlightsHandler(s)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -35,6 +36,7 @@ func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog
 		r.Post("/jobs", jobs.Create)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
+		r.Get("/flights", flights.List)
 	})
 
 	return &Server{

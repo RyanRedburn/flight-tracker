@@ -31,6 +31,7 @@ Go service with a REST API and an in-process background operator for fetching an
 | `make migrate-up` | Apply migrations via the migrate sidecar |
 | `make migrate-down` | Roll back one migration |
 | `make migrate-version` | Show current migration version |
+| `make db-seed` | Import DOT on-time flight CSV into SQLite (migrate sidecar) |
 | `make db-shell` | Interactive SQLite shell against the Docker volume |
 | `make clean-cover` | Remove generated coverage files |
 
@@ -103,6 +104,22 @@ curl http://localhost:8080/api/v1/jobs/<job-id>
 
 # List recent jobs
 curl http://localhost:8080/api/v1/jobs
+
+# Query on-time flights (optional filters: flight_date, origin, dest, limit, offset)
+curl "http://localhost:8080/api/v1/flights?flight_date=2026-04-24&origin=ORD&dest=BHM&limit=10"
+```
+
+## Flight data seed (deploy time)
+
+DOT **Marketing Carrier On-Time Performance** data in `test-data/` is loaded at deploy time via the migrate sidecar's `sqlite3` CLI (`.mode csv` / `.import --skip 1`). The sample file is April 2026 on-time data (~660k rows, ~313 MB); first import takes on the order of 30–60 seconds. Import is skipped if `on_time_flights` already has rows.
+
+`test-data/` is mounted read-only into the migrate container at `/test-data`. Override the CSV path with `FLIGHT_DATA_CSV` when calling the sidecar directly.
+
+```bash
+make docker-build
+make migrate-up    # creates on_time_flights table
+make db-seed       # one-time CSV import
+make docker-run
 ```
 
 ## Migrations

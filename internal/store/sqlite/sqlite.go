@@ -170,6 +170,66 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	return err
 }
 
+func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := store.QueryListOnTimeFlightsBase
+	args := make([]any, 0, 5)
+	where := make([]string, 0, 3)
+
+	if filter.FlightDate != "" {
+		where = append(where, "FlightDate = ?")
+		args = append(args, filter.FlightDate)
+	}
+
+	if filter.Origin != "" {
+		where = append(where, "Origin = ?")
+		args = append(args, filter.Origin)
+	}
+
+	if filter.Dest != "" {
+		where = append(where, "Dest = ?")
+		args = append(args, filter.Dest)
+	}
+
+	if len(where) > 0 {
+		query += "\n\t\tWHERE " + strings.Join(where, " AND ")
+	}
+
+	query += "\n\t\tORDER BY FlightDate, Origin, CRSDepTime\n\t\tLIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var flights []*model.OnTimeFlight
+
+	for rows.Next() {
+		flight, err := scanOnTimeFlight(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		flights = append(flights, flight)
+	}
+
+	return flights, rows.Err()
+}
+
 type rowScanner interface {
 	Scan(dest ...any) error
 }
@@ -222,6 +282,33 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	}
 
 	return &job, nil
+}
+
+func scanOnTimeFlight(row rowScanner) (*model.OnTimeFlight, error) {
+	var flight model.OnTimeFlight
+
+	if err := row.Scan(
+		&flight.FlightDate,
+		&flight.Origin,
+		&flight.Dest,
+		&flight.IATA_Code_Marketing_Airline,
+		&flight.Flight_Number_Marketing_Airline,
+		&flight.IATA_Code_Operating_Airline,
+		&flight.Flight_Number_Operating_Airline,
+		&flight.CRSDepTime,
+		&flight.DepTime,
+		&flight.DepDelay,
+		&flight.CRSArrTime,
+		&flight.ArrTime,
+		&flight.ArrDelay,
+		&flight.Cancelled,
+		&flight.Diverted,
+		&flight.Distance,
+	); err != nil {
+		return nil, err
+	}
+
+	return &flight, nil
 }
 
 func runMigrations(migrationsPath, dbPath string) error {

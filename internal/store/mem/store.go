@@ -12,9 +12,10 @@ import (
 )
 
 type Store struct {
-	mu   sync.Mutex
-	jobs map[string]*model.Job
-	ping func(context.Context) error
+	mu      sync.Mutex
+	jobs    map[string]*model.Job
+	flights []*model.OnTimeFlight
+	ping    func(context.Context) error
 }
 
 func New() *Store {
@@ -22,6 +23,13 @@ func New() *Store {
 		jobs: make(map[string]*model.Job),
 		ping: func(context.Context) error { return nil },
 	}
+}
+
+func (s *Store) SetOnTimeFlights(flights []*model.OnTimeFlight) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.flights = cloneOnTimeFlights(flights)
 }
 
 func (s *Store) SetPingHook(fn func(context.Context) error) {
@@ -117,6 +125,80 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	return nil
 }
 
+func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	matches := make([]*model.OnTimeFlight, 0, len(s.flights))
+	for _, flight := range s.flights {
+		if filter.FlightDate != "" && flight.FlightDate != filter.FlightDate {
+			continue
+		}
+
+		if filter.Origin != "" && flight.Origin != filter.Origin {
+			continue
+		}
+
+		if filter.Dest != "" && flight.Dest != filter.Dest {
+			continue
+		}
+
+		matches = append(matches, cloneOnTimeFlight(flight))
+	}
+
+	slices.SortFunc(matches, func(a, b *model.OnTimeFlight) int {
+		if a.FlightDate != b.FlightDate {
+			if a.FlightDate < b.FlightDate {
+				return -1
+			}
+
+			return 1
+		}
+
+		if a.Origin != b.Origin {
+			if a.Origin < b.Origin {
+				return -1
+			}
+
+			return 1
+		}
+
+		if a.CRSDepTime < b.CRSDepTime {
+			return -1
+		}
+
+		if a.CRSDepTime > b.CRSDepTime {
+			return 1
+		}
+
+		return 0
+	})
+
+	if offset >= len(matches) {
+		return []*model.OnTimeFlight{}, nil
+	}
+
+	end := offset + limit
+	if end > len(matches) {
+		end = len(matches)
+	}
+
+	return matches[offset:end], nil
+}
+
 func cloneJob(job *model.Job) *model.Job {
 	jobCopy := *job
 	if job.Payload != nil {
@@ -128,4 +210,18 @@ func cloneJob(job *model.Job) *model.Job {
 	}
 
 	return &jobCopy
+}
+
+func cloneOnTimeFlight(flight *model.OnTimeFlight) *model.OnTimeFlight {
+	flightCopy := *flight
+	return &flightCopy
+}
+
+func cloneOnTimeFlights(flights []*model.OnTimeFlight) []*model.OnTimeFlight {
+	cloned := make([]*model.OnTimeFlight, len(flights))
+	for i, flight := range flights {
+		cloned[i] = cloneOnTimeFlight(flight)
+	}
+
+	return cloned
 }

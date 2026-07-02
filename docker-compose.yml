@@ -18,6 +18,7 @@ services:
     image: flight-tracker-migrate:latest
     volumes:
       - flight-data:/data
+      - ./test-data:/test-data:ro
     environment:
       MIGRATIONS_PATH: /migrations/sqlite
       DATABASE_URL: sqlite3:///data/flight-tracker.db
