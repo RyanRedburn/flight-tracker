@@ -1,5 +1,8 @@
 # flight-tracker
 
+![Lint](https://github.com/RyanRedburn/flight-tracker/actions/workflows/lint.yml/badge.svg?branch=main)
+![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
+
 Go service with a REST API and an in-process background worker for importing BTS on-time flight data.
 
 ## Features
@@ -52,7 +55,7 @@ Equivalent raw commands:
 
 ```bash
 # Unit tests (no CGO required)
-go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/store/mem/...
+go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/model/... ./internal/store ./internal/store/mem/...
 
 # Full suite including SQLite integration tests (requires CGO)
 CGO_ENABLED=1 go test ./...
