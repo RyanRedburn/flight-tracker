@@ -81,7 +81,7 @@ func TestStorePingHook(t *testing.T) {
 	}
 }
 
-func TestStoreListJobsDefaultLimit(t *testing.T) {
+func TestStoreListJobsZeroLimitReturnsEmpty(t *testing.T) {
 	s := New()
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -104,11 +104,7 @@ func TestStoreListJobsDefaultLimit(t *testing.T) {
 		t.Fatalf("ListJobs() error = %v", err)
 	}
 
-	if len(jobs) != 3 {
-		t.Fatalf("len(jobs) = %d, want 3", len(jobs))
-	}
-
-	if jobs[0].ID != "job-c" {
-		t.Errorf("first job ID = %q, want job-c (newest first)", jobs[0].ID)
+	if len(jobs) != 0 {
+		t.Fatalf("len(jobs) = %d, want 0", len(jobs))
 	}
 }

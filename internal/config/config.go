@@ -22,6 +22,7 @@ type Config struct {
 	StaleJobThreshold  time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
 	BTSDownloadTimeout time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
 	BTSBaseURL         string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
+	MaxIngestMonths    int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
 	LogLevel           slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 }
 
@@ -43,6 +44,10 @@ func Load() (Config, error) {
 
 	if cfg.WorkerConcurrency < 1 {
 		return Config{}, errors.New("WORKER_CONCURRENCY must be >= 1")
+	}
+
+	if cfg.MaxIngestMonths < 1 {
+		return Config{}, errors.New("MAX_INGEST_MONTHS must be >= 1")
 	}
 
 	return cfg, nil

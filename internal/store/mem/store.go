@@ -83,10 +83,6 @@ func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
 }
 
 func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -129,18 +125,7 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 
 func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
 	limit := filter.Limit
-	if limit <= 0 {
-		limit = 50
-	}
-
-	if limit > 500 {
-		limit = 500
-	}
-
 	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

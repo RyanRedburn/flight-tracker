@@ -80,7 +80,7 @@ func TestMemReplaceOnTimeFlightsByMonth(t *testing.T) {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}
 
-	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: "2026-05-01"})
+	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: "2026-05-01", Limit: 100})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
 	}

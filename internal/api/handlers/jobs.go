@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/query"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -38,8 +38,8 @@ type jobResponse struct {
 
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: "id is required"})
+	if err := query.ParseJobID(id); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
 		return
 	}
 
@@ -65,16 +65,10 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 1 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: "invalid limit"})
-			return
-		}
-
-		limit = parsed
+	limit, err := query.ParseJobsList(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
+		return
 	}
 
 	jobs, err := h.store.ListJobs(r.Context(), limit)

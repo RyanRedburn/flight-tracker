@@ -322,6 +322,7 @@ func TestReplaceOnTimeFlightsByMonthRollback(t *testing.T) {
 		FlightDate: testFlightDate20260424,
 		Origin:     testAirportORD,
 		Dest:       testAirportBHM,
+		Limit:      100,
 	})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
@@ -348,7 +349,7 @@ func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
 		t.Fatalf("replacement replace error = %v", err)
 	}
 
-	oldMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260424})
+	oldMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260424, Limit: 100})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
 	}
@@ -357,7 +358,7 @@ func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
 		t.Fatalf("len(oldMonth) = %d, want 0 after replace", len(oldMonth))
 	}
 
-	newMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260430})
+	newMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260430, Limit: 100})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() new error = %v", err)
 	}

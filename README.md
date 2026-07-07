@@ -1,12 +1,12 @@
 # flight-tracker
 
-Go service with a REST API and an in-process background operator for fetching and processing flight data.
+Go service with a REST API and an in-process background worker for importing BTS on-time flight data.
 
 ## Features
 
-- REST API for triggering and querying async jobs
-- Background worker pool processing jobs from a SQLite-backed queue
-- Pluggable external data source interface (mock provider included)
+- `POST /api/v1/ingest` to queue per-month BTS import jobs
+- Poll-based background workers that download, parse, and load flight data into SQLite
+- REST API to query on-time flights and job status
 - Per-driver SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker deployment with persistent SQLite volume
 
@@ -31,7 +31,6 @@ Go service with a REST API and an in-process background operator for fetching an
 | `make migrate-up` | Apply migrations via the migrate sidecar |
 | `make migrate-down` | Roll back one migration |
 | `make migrate-version` | Show current migration version |
-| `make db-seed` | Import DOT on-time flight CSV into SQLite (migrate sidecar) |
 | `make db-shell` | Interactive SQLite shell against the Docker volume |
 | `make clean-cover` | Remove generated coverage files |
 
@@ -53,7 +52,7 @@ Equivalent raw commands:
 
 ```bash
 # Unit tests (no CGO required)
-go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/store/mem/...
+go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/store/mem/...
 
 # Full suite including SQLite integration tests (requires CGO)
 CGO_ENABLED=1 go test ./...
@@ -68,6 +67,11 @@ Environment variables (defaults shown):
 | `DATABASE_URL` | `file:flight-tracker.db` | Database DSN |
 | `MIGRATIONS_PATH` | `migrations/sqlite` | Migration folder for the active driver |
 | `WORKER_CONCURRENCY` | `2` | Background worker goroutines |
+| `WORKER_POLL_INTERVAL` | `5s` | How often workers poll for pending jobs |
+| `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
+| `BTS_DOWNLOAD_TIMEOUT` | `10m` | HTTP timeout for BTS zip downloads |
+| `BTS_BASE_URL` | `https://transtats.bts.gov/PREZIP` | BTS zip base URL (override in tests) |
+| `MAX_INGEST_MONTHS` | `24` | Max months per ingest request |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Docker
@@ -94,7 +98,17 @@ curl http://localhost:8080/ready
 # Database migration version
 curl http://localhost:8080/db/version
 
-# Get job status (jobs are created via ingest; see Phase 4)
+# Queue BTS on-time data import for a month range
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2026,"start_month":1,"end_year":2026,"end_month":4}'
+
+# Re-import months that already have data
+curl -X POST http://localhost:8080/api/v1/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2026,"start_month":4,"force":true}'
+
+# Get job status
 curl http://localhost:8080/api/v1/jobs/<job-id>
 
 # List recent jobs
@@ -104,18 +118,15 @@ curl http://localhost:8080/api/v1/jobs
 curl "http://localhost:8080/api/v1/flights?flight_date=2026-04-24&origin=ORD&dest=BHM&limit=10"
 ```
 
-## Flight data seed (deploy time)
+### Ingest behavior
 
-DOT **Marketing Carrier On-Time Performance** data in `test-data/` is loaded at deploy time via the migrate sidecar's `sqlite3` CLI (`.mode csv` / `.import --skip 1`). The sample file is April 2026 on-time data (~660k rows, ~313 MB); first import takes on the order of 30–60 seconds. Import is skipped if `on_time_flights` already has rows.
+- Creates one `import_bts_on_time` job per month in the requested range.
+- Workers poll the database, download the BTS zip for each month, and load `on_time_flights`.
+- Returns **409** if a pending/running ingest job already exists for a requested month.
+- Returns **409** if flight data already exists and `force` is not set.
+- `force: true` skips the data-exists check; workers always replace the target month on import.
 
-`test-data/` is mounted read-only into the migrate container at `/test-data`. Override the CSV path with `FLIGHT_DATA_CSV` when calling the sidecar directly.
-
-```bash
-make docker-build
-make migrate-up    # creates on_time_flights table
-make db-seed       # one-time CSV import
-make docker-run
-```
+`test-data/` contains a sample BTS CSV used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
 
 ## Migrations
 
@@ -171,12 +182,14 @@ migrate -path migrations/postgres -database "postgres://..." up
 cmd/server/          Entry point
 internal/api/        HTTP server, handlers, middleware
 internal/config/     Environment configuration
+internal/ingest/     Ingest range validation and BTS download/parse/load
 internal/model/      Domain types
 internal/operator/   Background worker and job processor
 internal/database/   Store factory (driver selection)
 internal/store/      Store interface, queries, SQLite + in-memory implementations
 docker/migrate/      Migrate sidecar (Dockerfile + Makefile for up/down/shell)
 migrations/          Per-driver SQL migrations (sqlite/, postgres/)
+test-data/           Sample BTS CSV for tests
 ```
 
 ## Design notes

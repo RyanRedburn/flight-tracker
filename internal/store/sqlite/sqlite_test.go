@@ -177,6 +177,7 @@ func TestListOnTimeFlights(t *testing.T) {
 		FlightDate: testFlightDate20260424,
 		Origin:     testAirportORD,
 		Dest:       testAirportBHM,
+		Limit:      100,
 	})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)

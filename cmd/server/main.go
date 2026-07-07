@@ -58,7 +58,7 @@ func run() int {
 	worker.Start(ctx)
 	defer worker.Stop(10 * time.Second)
 
-	server := api.NewServer(cfg.HTTPAddr, st, logger)
+	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths)
 
 	serverErr := make(chan error, 1)
 

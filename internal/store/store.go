@@ -20,9 +20,9 @@ type MigrationVersion struct {
 }
 
 type OnTimeFlightFilter struct {
-	FlightDate string `validate:"omitempty,datetime=2006-01-02"`
-	Origin     string `validate:"omitempty,len=3"`
-	Dest       string `validate:"omitempty,len=3"`
+	FlightDate string
+	Origin     string
+	Dest       string
 	Limit      int
 	Offset     int
 }

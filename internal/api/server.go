@@ -18,10 +18,11 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(addr string, s store.Store, logger *slog.Logger) *Server {
+func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths int) *Server {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
 	flights := handlers.NewFlightsHandler(s)
+	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -32,6 +33,7 @@ func NewServer(addr string, s store.Store, logger *slog.Logger) *Server {
 	r.Get("/db/version", health.DatabaseVersion)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Post("/ingest", ingestHandler.Create)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
 		r.Get("/flights", flights.List)

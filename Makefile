@@ -1,4 +1,4 @@
-.PHONY: lint test test-all test-cover-html docker-build docker-run migrate-up migrate-down migrate-version db-seed db-shell clean-cover
+.PHONY: lint test test-all test-cover-html docker-build docker-run migrate-up migrate-down migrate-version db-shell clean-cover
 
 # SQLite driver requires CGO; export works on Unix and Windows (GNU Make).
 export CGO_ENABLED := 1
@@ -32,9 +32,6 @@ migrate-down:
 
 migrate-version:
 	docker compose run --rm migrate version
-
-db-seed:
-	docker compose run --rm migrate seed-flights
 
 db-shell:
 	docker compose run --rm -it migrate shell

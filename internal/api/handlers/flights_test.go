@@ -73,7 +73,7 @@ func TestFlightsListFilters(t *testing.T) {
 		t.Fatalf("len(flights) = %d, want 1", len(flights))
 	}
 
-	if flights[0].Dest != "BHM" {
+	if flights[0].Dest != testAirportBHM {
 		t.Errorf("Dest = %q, want BHM", flights[0].Dest)
 	}
 }
@@ -134,6 +134,18 @@ func TestFlightsListInvalidFlightDate(t *testing.T) {
 	h, _ := newTestFlightsHandler(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/flights?flight_date=not-a-date", nil)
+	rec := httptest.NewRecorder()
+	h.List(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestFlightsListLimitTooHigh(t *testing.T) {
+	h, _ := newTestFlightsHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/flights?limit=501", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
