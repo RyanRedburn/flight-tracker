@@ -73,7 +73,8 @@ func TestMemReplaceOnTimeFlightsByMonth(t *testing.T) {
 	ctx := context.Background()
 	s := New()
 
-	columns := []string{"FlightDate", "Origin", "Dest"}
+	columns := []string{"flight_date", "origin", "dest"}
+
 	rows := [][]string{{"2026-05-01", "ORD", "BHM"}}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 5, columns, rows); err != nil {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)

@@ -31,7 +31,7 @@ func TestOpenCRUD(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	job := &model.Job{
 		ID:        "sqlite-job-1",
-		Type:      model.JobTypeFetchFlights,
+		Type:      model.JobTypeImportBTSOnTime,
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -45,12 +45,14 @@ func TestOpenCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetJob() error = %v", err)
 	}
+
 	if got.Type != job.Type {
 		t.Errorf("Type = %q, want %q", got.Type, job.Type)
 	}
 
 	got.Status = model.JobStatusCompleted
 	got.Result = json.RawMessage(`[{"callsign":"X"}]`)
+
 	got.UpdatedAt = now.Add(time.Minute)
 	if err := s.UpdateJob(ctx, got); err != nil {
 		t.Fatalf("UpdateJob() error = %v", err)
@@ -60,6 +62,7 @@ func TestOpenCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetJob() after update error = %v", err)
 	}
+
 	if updated.Status != model.JobStatusCompleted {
 		t.Errorf("Status = %q, want completed", updated.Status)
 	}
@@ -68,6 +71,7 @@ func TestOpenCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListJobs() error = %v", err)
 	}
+
 	if len(jobs) != 1 {
 		t.Fatalf("len(jobs) = %d, want 1", len(jobs))
 	}
@@ -136,11 +140,14 @@ func TestSQLiteDBPath(t *testing.T) {
 				if err == nil {
 					t.Fatal("sqliteDBPath() expected error")
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Fatalf("sqliteDBPath() error = %v", err)
 			}
+
 			if got != tt.want {
 				t.Errorf("sqliteDBPath() = %q, want %q", got, tt.want)
 			}
@@ -161,15 +168,15 @@ func TestListOnTimeFlights(t *testing.T) {
 	defer s.Close()
 
 	seedOnTimeFlights(t, dbPath,
-		[]string{"2026-04-24", "ORD", "BHM", "UA", "4547", "1535"},
-		[]string{"2026-04-24", "ORD", "AVP", "UA", "4546", "1805"},
-		[]string{"2026-04-25", "LAX", "SFO", "UA", "100", "0900"},
+		[]string{testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535"},
+		[]string{testFlightDate20260424, testAirportORD, testAirportAVP, "UA", "4546", "1805"},
+		[]string{testFlightDate20260425, testAirportLAX, testAirportSFO, "UA", "100", "0900"},
 	)
 
 	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{
-		FlightDate: "2026-04-24",
-		Origin:     "ORD",
-		Dest:       "BHM",
+		FlightDate: testFlightDate20260424,
+		Origin:     testAirportORD,
+		Dest:       testAirportBHM,
 	})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
@@ -192,7 +199,7 @@ func TestListOnTimeFlights(t *testing.T) {
 		t.Fatalf("len(all) = %d, want 2", len(all))
 	}
 
-	if all[0].Origin != "ORD" {
+	if all[0].Origin != testAirportORD {
 		t.Errorf("Origin = %q, want ORD", all[0].Origin)
 	}
 }
@@ -208,9 +215,9 @@ func seedOnTimeFlights(t *testing.T, dbPath string, rows ...[]string) {
 
 	const insert = `
 		INSERT INTO on_time_flights (
-			FlightDate, Origin, Dest,
-			IATA_Code_Marketing_Airline, Flight_Number_Marketing_Airline,
-			CRSDepTime
+			flight_date, origin, dest,
+			iata_code_marketing_airline, flight_number_marketing_airline,
+			crs_dep_time
 		) VALUES (?, ?, ?, ?, ?, ?)`
 
 	for _, row := range rows {

@@ -32,7 +32,7 @@ func TestNewStoreSQLite(t *testing.T) {
 	cfg := config.Config{
 		DatabaseDriver: "sqlite",
 		DatabaseURL:    "file:" + filepath.ToSlash(dbPath),
-		MigrationsPath: filepath.Join("..", "..", "..", "migrations", "sqlite"),
+		MigrationsPath: filepath.Join("..", "..", "migrations", "sqlite"),
 	}
 
 	store, err := NewStore(context.Background(), cfg)

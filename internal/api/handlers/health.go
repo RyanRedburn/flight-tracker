@@ -15,13 +15,15 @@ func NewHealthHandler(s store.Store) *HealthHandler {
 	return &HealthHandler{store: s}
 }
 
+const jsonErrKey = "error"
+
 func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.Ping(r.Context()); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{jsonErrKey: "database unavailable"})
 		return
 	}
 
@@ -31,7 +33,7 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 func (h *HealthHandler) DatabaseVersion(w http.ResponseWriter, r *http.Request) {
 	version, err := h.store.MigrationVersion(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "database version unavailable"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "database version unavailable"})
 		return
 	}
 

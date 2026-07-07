@@ -45,8 +45,9 @@ func (s *Store) GetBTSIngestJob(ctx context.Context, jobID string) (*model.BTSIn
 		return nil, fmt.Errorf("bts ingest job %q: %w", jobID, store.ErrNotFound)
 	}
 
-	copy := detail
-	return &copy, nil
+	detailCopy := detail
+
+	return &detailCopy, nil
 }
 
 func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
@@ -95,6 +96,7 @@ func (s *Store) CompleteJob(ctx context.Context, id string, result json.RawMessa
 	now := time.Now().UTC()
 	updated := cloneJob(job)
 	updated.Status = model.JobStatusCompleted
+
 	updated.Result = append(json.RawMessage(nil), result...)
 	updated.Error = ""
 	updated.EndedAt = &now
@@ -164,6 +166,7 @@ func (s *Store) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMo
 	}
 
 	activeSet := make(map[model.YearMonth]struct{})
+
 	var active []model.YearMonth
 
 	for jobID, detail := range s.btsIngest {
@@ -225,9 +228,9 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 		colIndex[col] = i
 	}
 
-	flightDateIdx, ok := colIndex["FlightDate"]
+	flightDateIdx, ok := colIndex["flight_date"]
 	if !ok {
-		return errors.New("FlightDate column required")
+		return errors.New("flight_date column required")
 	}
 
 	s.mu.Lock()
@@ -249,49 +252,64 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 		}
 
 		flight := &model.OnTimeFlight{FlightDate: row[flightDateIdx]}
-		if idx, ok := colIndex["Origin"]; ok {
+
+		if idx, ok := colIndex["origin"]; ok {
 			flight.Origin = row[idx]
 		}
-		if idx, ok := colIndex["Dest"]; ok {
+
+		if idx, ok := colIndex["dest"]; ok {
 			flight.Dest = row[idx]
 		}
-		if idx, ok := colIndex["IATA_Code_Marketing_Airline"]; ok {
+
+		if idx, ok := colIndex["iata_code_marketing_airline"]; ok {
 			flight.IATA_Code_Marketing_Airline = row[idx]
 		}
-		if idx, ok := colIndex["Flight_Number_Marketing_Airline"]; ok {
+
+		if idx, ok := colIndex["flight_number_marketing_airline"]; ok {
 			flight.Flight_Number_Marketing_Airline = row[idx]
 		}
-		if idx, ok := colIndex["IATA_Code_Operating_Airline"]; ok {
+
+		if idx, ok := colIndex["iata_code_operating_airline"]; ok {
 			flight.IATA_Code_Operating_Airline = row[idx]
 		}
-		if idx, ok := colIndex["Flight_Number_Operating_Airline"]; ok {
+
+		if idx, ok := colIndex["flight_number_operating_airline"]; ok {
 			flight.Flight_Number_Operating_Airline = row[idx]
 		}
-		if idx, ok := colIndex["CRSDepTime"]; ok {
+
+		if idx, ok := colIndex["crs_dep_time"]; ok {
 			flight.CRSDepTime = row[idx]
 		}
-		if idx, ok := colIndex["DepTime"]; ok {
+
+		if idx, ok := colIndex["dep_time"]; ok {
 			flight.DepTime = row[idx]
 		}
-		if idx, ok := colIndex["DepDelay"]; ok {
+
+		if idx, ok := colIndex["dep_delay"]; ok {
 			flight.DepDelay = row[idx]
 		}
-		if idx, ok := colIndex["CRSArrTime"]; ok {
+
+		if idx, ok := colIndex["crs_arr_time"]; ok {
 			flight.CRSArrTime = row[idx]
 		}
-		if idx, ok := colIndex["ArrTime"]; ok {
+
+		if idx, ok := colIndex["arr_time"]; ok {
 			flight.ArrTime = row[idx]
 		}
-		if idx, ok := colIndex["ArrDelay"]; ok {
+
+		if idx, ok := colIndex["arr_delay"]; ok {
 			flight.ArrDelay = row[idx]
 		}
-		if idx, ok := colIndex["Cancelled"]; ok {
+
+		if idx, ok := colIndex["cancelled"]; ok {
 			flight.Cancelled = row[idx]
 		}
-		if idx, ok := colIndex["Diverted"]; ok {
+
+		if idx, ok := colIndex["diverted"]; ok {
 			flight.Diverted = row[idx]
 		}
-		if idx, ok := colIndex["Distance"]; ok {
+
+		if idx, ok := colIndex["distance"]; ok {
 			flight.Distance = row[idx]
 		}
 
@@ -299,5 +317,6 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 	}
 
 	s.flights = remaining
+
 	return nil
 }

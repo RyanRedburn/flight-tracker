@@ -30,7 +30,7 @@ func (s *Store) CreateBTSIngestJob(ctx context.Context, year, month int) (*model
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := execCreateJob(ctx, tx, job); err != nil {
 		return nil, err
@@ -71,9 +71,10 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	row := tx.QueryRowxContext(ctx, store.QueryClaimNextPendingJobSelect, string(model.JobStatusPending))
+
 	job, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, store.ErrNotFound
@@ -191,6 +192,7 @@ func (s *Store) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMo
 	defer rows.Close()
 
 	activeSet := make(map[model.YearMonth]struct{}, len(months))
+
 	requested := make(map[model.YearMonth]struct{}, len(months))
 	for _, ym := range months {
 		requested[ym] = struct{}{}
@@ -252,7 +254,7 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.ExecContext(ctx, store.QueryDeleteOnTimeFlightsByMonth,
 		strconv.Itoa(year),
@@ -374,5 +376,6 @@ func parseOptionalTime(raw sql.NullString) (*time.Time, error) {
 	}
 
 	utc := parsed.UTC()
+
 	return &utc, nil
 }

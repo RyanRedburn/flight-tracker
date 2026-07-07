@@ -2,62 +2,50 @@ package operator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/source"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 type Processor struct {
 	store    store.Store
-	provider source.Provider
+	handlers map[string]JobHandler
 }
 
-func NewProcessor(s store.Store, provider source.Provider) *Processor {
+func NewProcessor(s store.Store, handlers ...JobHandler) *Processor {
+	m := make(map[string]JobHandler, len(handlers))
+	for _, h := range handlers {
+		m[h.Type()] = h
+	}
+
 	return &Processor{
 		store:    s,
-		provider: provider,
+		handlers: m,
 	}
 }
 
-func (p *Processor) Process(ctx context.Context, jobID string) error {
-	job, err := p.store.GetJob(ctx, jobID)
-	if err != nil {
-		return fmt.Errorf("get job: %w", err)
-	}
-
-	now := time.Now().UTC()
-	job.Status = model.JobStatusRunning
-	job.UpdatedAt = now
-
-	if err := p.store.UpdateJob(ctx, job); err != nil {
-		return fmt.Errorf("mark running: %w", err)
-	}
-
-	result, err := p.provider.Fetch(ctx, source.FetchRequest{Params: json.RawMessage(`{}`)})
-	now = time.Now().UTC()
-	job.UpdatedAt = now
-
-	if err != nil {
-		job.Status = model.JobStatusFailed
-		job.Error = err.Error()
-
-		if updateErr := p.store.UpdateJob(ctx, job); updateErr != nil {
-			return fmt.Errorf("fetch failed: %w; update job: %v", err, updateErr)
+func (p *Processor) Process(ctx context.Context, job *model.Job) error {
+	handler, ok := p.handlers[job.Type]
+	if !ok {
+		if err := p.store.FailJob(ctx, job.ID, fmt.Sprintf("unknown job type %q", job.Type)); err != nil {
+			return fmt.Errorf("fail job: %w", err)
 		}
 
-		return fmt.Errorf("fetch: %w", err)
+		return fmt.Errorf("unknown job type %q", job.Type)
 	}
 
-	job.Status = model.JobStatusCompleted
-	job.Result = result
-	job.Error = ""
+	result, err := handler.Process(ctx, job)
+	if err != nil {
+		if failErr := p.store.FailJob(ctx, job.ID, err.Error()); failErr != nil {
+			return fmt.Errorf("process: %w; fail job: %v", err, failErr)
+		}
 
-	if err := p.store.UpdateJob(ctx, job); err != nil {
-		return fmt.Errorf("mark completed: %w", err)
+		return err
+	}
+
+	if err := p.store.CompleteJob(ctx, job.ID, result); err != nil {
+		return fmt.Errorf("complete job: %w", err)
 	}
 
 	return nil

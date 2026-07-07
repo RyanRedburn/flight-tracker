@@ -14,10 +14,7 @@ const (
 	JobStatusFailed    JobStatus = "failed"
 )
 
-const (
-	JobTypeFetchFlights    = "fetch_flights"
-	JobTypeImportBTSOnTime = "import_bts_on_time"
-)
+const JobTypeImportBTSOnTime = "import_bts_on_time"
 
 type Job struct {
 	ID        string          `json:"id"`

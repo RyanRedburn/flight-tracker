@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"testing"
+	"time"
 )
 
 func TestLoadDefaults(t *testing.T) {
@@ -11,6 +12,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("MIGRATIONS_PATH", "")
 	t.Setenv("WORKER_CONCURRENCY", "")
+	t.Setenv("WORKER_POLL_INTERVAL", "")
+	t.Setenv("STALE_JOB_THRESHOLD", "")
 	t.Setenv("LOG_LEVEL", "")
 
 	cfg, err := Load()
@@ -36,6 +39,14 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.WorkerConcurrency != 2 {
 		t.Errorf("WorkerConcurrency = %d, want 2", cfg.WorkerConcurrency)
+	}
+
+	if cfg.WorkerPollInterval != 5*time.Second {
+		t.Errorf("WorkerPollInterval = %v, want 5s", cfg.WorkerPollInterval)
+	}
+
+	if cfg.StaleJobThreshold != 30*time.Minute {
+		t.Errorf("StaleJobThreshold = %v, want 30m", cfg.StaleJobThreshold)
 	}
 
 	if cfg.LogLevel != slog.LevelInfo {

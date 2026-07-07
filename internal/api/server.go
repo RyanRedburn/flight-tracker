@@ -8,7 +8,6 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
 	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
-	"github.com/RyanRedburn/flight-tracker/internal/operator"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -19,9 +18,9 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog.Logger) *Server {
+func NewServer(addr string, s store.Store, logger *slog.Logger) *Server {
 	health := handlers.NewHealthHandler(s)
-	jobs := handlers.NewJobsHandler(s, worker)
+	jobs := handlers.NewJobsHandler(s)
 	flights := handlers.NewFlightsHandler(s)
 
 	r := chi.NewRouter()

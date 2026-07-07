@@ -2,30 +2,39 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 type Worker struct {
-	processor   *Processor
-	concurrency int
-	queue       chan string
-	wg          sync.WaitGroup
-	cancel      context.CancelFunc
-	logger      *slog.Logger
+	store        store.Store
+	processor    *Processor
+	concurrency  int
+	pollInterval time.Duration
+	wg           sync.WaitGroup
+	cancel       context.CancelFunc
+	logger       *slog.Logger
 }
 
-func NewWorker(processor *Processor, concurrency int, logger *slog.Logger) *Worker {
+func NewWorker(s store.Store, processor *Processor, concurrency int, pollInterval time.Duration, logger *slog.Logger) *Worker {
 	if concurrency < 1 {
 		concurrency = 1
 	}
 
+	if pollInterval <= 0 {
+		pollInterval = 5 * time.Second
+	}
+
 	return &Worker{
-		processor:   processor,
-		concurrency: concurrency,
-		queue:       make(chan string, 256),
-		logger:      logger,
+		store:        s,
+		processor:    processor,
+		concurrency:  concurrency,
+		pollInterval: pollInterval,
+		logger:       logger,
 	}
 }
 
@@ -44,26 +53,37 @@ func (w *Worker) loop(ctx context.Context, workerID int) {
 
 	logger := w.logger.With("worker", workerID)
 
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case jobID, ok := <-w.queue:
-			if !ok {
-				return
-			}
-
-			if err := w.processor.Process(ctx, jobID); err != nil {
-				logger.Error("job failed", "job_id", jobID, "error", err)
-			} else {
-				logger.Info("job completed", "job_id", jobID)
-			}
+		case <-timer.C:
+			w.poll(ctx, logger)
+			timer.Reset(w.pollInterval)
 		}
 	}
 }
 
-func (w *Worker) Submit(jobID string) {
-	w.queue <- jobID
+func (w *Worker) poll(ctx context.Context, logger *slog.Logger) {
+	job, err := w.store.ClaimNextPendingJob(ctx)
+	if errors.Is(err, store.ErrNotFound) {
+		return
+	}
+
+	if err != nil {
+		logger.Error("claim job failed", "error", err)
+		return
+	}
+
+	if err := w.processor.Process(ctx, job); err != nil {
+		logger.Error("job failed", "job_id", job.ID, "error", err)
+		return
+	}
+
+	logger.Info("job completed", "job_id", job.ID)
 }
 
 func (w *Worker) Stop(timeout time.Duration) {

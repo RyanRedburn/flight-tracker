@@ -7,17 +7,20 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
-	HTTPAddr          string     `env:"HTTP_ADDR" envDefault:":8080"`
-	DatabaseDriver    string     `env:"DATABASE_DRIVER" envDefault:"sqlite"`
-	DatabaseURL       string     `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
-	MigrationsPath    string     `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
-	WorkerConcurrency int        `env:"WORKER_CONCURRENCY" envDefault:"2"`
-	LogLevel          slog.Level `env:"LOG_LEVEL" envDefault:"info"`
+	HTTPAddr           string        `env:"HTTP_ADDR" envDefault:":8080"`
+	DatabaseDriver     string        `env:"DATABASE_DRIVER" envDefault:"sqlite"`
+	DatabaseURL        string        `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
+	MigrationsPath     string        `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
+	WorkerConcurrency  int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
+	WorkerPollInterval time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
+	StaleJobThreshold  time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
+	LogLevel           slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 func Load() (Config, error) {
@@ -27,6 +30,9 @@ func Load() (Config, error) {
 		FuncMap: map[reflect.Type]env.ParserFunc{
 			reflect.TypeFor[slog.Level](): func(v string) (any, error) {
 				return parseLogLevel(v)
+			},
+			reflect.TypeFor[time.Duration](): func(v string) (any, error) {
+				return time.ParseDuration(v)
 			},
 		},
 	}); err != nil {

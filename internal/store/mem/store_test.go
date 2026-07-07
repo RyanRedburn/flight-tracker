@@ -18,7 +18,7 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 
 	job := &model.Job{
 		ID:        "job-1",
-		Type:      model.JobTypeFetchFlights,
+		Type:      model.JobTypeImportBTSOnTime,
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -38,6 +38,7 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 	}
 
 	got.Status = model.JobStatusCompleted
+
 	got.Result = json.RawMessage(`{"ok":true}`)
 	if err := s.UpdateJob(ctx, got); err != nil {
 		t.Fatalf("UpdateJob() error = %v", err)
@@ -88,7 +89,7 @@ func TestStoreListJobsDefaultLimit(t *testing.T) {
 	for i := range 3 {
 		job := &model.Job{
 			ID:        "job-" + string(rune('a'+i)),
-			Type:      model.JobTypeFetchFlights,
+			Type:      model.JobTypeImportBTSOnTime,
 			Status:    model.JobStatusPending,
 			CreatedAt: now.Add(time.Duration(i) * time.Second),
 			UpdatedAt: now,

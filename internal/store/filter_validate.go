@@ -37,10 +37,10 @@ func formatFieldError(fieldErr validator.FieldError) string {
 
 	switch fieldErr.Tag() {
 	case "len":
-		return fmt.Sprintf("%s must be exactly 3 characters", field)
+		return field + " must be exactly 3 characters"
 	case "datetime":
-		return fmt.Sprintf("%s must be a valid date (YYYY-MM-DD)", field)
+		return field + " must be a valid date (YYYY-MM-DD)"
 	default:
-		return fmt.Sprintf("%s is invalid", field)
+		return field + " is invalid"
 	}
 }

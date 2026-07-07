@@ -145,6 +145,7 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 	if limit <= 0 {
 		limit = 50
 	}
+
 	if limit > 500 {
 		limit = 500
 	}
@@ -159,17 +160,17 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 	where := make([]string, 0, 3)
 
 	if filter.FlightDate != "" {
-		where = append(where, "FlightDate = ?")
+		where = append(where, "flight_date = ?")
 		args = append(args, filter.FlightDate)
 	}
 
 	if filter.Origin != "" {
-		where = append(where, "Origin = ?")
+		where = append(where, "origin = ?")
 		args = append(args, filter.Origin)
 	}
 
 	if filter.Dest != "" {
-		where = append(where, "Dest = ?")
+		where = append(where, "dest = ?")
 		args = append(args, filter.Dest)
 	}
 
@@ -177,7 +178,8 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 		query += "\n\t\tWHERE " + strings.Join(where, " AND ")
 	}
 
-	query += "\n\t\tORDER BY FlightDate, Origin, CRSDepTime\n\t\tLIMIT ? OFFSET ?"
+	query += "\n\t\tORDER BY flight_date, origin, crs_dep_time\n\t\tLIMIT ? OFFSET ?"
+
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryxContext(ctx, query, args...)
@@ -266,30 +268,72 @@ func scanJob(row rowScanner) (*model.Job, error) {
 }
 
 func scanOnTimeFlight(row rowScanner) (*model.OnTimeFlight, error) {
-	var flight model.OnTimeFlight
+	var (
+		flightDate         sql.NullString
+		origin             sql.NullString
+		dest               sql.NullString
+		iataMarketing      sql.NullString
+		flightNumMarketing sql.NullString
+		iataOperating      sql.NullString
+		flightNumOperating sql.NullString
+		crsDep             sql.NullString
+		depTime            sql.NullString
+		depDelay           sql.NullString
+		crsArr             sql.NullString
+		arrTime            sql.NullString
+		arrDelay           sql.NullString
+		cancelled          sql.NullString
+		diverted           sql.NullString
+		distance           sql.NullString
+	)
 
 	if err := row.Scan(
-		&flight.FlightDate,
-		&flight.Origin,
-		&flight.Dest,
-		&flight.IATA_Code_Marketing_Airline,
-		&flight.Flight_Number_Marketing_Airline,
-		&flight.IATA_Code_Operating_Airline,
-		&flight.Flight_Number_Operating_Airline,
-		&flight.CRSDepTime,
-		&flight.DepTime,
-		&flight.DepDelay,
-		&flight.CRSArrTime,
-		&flight.ArrTime,
-		&flight.ArrDelay,
-		&flight.Cancelled,
-		&flight.Diverted,
-		&flight.Distance,
+		&flightDate,
+		&origin,
+		&dest,
+		&iataMarketing,
+		&flightNumMarketing,
+		&iataOperating,
+		&flightNumOperating,
+		&crsDep,
+		&depTime,
+		&depDelay,
+		&crsArr,
+		&arrTime,
+		&arrDelay,
+		&cancelled,
+		&diverted,
+		&distance,
 	); err != nil {
 		return nil, err
 	}
 
-	return &flight, nil
+	return &model.OnTimeFlight{
+		FlightDate:                      nullString(flightDate),
+		Origin:                          nullString(origin),
+		Dest:                            nullString(dest),
+		IATA_Code_Marketing_Airline:     nullString(iataMarketing),
+		Flight_Number_Marketing_Airline: nullString(flightNumMarketing),
+		IATA_Code_Operating_Airline:     nullString(iataOperating),
+		Flight_Number_Operating_Airline: nullString(flightNumOperating),
+		CRSDepTime:                      nullString(crsDep),
+		DepTime:                         nullString(depTime),
+		DepDelay:                        nullString(depDelay),
+		CRSArrTime:                      nullString(crsArr),
+		ArrTime:                         nullString(arrTime),
+		ArrDelay:                        nullString(arrDelay),
+		Cancelled:                       nullString(cancelled),
+		Diverted:                        nullString(diverted),
+		Distance:                        nullString(distance),
+	}, nil
+}
+
+func nullString(s sql.NullString) string {
+	if s.Valid {
+		return s.String
+	}
+
+	return ""
 }
 
 func runMigrations(migrationsPath, dbPath string) error {

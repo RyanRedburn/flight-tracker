@@ -10,15 +10,22 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
 )
 
+const (
+	testFlightDate = "2026-04-24"
+	testAirportORD = "ORD"
+	testAirportBHM = "BHM"
+	testAirportAVP = "AVP"
+)
+
 func newTestFlightsHandler(t *testing.T) (*FlightsHandler, *mem.Store) {
 	t.Helper()
 
 	store := mem.New()
 	store.SetOnTimeFlights([]*model.OnTimeFlight{
 		{
-			FlightDate:                      "2026-04-24",
-			Origin:                          "ORD",
-			Dest:                            "BHM",
+			FlightDate:                      testFlightDate,
+			Origin:                          testAirportORD,
+			Dest:                            testAirportBHM,
 			IATA_Code_Marketing_Airline:     "UA",
 			Flight_Number_Marketing_Airline: "4547",
 			CRSDepTime:                      "1535",
@@ -26,9 +33,9 @@ func newTestFlightsHandler(t *testing.T) (*FlightsHandler, *mem.Store) {
 			DepDelay:                        "-10.00",
 		},
 		{
-			FlightDate:                      "2026-04-24",
-			Origin:                          "ORD",
-			Dest:                            "AVP",
+			FlightDate:                      testFlightDate,
+			Origin:                          testAirportORD,
+			Dest:                            testAirportAVP,
 			IATA_Code_Marketing_Airline:     "UA",
 			Flight_Number_Marketing_Airline: "4546",
 			CRSDepTime:                      "1805",
@@ -155,7 +162,7 @@ func TestFlightsListLimitAndOffset(t *testing.T) {
 		t.Fatalf("len(flights) = %d, want 1", len(flights))
 	}
 
-	if flights[0].Origin != "ORD" || flights[0].Dest != "AVP" {
+	if flights[0].Origin != testAirportORD || flights[0].Dest != testAirportAVP {
 		t.Errorf("flight = %+v, want ORD->AVP", flights[0])
 	}
 }

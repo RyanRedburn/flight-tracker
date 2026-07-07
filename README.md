@@ -53,7 +53,7 @@ Equivalent raw commands:
 
 ```bash
 # Unit tests (no CGO required)
-go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/source/... ./internal/store/mem/...
+go test ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/store/mem/...
 
 # Full suite including SQLite integration tests (requires CGO)
 CGO_ENABLED=1 go test ./...
@@ -94,12 +94,7 @@ curl http://localhost:8080/ready
 # Database migration version
 curl http://localhost:8080/db/version
 
-# Create a job
-curl -X POST http://localhost:8080/api/v1/jobs \
-  -H "Content-Type: application/json" \
-  -d '{"type":"fetch_flights","payload":{}}'
-
-# Get job status
+# Get job status (jobs are created via ingest; see Phase 4)
 curl http://localhost:8080/api/v1/jobs/<job-id>
 
 # List recent jobs
@@ -178,7 +173,6 @@ internal/api/        HTTP server, handlers, middleware
 internal/config/     Environment configuration
 internal/model/      Domain types
 internal/operator/   Background worker and job processor
-internal/source/     External data provider interface
 internal/database/   Store factory (driver selection)
 internal/store/      Store interface, queries, SQLite + in-memory implementations
 docker/migrate/      Migrate sidecar (Dockerfile + Makefile for up/down/shell)

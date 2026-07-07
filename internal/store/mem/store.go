@@ -132,6 +132,7 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 	if limit <= 0 {
 		limit = 50
 	}
+
 	if limit > 500 {
 		limit = 500
 	}

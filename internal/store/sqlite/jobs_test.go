@@ -14,6 +14,17 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
+const (
+	testFlightDate20260424 = "2026-04-24"
+	testFlightDate20260425 = "2026-04-25"
+	testFlightDate20260430 = "2026-04-30"
+	testAirportORD         = "ORD"
+	testAirportBHM         = "BHM"
+	testAirportAVP         = "AVP"
+	testAirportLAX         = "LAX"
+	testAirportSFO         = "SFO"
+)
+
 func openTestStore(t *testing.T) store.Store {
 	t.Helper()
 
@@ -105,6 +116,7 @@ func TestClaimNextPendingJobConcurrent(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
+
 	const workers = 8
 
 	claimed := make(chan string, workers)
@@ -243,8 +255,8 @@ func TestActiveBTSIngestMonths(t *testing.T) {
 
 func testFlightColumns() []string {
 	return []string{
-		"Year", "Month", "FlightDate", "Origin", "Dest",
-		"IATA_Code_Marketing_Airline", "Flight_Number_Marketing_Airline", "CRSDepTime",
+		"year", "month", "flight_date", "origin", "dest",
+		"iata_code_marketing_airline", "flight_number_marketing_airline", "crs_dep_time",
 	}
 }
 
@@ -266,12 +278,14 @@ func TestMonthsWithOnTimeFlightData(t *testing.T) {
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
-	rows := [][]string{testFlightRow("2026-04-24", "ORD", "BHM", "UA", "4547", "1535")}
+
+	rows := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, rows); err != nil {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}
 
 	months := []model.YearMonth{{Year: 2026, Month: 4}, {Year: 2026, Month: 5}}
+
 	withData, err := s.MonthsWithOnTimeFlightData(ctx, months)
 	if err != nil {
 		t.Fatalf("MonthsWithOnTimeFlightData() error = %v", err)
@@ -291,21 +305,23 @@ func TestReplaceOnTimeFlightsByMonthRollback(t *testing.T) {
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
-	seed := [][]string{testFlightRow("2026-04-24", "ORD", "BHM", "UA", "4547", "1535")}
+
+	seed := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, seed); err != nil {
 		t.Fatalf("seed ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}
 
-	badColumns := []string{"FlightDate", "NotAColumn"}
-	badRows := [][]string{{"2026-04-25", "LAX"}}
+	badColumns := []string{"flight_date", "not_a_column"}
+
+	badRows := [][]string{{testFlightDate20260425, testAirportLAX}}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, badColumns, badRows); err == nil {
 		t.Fatal("ReplaceOnTimeFlightsByMonth() expected error for invalid column")
 	}
 
 	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{
-		FlightDate: "2026-04-24",
-		Origin:     "ORD",
-		Dest:       "BHM",
+		FlightDate: testFlightDate20260424,
+		Origin:     testAirportORD,
+		Dest:       testAirportBHM,
 	})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
@@ -321,17 +337,18 @@ func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
-	initial := [][]string{testFlightRow("2026-04-24", "ORD", "BHM", "UA", "4547", "1535")}
+
+	initial := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, initial); err != nil {
 		t.Fatalf("initial replace error = %v", err)
 	}
 
-	replacement := [][]string{testFlightRow("2026-04-30", "LAX", "SFO", "UA", "100", "0900")}
+	replacement := [][]string{testFlightRow(testFlightDate20260430, testAirportLAX, testAirportSFO, "UA", "100", "0900")}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, replacement); err != nil {
 		t.Fatalf("replacement replace error = %v", err)
 	}
 
-	oldMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: "2026-04-24"})
+	oldMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260424})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() error = %v", err)
 	}
@@ -340,7 +357,7 @@ func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
 		t.Fatalf("len(oldMonth) = %d, want 0 after replace", len(oldMonth))
 	}
 
-	newMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: "2026-04-30"})
+	newMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260430})
 	if err != nil {
 		t.Fatalf("ListOnTimeFlights() new error = %v", err)
 	}

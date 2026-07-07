@@ -66,12 +66,12 @@ const (
 	QueryMonthsWithOnTimeFlightData = `
 		SELECT 1
 		FROM on_time_flights
-		WHERE "Year" = ? AND "Month" = ?
+		WHERE year = ? AND month = ?
 		LIMIT 1`
 
 	QueryDeleteOnTimeFlightsByMonth = `
 		DELETE FROM on_time_flights
-		WHERE "Year" = ? AND "Month" = ?`
+		WHERE year = ? AND month = ?`
 
 	QueryMigrationVersion = `
 		SELECT version, dirty
@@ -80,21 +80,21 @@ const (
 
 	QueryListOnTimeFlightsBase = `
 		SELECT
-			FlightDate,
-			Origin,
-			Dest,
-			IATA_Code_Marketing_Airline,
-			Flight_Number_Marketing_Airline,
-			IATA_Code_Operating_Airline,
-			Flight_Number_Operating_Airline,
-			CRSDepTime,
-			DepTime,
-			DepDelay,
-			CRSArrTime,
-			ArrTime,
-			ArrDelay,
-			Cancelled,
-			Diverted,
-			Distance
+			flight_date,
+			origin,
+			dest,
+			iata_code_marketing_airline,
+			flight_number_marketing_airline,
+			iata_code_operating_airline,
+			flight_number_operating_airline,
+			crs_dep_time,
+			dep_time,
+			dep_delay,
+			crs_arr_time,
+			arr_time,
+			arr_delay,
+			cancelled,
+			diverted,
+			distance
 		FROM on_time_flights`
 )
