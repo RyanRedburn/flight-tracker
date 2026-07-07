@@ -5,50 +5,63 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
+	"reflect"
 	"strings"
+	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
-	HTTPAddr          string
-	DatabaseDriver    string
-	DatabaseURL       string
-	MigrationsPath    string
-	WorkerConcurrency int
-	LogLevel          slog.Level
+	HTTPAddr           string        `env:"HTTP_ADDR" envDefault:":8080"`
+	DatabaseDriver     string        `env:"DATABASE_DRIVER" envDefault:"sqlite"`
+	DatabaseURL        string        `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
+	MigrationsPath     string        `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
+	WorkerConcurrency  int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
+	WorkerPollInterval time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
+	StaleJobThreshold  time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
+	BTSDownloadTimeout time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
+	BTSBaseURL         string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
+	MaxIngestMonths    int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
+	LogLevel           slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 func Load() (Config, error) {
-	logLevel, err := parseLogLevel(envOr("LOG_LEVEL", "info"))
-	if err != nil {
+	var cfg Config
+	if err := env.ParseWithOptions(&cfg, env.Options{
+		Environment: nonEmptyEnv(env.ToMap(os.Environ())),
+		FuncMap: map[reflect.Type]env.ParserFunc{
+			reflect.TypeFor[slog.Level](): func(v string) (any, error) {
+				return parseLogLevel(v)
+			},
+			reflect.TypeFor[time.Duration](): func(v string) (any, error) {
+				return time.ParseDuration(v)
+			},
+		},
+	}); err != nil {
 		return Config{}, err
 	}
 
-	workerConcurrency, err := strconv.Atoi(envOr("WORKER_CONCURRENCY", "2"))
-	if err != nil {
-		return Config{}, fmt.Errorf("WORKER_CONCURRENCY: %w", err)
-	}
-
-	if workerConcurrency < 1 {
+	if cfg.WorkerConcurrency < 1 {
 		return Config{}, errors.New("WORKER_CONCURRENCY must be >= 1")
 	}
 
-	return Config{
-		HTTPAddr:          envOr("HTTP_ADDR", ":8080"),
-		DatabaseDriver:    envOr("DATABASE_DRIVER", "sqlite"),
-		DatabaseURL:       envOr("DATABASE_URL", "file:flight-tracker.db"),
-		MigrationsPath:    envOr("MIGRATIONS_PATH", "migrations/sqlite"),
-		WorkerConcurrency: workerConcurrency,
-		LogLevel:          logLevel,
-	}, nil
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	if cfg.MaxIngestMonths < 1 {
+		return Config{}, errors.New("MAX_INGEST_MONTHS must be >= 1")
 	}
 
-	return fallback
+	return cfg, nil
+}
+
+func nonEmptyEnv(src map[string]string) map[string]string {
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		if v != "" {
+			out[k] = v
+		}
+	}
+
+	return out
 }
 
 func parseLogLevel(raw string) (slog.Level, error) {

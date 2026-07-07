@@ -76,33 +76,7 @@ func (s *Store) MigrationVersion(ctx context.Context) (store.MigrationVersion, e
 }
 
 func (s *Store) CreateJob(ctx context.Context, job *model.Job) error {
-	payload := string(job.Payload)
-	if payload == "" {
-		payload = "{}"
-	}
-
-	var result sql.NullString
-	if len(job.Result) > 0 {
-		result = sql.NullString{String: string(job.Result), Valid: true}
-	}
-
-	var errMsg sql.NullString
-	if job.Error != "" {
-		errMsg = sql.NullString{String: job.Error, Valid: true}
-	}
-
-	_, err := s.db.ExecContext(ctx, store.QueryCreateJob,
-		job.ID,
-		job.Type,
-		payload,
-		string(job.Status),
-		result,
-		errMsg,
-		job.CreatedAt.UTC().Format(time.RFC3339),
-		job.UpdatedAt.UTC().Format(time.RFC3339),
-	)
-
-	return err
+	return execCreateJob(ctx, s.db, job)
 }
 
 func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
@@ -117,10 +91,6 @@ func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
 }
 
 func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-
 	rows, err := s.db.QueryxContext(ctx, store.QueryListJobs, limit)
 	if err != nil {
 		return nil, err
@@ -142,11 +112,6 @@ func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 }
 
 func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
-	payload := string(job.Payload)
-	if payload == "" {
-		payload = "{}"
-	}
-
 	var result sql.NullString
 	if len(job.Result) > 0 {
 		result = sql.NullString{String: string(job.Result), Valid: true}
@@ -159,15 +124,67 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 
 	_, err := s.db.ExecContext(ctx, store.QueryUpdateJob,
 		job.Type,
-		payload,
 		string(job.Status),
 		result,
 		errMsg,
 		job.UpdatedAt.UTC().Format(time.RFC3339),
+		nullTimeString(job.StartedAt),
+		nullTimeString(job.EndedAt),
 		job.ID,
 	)
 
 	return err
+}
+
+func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
+	limit := filter.Limit
+	offset := filter.Offset
+
+	query := store.QueryListOnTimeFlightsBase
+	args := make([]any, 0, 5)
+	where := make([]string, 0, 3)
+
+	if filter.FlightDate != "" {
+		where = append(where, "flight_date = ?")
+		args = append(args, filter.FlightDate)
+	}
+
+	if filter.Origin != "" {
+		where = append(where, "origin = ?")
+		args = append(args, filter.Origin)
+	}
+
+	if filter.Dest != "" {
+		where = append(where, "dest = ?")
+		args = append(args, filter.Dest)
+	}
+
+	if len(where) > 0 {
+		query += "\n\t\tWHERE " + strings.Join(where, " AND ")
+	}
+
+	query += "\n\t\tORDER BY flight_date, origin, crs_dep_time\n\t\tLIMIT ? OFFSET ?"
+
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var flights []*model.OnTimeFlight
+
+	for rows.Next() {
+		flight, err := scanOnTimeFlight(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		flights = append(flights, flight)
+	}
+
+	return flights, rows.Err()
 }
 
 type rowScanner interface {
@@ -178,28 +195,29 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	var (
 		job       model.Job
 		status    string
-		payload   string
 		result    sql.NullString
 		errMsg    sql.NullString
 		createdAt string
 		updatedAt string
+		startedAt sql.NullString
+		endedAt   sql.NullString
 	)
 
 	if err := row.Scan(
 		&job.ID,
 		&job.Type,
-		&payload,
 		&status,
 		&result,
 		&errMsg,
 		&createdAt,
 		&updatedAt,
+		&startedAt,
+		&endedAt,
 	); err != nil {
 		return nil, err
 	}
 
 	job.Status = model.JobStatus(status)
-	job.Payload = json.RawMessage(payload)
 
 	if result.Valid {
 		job.Result = json.RawMessage(result.String)
@@ -221,7 +239,86 @@ func scanJob(row rowScanner) (*model.Job, error) {
 		return nil, fmt.Errorf("parse updated_at: %w", err)
 	}
 
+	job.StartedAt, err = parseOptionalTime(startedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	job.EndedAt, err = parseOptionalTime(endedAt)
+	if err != nil {
+		return nil, err
+	}
+
 	return &job, nil
+}
+
+func scanOnTimeFlight(row rowScanner) (*model.OnTimeFlight, error) {
+	var (
+		flightDate         sql.NullString
+		origin             sql.NullString
+		dest               sql.NullString
+		iataMarketing      sql.NullString
+		flightNumMarketing sql.NullString
+		iataOperating      sql.NullString
+		flightNumOperating sql.NullString
+		crsDep             sql.NullString
+		depTime            sql.NullString
+		depDelay           sql.NullString
+		crsArr             sql.NullString
+		arrTime            sql.NullString
+		arrDelay           sql.NullString
+		cancelled          sql.NullString
+		diverted           sql.NullString
+		distance           sql.NullString
+	)
+
+	if err := row.Scan(
+		&flightDate,
+		&origin,
+		&dest,
+		&iataMarketing,
+		&flightNumMarketing,
+		&iataOperating,
+		&flightNumOperating,
+		&crsDep,
+		&depTime,
+		&depDelay,
+		&crsArr,
+		&arrTime,
+		&arrDelay,
+		&cancelled,
+		&diverted,
+		&distance,
+	); err != nil {
+		return nil, err
+	}
+
+	return &model.OnTimeFlight{
+		FlightDate:                      nullString(flightDate),
+		Origin:                          nullString(origin),
+		Dest:                            nullString(dest),
+		IATA_Code_Marketing_Airline:     nullString(iataMarketing),
+		Flight_Number_Marketing_Airline: nullString(flightNumMarketing),
+		IATA_Code_Operating_Airline:     nullString(iataOperating),
+		Flight_Number_Operating_Airline: nullString(flightNumOperating),
+		CRSDepTime:                      nullString(crsDep),
+		DepTime:                         nullString(depTime),
+		DepDelay:                        nullString(depDelay),
+		CRSArrTime:                      nullString(crsArr),
+		ArrTime:                         nullString(arrTime),
+		ArrDelay:                        nullString(arrDelay),
+		Cancelled:                       nullString(cancelled),
+		Diverted:                        nullString(diverted),
+		Distance:                        nullString(distance),
+	}, nil
+}
+
+func nullString(s sql.NullString) string {
+	if s.Valid {
+		return s.String
+	}
+
+	return ""
 }
 
 func runMigrations(migrationsPath, dbPath string) error {

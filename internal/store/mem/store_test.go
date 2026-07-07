@@ -18,8 +18,7 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 
 	job := &model.Job{
 		ID:        "job-1",
-		Type:      model.JobTypeFetchFlights,
-		Payload:   json.RawMessage(`{"foo":"bar"}`),
+		Type:      model.JobTypeImportBTSOnTime,
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -34,8 +33,8 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 		t.Fatalf("GetJob() error = %v", err)
 	}
 
-	if string(got.Payload) != string(job.Payload) {
-		t.Errorf("Payload = %s, want %s", got.Payload, job.Payload)
+	if got.Type != job.Type {
+		t.Errorf("Type = %q, want %q", got.Type, job.Type)
 	}
 
 	got.Status = model.JobStatusCompleted
@@ -82,7 +81,7 @@ func TestStorePingHook(t *testing.T) {
 	}
 }
 
-func TestStoreListJobsDefaultLimit(t *testing.T) {
+func TestStoreListJobsZeroLimitReturnsEmpty(t *testing.T) {
 	s := New()
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -90,7 +89,7 @@ func TestStoreListJobsDefaultLimit(t *testing.T) {
 	for i := range 3 {
 		job := &model.Job{
 			ID:        "job-" + string(rune('a'+i)),
-			Type:      model.JobTypeFetchFlights,
+			Type:      model.JobTypeImportBTSOnTime,
 			Status:    model.JobStatusPending,
 			CreatedAt: now.Add(time.Duration(i) * time.Second),
 			UpdatedAt: now,
@@ -105,11 +104,7 @@ func TestStoreListJobsDefaultLimit(t *testing.T) {
 		t.Fatalf("ListJobs() error = %v", err)
 	}
 
-	if len(jobs) != 3 {
-		t.Fatalf("len(jobs) = %d, want 3", len(jobs))
-	}
-
-	if jobs[0].ID != "job-c" {
-		t.Errorf("first job ID = %q, want job-c (newest first)", jobs[0].ID)
+	if len(jobs) != 0 {
+		t.Fatalf("len(jobs) = %d, want 0", len(jobs))
 	}
 }

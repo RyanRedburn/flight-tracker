@@ -8,7 +8,6 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
 	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
-	"github.com/RyanRedburn/flight-tracker/internal/operator"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -19,9 +18,11 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog.Logger) *Server {
+func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths int) *Server {
 	health := handlers.NewHealthHandler(s)
-	jobs := handlers.NewJobsHandler(s, worker)
+	jobs := handlers.NewJobsHandler(s)
+	flights := handlers.NewFlightsHandler(s)
+	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -32,9 +33,10 @@ func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog
 	r.Get("/db/version", health.DatabaseVersion)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/jobs", jobs.Create)
+		r.Post("/ingest", ingestHandler.Create)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
+		r.Get("/flights", flights.List)
 	})
 
 	return &Server{

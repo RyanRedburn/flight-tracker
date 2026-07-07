@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"testing"
+	"time"
 )
 
 func TestLoadDefaults(t *testing.T) {
@@ -11,6 +12,11 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("MIGRATIONS_PATH", "")
 	t.Setenv("WORKER_CONCURRENCY", "")
+	t.Setenv("WORKER_POLL_INTERVAL", "")
+	t.Setenv("STALE_JOB_THRESHOLD", "")
+	t.Setenv("BTS_DOWNLOAD_TIMEOUT", "")
+	t.Setenv("BTS_BASE_URL", "")
+	t.Setenv("MAX_INGEST_MONTHS", "")
 	t.Setenv("LOG_LEVEL", "")
 
 	cfg, err := Load()
@@ -36,6 +42,26 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.WorkerConcurrency != 2 {
 		t.Errorf("WorkerConcurrency = %d, want 2", cfg.WorkerConcurrency)
+	}
+
+	if cfg.WorkerPollInterval != 5*time.Second {
+		t.Errorf("WorkerPollInterval = %v, want 5s", cfg.WorkerPollInterval)
+	}
+
+	if cfg.StaleJobThreshold != 30*time.Minute {
+		t.Errorf("StaleJobThreshold = %v, want 30m", cfg.StaleJobThreshold)
+	}
+
+	if cfg.BTSDownloadTimeout != 10*time.Minute {
+		t.Errorf("BTSDownloadTimeout = %v, want 10m", cfg.BTSDownloadTimeout)
+	}
+
+	if cfg.BTSBaseURL != "https://transtats.bts.gov/PREZIP" {
+		t.Errorf("BTSBaseURL = %q, want default transtats URL", cfg.BTSBaseURL)
+	}
+
+	if cfg.MaxIngestMonths != 24 {
+		t.Errorf("MaxIngestMonths = %d, want 24", cfg.MaxIngestMonths)
 	}
 
 	if cfg.LogLevel != slog.LevelInfo {
@@ -84,6 +110,15 @@ func TestLoadInvalidWorkerConcurrencyValue(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() expected error for invalid WORKER_CONCURRENCY")
+	}
+}
+
+func TestLoadInvalidMaxIngestMonths(t *testing.T) {
+	t.Setenv("MAX_INGEST_MONTHS", "0")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for MAX_INGEST_MONTHS=0")
 	}
 }
 

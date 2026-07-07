@@ -1,124 +1,135 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/query"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/operator"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type JobsHandler struct {
-	store  store.Store
-	worker *operator.Worker
+	store store.Store
 }
 
-func NewJobsHandler(s store.Store, worker *operator.Worker) *JobsHandler {
-	return &JobsHandler{store: s, worker: worker}
+func NewJobsHandler(s store.Store) *JobsHandler {
+	return &JobsHandler{store: s}
 }
 
-type createJobRequest struct {
-	Type    string          `json:"type"`
-	Payload json.RawMessage `json:"payload"`
-}
-
-type createJobResponse struct {
-	ID     string          `json:"id"`
-	Status model.JobStatus `json:"status"`
-}
-
-func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req createJobRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json body")
-		return
-	}
-
-	if req.Type == "" {
-		writeError(w, http.StatusBadRequest, "type is required")
-		return
-	}
-
-	payload := req.Payload
-
-	if len(payload) == 0 {
-		payload = json.RawMessage(`{}`)
-	}
-
-	now := time.Now().UTC()
-	job := &model.Job{
-		ID:        uuid.NewString(),
-		Type:      req.Type,
-		Payload:   payload,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-
-	if err := h.store.CreateJob(r.Context(), job); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create job")
-		return
-	}
-
-	h.worker.Submit(job.ID)
-
-	writeJSON(w, http.StatusCreated, createJobResponse{
-		ID:     job.ID,
-		Status: job.Status,
-	})
+type jobResponse struct {
+	ID        string          `json:"id"`
+	Type      string          `json:"type"`
+	Status    model.JobStatus `json:"status"`
+	Result    json.RawMessage `json:"result,omitempty"`
+	Error     string          `json:"error,omitempty"`
+	Year      *int            `json:"year,omitempty"`
+	Month     *int            `json:"month,omitempty"`
+	CreatedAt string          `json:"created_at"`
+	UpdatedAt string          `json:"updated_at"`
+	StartedAt *string         `json:"started_at,omitempty"`
+	EndedAt   *string         `json:"ended_at,omitempty"`
 }
 
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		writeError(w, http.StatusBadRequest, "id is required")
+	if err := query.ParseJobID(id); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
 		return
 	}
 
 	job, err := h.store.GetJob(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "job not found")
+			writeJSON(w, http.StatusNotFound, map[string]string{jsonErrKey: "job not found"})
 			return
 		}
 
-		writeError(w, http.StatusInternalServerError, "failed to get job")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to get job"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, job)
+	resp, err := h.toJobResponse(r.Context(), job)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to load job details"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
-	limit := 50
-
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil || parsed < 1 {
-			writeError(w, http.StatusBadRequest, "invalid limit")
-			return
-		}
-
-		limit = parsed
+	limit, err := query.ParseJobsList(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
+		return
 	}
 
 	jobs, err := h.store.ListJobs(r.Context(), limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list jobs")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to list jobs"})
 		return
 	}
 
 	if jobs == nil {
-		jobs = []*model.Job{}
+		writeJSON(w, http.StatusOK, []jobResponse{})
+		return
 	}
 
-	writeJSON(w, http.StatusOK, jobs)
+	responses := make([]jobResponse, 0, len(jobs))
+	for _, job := range jobs {
+		resp, err := h.toJobResponse(r.Context(), job)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to load job details"})
+			return
+		}
+
+		responses = append(responses, resp)
+	}
+
+	writeJSON(w, http.StatusOK, responses)
+}
+
+func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (jobResponse, error) {
+	resp := jobResponse{
+		ID:        job.ID,
+		Type:      job.Type,
+		Status:    job.Status,
+		Result:    job.Result,
+		Error:     job.Error,
+		CreatedAt: job.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: job.UpdatedAt.UTC().Format(time.RFC3339),
+	}
+
+	if job.StartedAt != nil {
+		started := job.StartedAt.UTC().Format(time.RFC3339)
+		resp.StartedAt = &started
+	}
+
+	if job.EndedAt != nil {
+		ended := job.EndedAt.UTC().Format(time.RFC3339)
+		resp.EndedAt = &ended
+	}
+
+	if job.Type != model.JobTypeImportBTSOnTime {
+		return resp, nil
+	}
+
+	detail, err := h.store.GetBTSIngestJob(ctx, job.ID)
+	if err != nil {
+		return jobResponse{}, err
+	}
+
+	year := detail.Year
+	month := detail.Month
+	resp.Year = &year
+	resp.Month = &month
+
+	return resp, nil
 }

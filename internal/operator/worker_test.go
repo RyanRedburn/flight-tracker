@@ -8,41 +8,31 @@ import (
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/source/mock"
 	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
 )
 
-func TestWorkerProcessesSubmittedJob(t *testing.T) {
+func TestWorkerPollsPendingJob(t *testing.T) {
 	store := mem.New()
-	now := time.Now().UTC()
+	ctx := context.Background()
 
-	job := &model.Job{
-		ID:        "worker-job-1",
-		Type:      model.JobTypeFetchFlights,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := store.CreateJob(context.Background(), job); err != nil {
-		t.Fatalf("CreateJob() error = %v", err)
+	job, err := store.CreateBTSIngestJob(ctx, 2026, 4)
+	if err != nil {
+		t.Fatalf("CreateBTSIngestJob() error = %v", err)
 	}
 
-	provider := &mock.Provider{Latency: 0}
-	processor := NewProcessor(store, provider)
+	processor := NewProcessor(store, newTestBTSIngestHandler(t, store))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	worker := NewWorker(processor, 1, logger)
+	worker := NewWorker(store, processor, 1, 10*time.Millisecond, logger)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	worker.Start(ctx)
+	worker.Start(runCtx)
 	defer worker.Stop(5 * time.Second)
 
-	worker.Submit(job.ID)
-
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		got, err := store.GetJob(context.Background(), job.ID)
+		got, err := store.GetJob(ctx, job.ID)
 		if err != nil {
 			t.Fatalf("GetJob() error = %v", err)
 		}
@@ -62,10 +52,10 @@ func TestWorkerProcessesSubmittedJob(t *testing.T) {
 }
 
 func TestNewWorkerMinimumConcurrency(t *testing.T) {
-	processor := NewProcessor(mem.New(), &mock.Provider{Latency: 0})
+	processor := NewProcessor(mem.New(), newTestBTSIngestHandler(t, mem.New()))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	worker := NewWorker(processor, 0, logger)
+	worker := NewWorker(mem.New(), processor, 0, time.Second, logger)
 	if worker.concurrency != 1 {
 		t.Errorf("concurrency = %d, want 1", worker.concurrency)
 	}

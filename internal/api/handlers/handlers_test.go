@@ -1,20 +1,13 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/operator"
-	"github.com/RyanRedburn/flight-tracker/internal/source/mock"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
 
@@ -25,14 +18,8 @@ func newTestJobsHandler(t *testing.T) (*JobsHandler, *mem.Store) {
 	t.Helper()
 
 	store := mem.New()
-	provider := &mock.Provider{Latency: 0}
-	processor := operator.NewProcessor(store, provider)
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	worker := operator.NewWorker(processor, 1, logger)
-	worker.Start(context.Background())
-	t.Cleanup(func() { worker.Stop(2 * time.Second) })
 
-	return NewJobsHandler(store, worker), store
+	return NewJobsHandler(store), store
 }
 
 func TestHealthLiveness(t *testing.T) {
@@ -101,74 +88,6 @@ func TestHealthDatabaseVersion(t *testing.T) {
 	}
 }
 
-func TestJobsCreateAndGet(t *testing.T) {
-	h, store := newTestJobsHandler(t)
-
-	body := bytes.NewBufferString(`{"type":"fetch_flights","payload":{"region":"west"}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", body)
-	rec := httptest.NewRecorder()
-	h.Create(rec, req)
-
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("Create status = %d, want 201; body = %s", rec.Code, rec.Body.String())
-	}
-
-	var created createJobResponse
-	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
-		t.Fatalf("decode create response: %v", err)
-	}
-
-	if created.Status != model.JobStatusPending {
-		t.Errorf("Status = %q, want pending", created.Status)
-	}
-
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+created.ID, nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", created.ID)
-	getReq = getReq.WithContext(context.WithValue(getReq.Context(), chi.RouteCtxKey, rctx))
-
-	getRec := httptest.NewRecorder()
-	h.Get(getRec, getReq)
-
-	if getRec.Code != http.StatusOK {
-		t.Fatalf("Get status = %d, want 200", getRec.Code)
-	}
-
-	job, err := store.GetJob(context.Background(), created.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
-	}
-
-	if job.Type != "fetch_flights" {
-		t.Errorf("Type = %q, want fetch_flights", job.Type)
-	}
-}
-
-func TestJobsCreateValidation(t *testing.T) {
-	h, _ := newTestJobsHandler(t)
-
-	tests := []struct {
-		name       string
-		body       string
-		wantStatus int
-	}{
-		{"invalid json", `{`, http.StatusBadRequest},
-		{"missing type", `{}`, http.StatusBadRequest},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(tt.body))
-			rec := httptest.NewRecorder()
-			h.Create(rec, req)
-
-			if rec.Code != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
-			}
-		})
-	}
-}
-
 func TestJobsGetNotFound(t *testing.T) {
 	h, _ := newTestJobsHandler(t)
 
@@ -185,19 +104,48 @@ func TestJobsGetNotFound(t *testing.T) {
 	}
 }
 
+func TestJobsGetEnrichedBTSIngest(t *testing.T) {
+	h, store := newTestJobsHandler(t)
+	ctx := context.Background()
+
+	job, err := store.CreateBTSIngestJob(ctx, 2026, 4)
+	if err != nil {
+		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+job.ID, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", job.ID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Get(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var body jobResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Year == nil || *body.Year != 2026 {
+		t.Errorf("year = %v, want 2026", body.Year)
+	}
+
+	if body.Month == nil || *body.Month != 4 {
+		t.Errorf("month = %v, want 4", body.Month)
+	}
+}
+
 func TestJobsList(t *testing.T) {
 	h, store := newTestJobsHandler(t)
 	ctx := context.Background()
 
-	for _, id := range []string{"a", "b"} {
-		if err := store.CreateJob(ctx, &model.Job{
-			ID:        id,
-			Type:      model.JobTypeFetchFlights,
-			Status:    model.JobStatusPending,
-			CreatedAt: time.Now().UTC(),
-			UpdatedAt: time.Now().UTC(),
-		}); err != nil {
-			t.Fatalf("CreateJob() error = %v", err)
+	for range 2 {
+		if _, err := store.CreateBTSIngestJob(ctx, 2026, 4); err != nil {
+			t.Fatalf("CreateBTSIngestJob() error = %v", err)
 		}
 	}
 
@@ -209,7 +157,7 @@ func TestJobsList(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 
-	var jobs []*model.Job
+	var jobs []jobResponse
 	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
