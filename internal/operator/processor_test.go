@@ -32,7 +32,6 @@ func TestProcessorProcessSuccess(t *testing.T) {
 	job := &model.Job{
 		ID:        "job-1",
 		Type:      model.JobTypeFetchFlights,
-		Payload:   json.RawMessage(`{"region":"test"}`),
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,

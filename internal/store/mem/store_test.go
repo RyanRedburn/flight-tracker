@@ -19,7 +19,6 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 	job := &model.Job{
 		ID:        "job-1",
 		Type:      model.JobTypeFetchFlights,
-		Payload:   json.RawMessage(`{"foo":"bar"}`),
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -34,12 +33,11 @@ func TestStoreCreateGetUpdateList(t *testing.T) {
 		t.Fatalf("GetJob() error = %v", err)
 	}
 
-	if string(got.Payload) != string(job.Payload) {
-		t.Errorf("Payload = %s, want %s", got.Payload, job.Payload)
+	if got.Type != job.Type {
+		t.Errorf("Type = %q, want %q", got.Type, job.Type)
 	}
 
 	got.Status = model.JobStatusCompleted
-
 	got.Result = json.RawMessage(`{"ok":true}`)
 	if err := s.UpdateJob(ctx, got); err != nil {
 		t.Fatalf("UpdateJob() error = %v", err)

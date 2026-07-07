@@ -33,7 +33,6 @@ func NewServer(addr string, s store.Store, worker *operator.Worker, logger *slog
 	r.Get("/db/version", health.DatabaseVersion)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/jobs", jobs.Create)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
 		r.Get("/flights", flights.List)

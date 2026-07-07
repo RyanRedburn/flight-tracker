@@ -21,7 +21,7 @@ func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.Ping(r.Context()); err != nil {
-		writeError(w, http.StatusServiceUnavailable, "database unavailable")
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
 		return
 	}
 
@@ -31,7 +31,7 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 func (h *HealthHandler) DatabaseVersion(w http.ResponseWriter, r *http.Request) {
 	version, err := h.store.MigrationVersion(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database version unavailable")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "database version unavailable"})
 		return
 	}
 
@@ -42,8 +42,4 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
 }

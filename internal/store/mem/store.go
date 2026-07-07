@@ -12,16 +12,18 @@ import (
 )
 
 type Store struct {
-	mu      sync.Mutex
-	jobs    map[string]*model.Job
-	flights []*model.OnTimeFlight
-	ping    func(context.Context) error
+	mu        sync.Mutex
+	jobs      map[string]*model.Job
+	btsIngest map[string]model.BTSIngestJob
+	flights   []*model.OnTimeFlight
+	ping      func(context.Context) error
 }
 
 func New() *Store {
 	return &Store{
-		jobs: make(map[string]*model.Job),
-		ping: func(context.Context) error { return nil },
+		jobs:      make(map[string]*model.Job),
+		btsIngest: make(map[string]model.BTSIngestJob),
+		ping:      func(context.Context) error { return nil },
 	}
 }
 
@@ -201,12 +203,18 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 
 func cloneJob(job *model.Job) *model.Job {
 	jobCopy := *job
-	if job.Payload != nil {
-		jobCopy.Payload = append(json.RawMessage(nil), job.Payload...)
-	}
-
 	if job.Result != nil {
 		jobCopy.Result = append(json.RawMessage(nil), job.Result...)
+	}
+
+	if job.StartedAt != nil {
+		started := job.StartedAt.UTC()
+		jobCopy.StartedAt = &started
+	}
+
+	if job.EndedAt != nil {
+		ended := job.EndedAt.UTC()
+		jobCopy.EndedAt = &ended
 	}
 
 	return &jobCopy

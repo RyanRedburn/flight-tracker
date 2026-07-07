@@ -27,7 +27,7 @@ func (h *FlightsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 {
-			writeError(w, http.StatusBadRequest, "invalid limit")
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid limit"})
 			return
 		}
 
@@ -37,7 +37,7 @@ func (h *FlightsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("offset"); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 0 {
-			writeError(w, http.StatusBadRequest, "invalid offset")
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid offset"})
 			return
 		}
 
@@ -45,13 +45,13 @@ func (h *FlightsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := filter.Validate(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 
 	flights, err := h.store.ListOnTimeFlights(r.Context(), filter)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list flights")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list flights"})
 		return
 	}
 

@@ -76,33 +76,7 @@ func (s *Store) MigrationVersion(ctx context.Context) (store.MigrationVersion, e
 }
 
 func (s *Store) CreateJob(ctx context.Context, job *model.Job) error {
-	payload := string(job.Payload)
-	if payload == "" {
-		payload = "{}"
-	}
-
-	var result sql.NullString
-	if len(job.Result) > 0 {
-		result = sql.NullString{String: string(job.Result), Valid: true}
-	}
-
-	var errMsg sql.NullString
-	if job.Error != "" {
-		errMsg = sql.NullString{String: job.Error, Valid: true}
-	}
-
-	_, err := s.db.ExecContext(ctx, store.QueryCreateJob,
-		job.ID,
-		job.Type,
-		payload,
-		string(job.Status),
-		result,
-		errMsg,
-		job.CreatedAt.UTC().Format(time.RFC3339),
-		job.UpdatedAt.UTC().Format(time.RFC3339),
-	)
-
-	return err
+	return execCreateJob(ctx, s.db, job)
 }
 
 func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
@@ -142,11 +116,6 @@ func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 }
 
 func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
-	payload := string(job.Payload)
-	if payload == "" {
-		payload = "{}"
-	}
-
 	var result sql.NullString
 	if len(job.Result) > 0 {
 		result = sql.NullString{String: string(job.Result), Valid: true}
@@ -159,11 +128,12 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 
 	_, err := s.db.ExecContext(ctx, store.QueryUpdateJob,
 		job.Type,
-		payload,
 		string(job.Status),
 		result,
 		errMsg,
 		job.UpdatedAt.UTC().Format(time.RFC3339),
+		nullTimeString(job.StartedAt),
+		nullTimeString(job.EndedAt),
 		job.ID,
 	)
 
@@ -238,28 +208,29 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	var (
 		job       model.Job
 		status    string
-		payload   string
 		result    sql.NullString
 		errMsg    sql.NullString
 		createdAt string
 		updatedAt string
+		startedAt sql.NullString
+		endedAt   sql.NullString
 	)
 
 	if err := row.Scan(
 		&job.ID,
 		&job.Type,
-		&payload,
 		&status,
 		&result,
 		&errMsg,
 		&createdAt,
 		&updatedAt,
+		&startedAt,
+		&endedAt,
 	); err != nil {
 		return nil, err
 	}
 
 	job.Status = model.JobStatus(status)
-	job.Payload = json.RawMessage(payload)
 
 	if result.Valid {
 		job.Result = json.RawMessage(result.String)
@@ -279,6 +250,16 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("parse updated_at: %w", err)
+	}
+
+	job.StartedAt, err = parseOptionalTime(startedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	job.EndedAt, err = parseOptionalTime(endedAt)
+	if err != nil {
+		return nil, err
 	}
 
 	return &job, nil

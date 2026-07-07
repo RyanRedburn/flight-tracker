@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -98,74 +97,6 @@ func TestHealthDatabaseVersion(t *testing.T) {
 
 	if body.Version != 0 || body.Dirty {
 		t.Errorf("version = %+v, want {Version:0 Dirty:false}", body)
-	}
-}
-
-func TestJobsCreateAndGet(t *testing.T) {
-	h, store := newTestJobsHandler(t)
-
-	body := bytes.NewBufferString(`{"type":"fetch_flights","payload":{"region":"west"}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", body)
-	rec := httptest.NewRecorder()
-	h.Create(rec, req)
-
-	if rec.Code != http.StatusCreated {
-		t.Fatalf("Create status = %d, want 201; body = %s", rec.Code, rec.Body.String())
-	}
-
-	var created createJobResponse
-	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
-		t.Fatalf("decode create response: %v", err)
-	}
-
-	if created.Status != model.JobStatusPending {
-		t.Errorf("Status = %q, want pending", created.Status)
-	}
-
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+created.ID, nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", created.ID)
-	getReq = getReq.WithContext(context.WithValue(getReq.Context(), chi.RouteCtxKey, rctx))
-
-	getRec := httptest.NewRecorder()
-	h.Get(getRec, getReq)
-
-	if getRec.Code != http.StatusOK {
-		t.Fatalf("Get status = %d, want 200", getRec.Code)
-	}
-
-	job, err := store.GetJob(context.Background(), created.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
-	}
-
-	if job.Type != "fetch_flights" {
-		t.Errorf("Type = %q, want fetch_flights", job.Type)
-	}
-}
-
-func TestJobsCreateValidation(t *testing.T) {
-	h, _ := newTestJobsHandler(t)
-
-	tests := []struct {
-		name       string
-		body       string
-		wantStatus int
-	}{
-		{"invalid json", `{`, http.StatusBadRequest},
-		{"missing type", `{}`, http.StatusBadRequest},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(tt.body))
-			rec := httptest.NewRecorder()
-			h.Create(rec, req)
-
-			if rec.Code != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
-			}
-		})
 	}
 }
 

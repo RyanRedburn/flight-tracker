@@ -32,7 +32,6 @@ func TestOpenCRUD(t *testing.T) {
 	job := &model.Job{
 		ID:        "sqlite-job-1",
 		Type:      model.JobTypeFetchFlights,
-		Payload:   json.RawMessage(`{"icao":"abc"}`),
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -107,8 +106,8 @@ func TestMigrationVersion(t *testing.T) {
 		t.Fatalf("MigrationVersion() error = %v", err)
 	}
 
-	if version.Version != 2 {
-		t.Errorf("Version = %d, want 2", version.Version)
+	if version.Version != 3 {
+		t.Errorf("Version = %d, want 3", version.Version)
 	}
 
 	if version.Dirty {

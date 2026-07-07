@@ -37,14 +37,7 @@ func (p *Processor) Process(ctx context.Context, jobID string) error {
 		return fmt.Errorf("mark running: %w", err)
 	}
 
-	var payload json.RawMessage
-	if len(job.Payload) > 0 {
-		payload = job.Payload
-	} else {
-		payload = json.RawMessage(`{}`)
-	}
-
-	result, err := p.provider.Fetch(ctx, source.FetchRequest{Params: payload})
+	result, err := p.provider.Fetch(ctx, source.FetchRequest{Params: json.RawMessage(`{}`)})
 	now = time.Now().UTC()
 	job.UpdatedAt = now
 
