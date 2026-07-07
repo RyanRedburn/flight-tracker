@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
 )
@@ -187,7 +188,7 @@ func TestBTSIngestHandlerImportsCSV(t *testing.T) {
 		t.Fatalf("Unmarshal result: %v", err)
 	}
 
-	if result["rows_imported"] == nil || result["rows_imported"].(float64) != 1 {
-		t.Fatalf("result = %v, want rows_imported = 1", result)
+	if result["rows_imported"] == nil || result["rows_imported"].(float64) != float64(bts.TestdataRowCount) {
+		t.Fatalf("result = %v, want rows_imported = %d", result, bts.TestdataRowCount)
 	}
 }

@@ -34,6 +34,16 @@ func TestCSVHeaderToColumnKnownFields(t *testing.T) {
 	}
 }
 
+func dbColumnIndex(name string) int {
+	for i, col := range DBColumns {
+		if col == name {
+			return i
+		}
+	}
+
+	return -1
+}
+
 func TestParseCSVFromFixture(t *testing.T) {
 	file, err := os.Open(testRepoCSVPath(t))
 	if err != nil {
@@ -50,16 +60,28 @@ func TestParseCSVFromFixture(t *testing.T) {
 		t.Fatalf("len(columns) = %d, want %d", len(columns), len(DBColumns))
 	}
 
-	if len(rows) == 0 {
-		t.Fatal("expected at least one data row")
+	if len(rows) != TestdataRowCount {
+		t.Fatalf("len(rows) = %d, want %d", len(rows), TestdataRowCount)
 	}
 
-	if rows[0][5] != "2026-04-24" {
-		t.Errorf("flight_date = %q, want 2026-04-24", rows[0][5])
+	originIdx := dbColumnIndex("origin")
+	destIdx := dbColumnIndex("dest")
+
+	foundORD := false
+
+	for _, row := range rows {
+		if row[originIdx] == "ORD" || row[destIdx] == "ORD" {
+			foundORD = true
+			break
+		}
 	}
 
-	if rows[0][23] != "ORD" {
-		t.Errorf("origin = %q, want ORD", rows[0][23])
+	if !foundORD {
+		t.Fatal("expected at least one ORD airport in fixture")
+	}
+
+	if rows[0][dbColumnIndex("flight_date")] == "" {
+		t.Fatal("expected flight_date on first row")
 	}
 }
 
@@ -73,5 +95,58 @@ func TestParseCSVDropsTrailingEmptyColumn(t *testing.T) {
 	_, _, err = ParseCSV(file)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
+	}
+}
+
+func TestFixtureHasOperationalVariety(t *testing.T) {
+	file, err := os.Open(testRepoCSVPath(t))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer file.Close()
+
+	_, rows, err := ParseCSV(file)
+	if err != nil {
+		t.Fatalf("ParseCSV() error = %v", err)
+	}
+
+	originIdx := dbColumnIndex("origin")
+	destIdx := dbColumnIndex("dest")
+	cancelledIdx := dbColumnIndex("cancelled")
+	divertedIdx := dbColumnIndex("diverted")
+	flightDateIdx := dbColumnIndex("flight_date")
+
+	routes := make(map[string]struct{})
+	dates := make(map[string]struct{})
+
+	var cancelled, diverted int
+
+	for _, row := range rows {
+		routes[row[originIdx]+"->"+row[destIdx]] = struct{}{}
+		dates[row[flightDateIdx]] = struct{}{}
+
+		if row[cancelledIdx] != "" && row[cancelledIdx] != "0.00" {
+			cancelled++
+		}
+
+		if row[divertedIdx] != "" && row[divertedIdx] != "0.00" {
+			diverted++
+		}
+	}
+
+	if len(routes) < 15 {
+		t.Errorf("unique routes = %d, want at least 15", len(routes))
+	}
+
+	if len(dates) < 3 {
+		t.Errorf("unique flight dates = %d, want at least 3", len(dates))
+	}
+
+	if cancelled == 0 {
+		t.Error("expected at least one cancelled flight in fixture")
+	}
+
+	if diverted == 0 {
+		t.Error("expected at least one diverted flight in fixture")
 	}
 }

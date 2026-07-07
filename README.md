@@ -126,7 +126,7 @@ curl "http://localhost:8080/api/v1/flights?flight_date=2026-04-24&origin=ORD&des
 - Returns **409** if flight data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.
 
-`test-data/` contains a sample BTS CSV used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
+`internal/ingest/bts/testdata/` contains a small BTS CSV sample (header plus 20 diverse April 2026 rows) used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
 
 ## Migrations
 
@@ -189,7 +189,7 @@ internal/database/   Store factory (driver selection)
 internal/store/      Store interface, queries, SQLite + in-memory implementations
 docker/migrate/      Migrate sidecar (Dockerfile + Makefile for up/down/shell)
 migrations/          Per-driver SQL migrations (sqlite/, postgres/)
-test-data/           Sample BTS CSV for tests
+internal/ingest/bts/  BTS download, parse, load; testdata/ sample CSV
 ```
 
 ## Design notes

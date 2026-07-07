@@ -21,8 +21,8 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Fatalf("ImportMonth() error = %v", err)
 	}
 
-	if result.RowsImported != 1 {
-		t.Fatalf("RowsImported = %d, want 1", result.RowsImported)
+	if result.RowsImported != TestdataRowCount {
+		t.Fatalf("RowsImported = %d, want %d", result.RowsImported, TestdataRowCount)
 	}
 
 	if result.Year != 2026 || result.Month != 4 {
@@ -110,9 +110,13 @@ func TestImportResultJSON(t *testing.T) {
 	}
 }
 
-func TestRepoCSVPathResolvable(t *testing.T) {
-	path := testRepoCSVPath(t)
-	if filepath.Base(path) == "" {
-		t.Fatal("expected non-empty csv filename")
+func TestTestdataCSVResolvable(t *testing.T) {
+	path, err := TestdataCSV()
+	if err != nil {
+		t.Fatalf("TestdataCSV() error = %v", err)
+	}
+
+	if filepath.Base(path) != "on_time_2026_04.csv" {
+		t.Errorf("basename = %q, want on_time_2026_04.csv", filepath.Base(path))
 	}
 }
