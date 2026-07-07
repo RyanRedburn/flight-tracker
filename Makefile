@@ -4,7 +4,7 @@
 export CGO_ENABLED := 1
 
 # Packages that do not import the SQLite driver (no C compiler required).
-TEST_UNIT_PKGS := ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/store/mem/...
+TEST_UNIT_PKGS := ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/store/mem/...
 
 lint:
 	golangci-lint run

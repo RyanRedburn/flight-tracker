@@ -20,6 +20,8 @@ type Config struct {
 	WorkerConcurrency  int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
 	WorkerPollInterval time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
 	StaleJobThreshold  time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
+	BTSDownloadTimeout time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
+	BTSBaseURL         string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
 	LogLevel           slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 }
 

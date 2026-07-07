@@ -14,6 +14,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("WORKER_CONCURRENCY", "")
 	t.Setenv("WORKER_POLL_INTERVAL", "")
 	t.Setenv("STALE_JOB_THRESHOLD", "")
+	t.Setenv("BTS_DOWNLOAD_TIMEOUT", "")
+	t.Setenv("BTS_BASE_URL", "")
 	t.Setenv("LOG_LEVEL", "")
 
 	cfg, err := Load()
@@ -47,6 +49,14 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.StaleJobThreshold != 30*time.Minute {
 		t.Errorf("StaleJobThreshold = %v, want 30m", cfg.StaleJobThreshold)
+	}
+
+	if cfg.BTSDownloadTimeout != 10*time.Minute {
+		t.Errorf("BTSDownloadTimeout = %v, want 10m", cfg.BTSDownloadTimeout)
+	}
+
+	if cfg.BTSBaseURL != "https://transtats.bts.gov/PREZIP" {
+		t.Errorf("BTSBaseURL = %q, want default transtats URL", cfg.BTSBaseURL)
 	}
 
 	if cfg.LogLevel != slog.LevelInfo {

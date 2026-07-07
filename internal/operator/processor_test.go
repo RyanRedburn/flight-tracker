@@ -150,7 +150,7 @@ func TestProcessorProcessUnknownJobType(t *testing.T) {
 	}
 }
 
-func TestBTSIngestHandlerSkeleton(t *testing.T) {
+func TestBTSIngestHandlerImportsCSV(t *testing.T) {
 	store := mem.New()
 	ctx := context.Background()
 
@@ -168,7 +168,7 @@ func TestBTSIngestHandlerSkeleton(t *testing.T) {
 		t.Fatalf("claimed ID = %q, want %q", claimed.ID, job.ID)
 	}
 
-	processor := NewProcessor(store, NewBTSIngestHandler(store))
+	processor := NewProcessor(store, newTestBTSIngestHandler(t, store))
 	if err := processor.Process(ctx, claimed); err != nil {
 		t.Fatalf("Process() error = %v", err)
 	}
@@ -180,5 +180,14 @@ func TestBTSIngestHandlerSkeleton(t *testing.T) {
 
 	if got.Status != model.JobStatusCompleted {
 		t.Errorf("Status = %q, want completed", got.Status)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(got.Result, &result); err != nil {
+		t.Fatalf("Unmarshal result: %v", err)
+	}
+
+	if result["rows_imported"] == nil || result["rows_imported"].(float64) != 1 {
+		t.Fatalf("result = %v, want rows_imported = 1", result)
 	}
 }

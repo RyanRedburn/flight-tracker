@@ -20,7 +20,7 @@ func TestWorkerPollsPendingJob(t *testing.T) {
 		t.Fatalf("CreateBTSIngestJob() error = %v", err)
 	}
 
-	processor := NewProcessor(store, NewBTSIngestHandler(store))
+	processor := NewProcessor(store, newTestBTSIngestHandler(t, store))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	worker := NewWorker(store, processor, 1, 10*time.Millisecond, logger)
 
@@ -30,7 +30,7 @@ func TestWorkerPollsPendingJob(t *testing.T) {
 	worker.Start(runCtx)
 	defer worker.Stop(5 * time.Second)
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		got, err := store.GetJob(ctx, job.ID)
 		if err != nil {
@@ -52,7 +52,7 @@ func TestWorkerPollsPendingJob(t *testing.T) {
 }
 
 func TestNewWorkerMinimumConcurrency(t *testing.T) {
-	processor := NewProcessor(mem.New(), NewBTSIngestHandler(mem.New()))
+	processor := NewProcessor(mem.New(), newTestBTSIngestHandler(t, mem.New()))
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	worker := NewWorker(mem.New(), processor, 0, time.Second, logger)
