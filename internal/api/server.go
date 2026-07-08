@@ -18,7 +18,7 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths int) *Server {
+func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Handler {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
 	flights := handlers.NewFlightsHandler(s)
@@ -39,10 +39,14 @@ func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths 
 		r.Get("/flights", flights.List)
 	})
 
+	return r
+}
+
+func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths int) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:              addr,
-			Handler:           r,
+			Handler:           newRouter(s, logger, maxIngestMonths),
 			ReadHeaderTimeout: 5 * time.Second,
 		},
 	}
