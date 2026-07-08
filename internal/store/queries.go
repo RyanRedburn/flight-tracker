@@ -78,23 +78,31 @@ const (
 		FROM schema_migrations
 		LIMIT 1`
 
-	QueryListOnTimeFlightsBase = `
+	QueryRoutePerfBase = `
 		SELECT
 			flight_date,
+			day_of_week,
 			origin,
 			dest,
 			iata_code_marketing_airline,
 			flight_number_marketing_airline,
-			iata_code_operating_airline,
-			flight_number_operating_airline,
 			crs_dep_time,
-			dep_time,
-			dep_delay,
-			crs_arr_time,
-			arr_time,
-			arr_delay,
+			arr_delay_minutes,
+			dep_delay_minutes,
+			arr_del15,
+			dep_del15,
 			cancelled,
+			cancellation_code,
 			diverted,
-			distance
+			carrier_delay,
+			weather_delay,
+			nas_delay,
+			security_delay,
+			late_aircraft_delay,
+			div1_airport,
+			div2_airport,
+			div3_airport,
+			div4_airport,
+			div5_airport
 		FROM on_time_flights`
 )

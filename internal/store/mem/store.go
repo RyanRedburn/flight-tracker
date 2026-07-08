@@ -123,68 +123,28 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	return nil
 }
 
-func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
-	limit := filter.Limit
-	offset := filter.Offset
-
+func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	matches := make([]*model.OnTimeFlight, 0, len(s.flights))
+	rows := make([]store.FlightPerf, 0, len(s.flights))
 	for _, flight := range s.flights {
-		if filter.FlightDate != "" && flight.FlightDate != filter.FlightDate {
-			continue
-		}
-
-		if filter.Origin != "" && flight.Origin != filter.Origin {
-			continue
-		}
-
-		if filter.Dest != "" && flight.Dest != filter.Dest {
-			continue
-		}
-
-		matches = append(matches, cloneOnTimeFlight(flight))
+		rows = append(rows, store.FlightPerfFromOnTime(flight))
 	}
 
-	slices.SortFunc(matches, func(a, b *model.OnTimeFlight) int {
-		if a.FlightDate != b.FlightDate {
-			if a.FlightDate < b.FlightDate {
-				return -1
-			}
+	return store.AggregateRouteStats(filter, rows), nil
+}
 
-			return 1
-		}
+func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-		if a.Origin != b.Origin {
-			if a.Origin < b.Origin {
-				return -1
-			}
-
-			return 1
-		}
-
-		if a.CRSDepTime < b.CRSDepTime {
-			return -1
-		}
-
-		if a.CRSDepTime > b.CRSDepTime {
-			return 1
-		}
-
-		return 0
-	})
-
-	if offset >= len(matches) {
-		return []*model.OnTimeFlight{}, nil
+	rows := make([]store.FlightPerf, 0, len(s.flights))
+	for _, flight := range s.flights {
+		rows = append(rows, store.FlightPerfFromOnTime(flight))
 	}
 
-	end := offset + limit
-	if end > len(matches) {
-		end = len(matches)
-	}
-
-	return matches[offset:end], nil
+	return store.AggregateRouteOutlook(filter, rows), nil
 }
 
 func cloneJob(job *model.Job) *model.Job {

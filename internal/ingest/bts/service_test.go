@@ -62,12 +62,17 @@ func TestServiceImportMonthReplace(t *testing.T) {
 		t.Fatalf("first ImportMonth() error = %v", err)
 	}
 
-	first, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{Limit: 1})
+	first, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    "JFK",
+		Dest:      "FLL",
+		StartDate: "2026-04-01",
+		EndDate:   "2026-04-30",
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() error = %v", err)
+		t.Fatalf("RouteStats() error = %v", err)
 	}
 
-	if len(first) == 0 {
+	if first.Flights == 0 {
 		t.Fatal("expected flights after first import")
 	}
 
@@ -75,12 +80,17 @@ func TestServiceImportMonthReplace(t *testing.T) {
 		t.Fatalf("second ImportMonth() error = %v", err)
 	}
 
-	second, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{Limit: 1})
+	second, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    "JFK",
+		Dest:      "FLL",
+		StartDate: "2026-04-01",
+		EndDate:   "2026-04-30",
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() after replace error = %v", err)
+		t.Fatalf("RouteStats() after replace error = %v", err)
 	}
 
-	if len(second) == 0 {
+	if second.Flights == 0 {
 		t.Fatal("expected flights after replace import")
 	}
 }

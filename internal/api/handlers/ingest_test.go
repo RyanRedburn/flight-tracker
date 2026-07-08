@@ -171,7 +171,7 @@ func TestIngestExistingDataConflict(t *testing.T) {
 
 	columns := []string{"flight_date", "origin", "dest"}
 
-	rows := [][]string{{testFlightDate, testAirportORD, testAirportBHM}}
+	rows := [][]string{{testFlightDate20260424, testAirportORD, testAirportBHM}}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, rows); err != nil {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}
@@ -202,7 +202,7 @@ func TestIngestForceReimport(t *testing.T) {
 
 	columns := []string{"flight_date", "origin", "dest"}
 
-	rows := [][]string{{testFlightDate, testAirportORD, testAirportBHM}}
+	rows := [][]string{{testFlightDate20260424, testAirportORD, testAirportBHM}}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, rows); err != nil {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}

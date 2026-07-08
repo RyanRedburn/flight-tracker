@@ -9,6 +9,8 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
+const testFlightDate20260501 = "2026-05-01"
+
 func TestMemCreateBTSIngestJobAndClaim(t *testing.T) {
 	ctx := context.Background()
 	s := New()
@@ -73,19 +75,24 @@ func TestMemReplaceOnTimeFlightsByMonth(t *testing.T) {
 	ctx := context.Background()
 	s := New()
 
-	columns := []string{"flight_date", "origin", "dest"}
+	columns := []string{"flight_date", "origin", "dest", "iata_code_marketing_airline"}
 
-	rows := [][]string{{"2026-05-01", "ORD", "BHM"}}
+	rows := [][]string{{testFlightDate20260501, "ORD", "BHM", "UA"}}
 	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 5, columns, rows); err != nil {
 		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
 	}
 
-	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: "2026-05-01", Limit: 100})
+	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    "ORD",
+		Dest:      "BHM",
+		StartDate: testFlightDate20260501,
+		EndDate:   testFlightDate20260501,
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() error = %v", err)
+		t.Fatalf("RouteStats() error = %v", err)
 	}
 
-	if len(flights) != 1 {
-		t.Fatalf("len(flights) = %d, want 1", len(flights))
+	if stats.Flights != 1 {
+		t.Fatalf("flights = %d, want 1", stats.Flights)
 	}
 }

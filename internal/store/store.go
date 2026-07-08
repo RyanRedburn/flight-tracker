@@ -19,14 +19,6 @@ type MigrationVersion struct {
 	Dirty   bool `json:"dirty"`
 }
 
-type OnTimeFlightFilter struct {
-	FlightDate string
-	Origin     string
-	Dest       string
-	Limit      int
-	Offset     int
-}
-
 type Store interface {
 	CreateJob(ctx context.Context, job *model.Job) error
 	CreateBTSIngestJob(ctx context.Context, year, month int) (*model.Job, error)
@@ -41,7 +33,8 @@ type Store interface {
 	ActiveBTSIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
-	ListOnTimeFlights(ctx context.Context, filter OnTimeFlightFilter) ([]*model.OnTimeFlight, error)
+	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)
+	RouteOutlook(ctx context.Context, filter RouteOutlookFilter) (*model.RouteOutlook, error)
 	Ping(ctx context.Context) error
 	MigrationVersion(ctx context.Context) (MigrationVersion, error)
 	Close() error

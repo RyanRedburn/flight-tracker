@@ -9,7 +9,7 @@ Go service with a REST API and an in-process background worker for importing BTS
 
 - `POST /api/v1/ingest` to queue per-month BTS import jobs
 - Poll-based background workers that download, parse, and load flight data into SQLite
-- REST API to query on-time flights and job status
+- REST API for route performance stats, booking outlook probabilities, and job status
 - Per-driver SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker deployment with persistent SQLite volume
 
@@ -112,8 +112,13 @@ curl http://localhost:8080/api/v1/jobs/<job-id>
 # List recent jobs
 curl http://localhost:8080/api/v1/jobs
 
-# Query on-time flights (optional filters: flight_date, origin, dest, limit, offset; default limit 50, max 500)
-curl "http://localhost:8080/api/v1/flights?flight_date=2026-04-24&origin=ORD&dest=BHM&limit=10"
+# Route performance stats for a date range (required: origin, dest, start_date, end_date;
+# optional: carrier, flight_number [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days)
+curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&days_of_week=1,2,3,4,5"
+
+# Booking outlook probabilities for a departure slot (required: origin, dest, carrier, day_of_week, dep_time;
+# optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history)
+curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
 ```
 
 ### Ingest behavior
@@ -176,7 +181,6 @@ internal/ingest/      Ingest range expansion; BTS download/parse/load (ingest/bt
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, SQLite + in-memory implementations
-internal/validation/  Shared request/query validation
 docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/shell)
 migrations/           Per-driver SQL migrations (sqlite/, postgres/)
 ```

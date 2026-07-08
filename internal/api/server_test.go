@@ -30,7 +30,9 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, "/ready", http.StatusOK},
 		{http.MethodGet, "/db/version", http.StatusOK},
 		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
-		{http.MethodGet, "/api/v1/flights", http.StatusOK},
+		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
+		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
+		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},
 	}
 

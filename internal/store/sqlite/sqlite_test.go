@@ -110,8 +110,8 @@ func TestMigrationVersion(t *testing.T) {
 		t.Fatalf("MigrationVersion() error = %v", err)
 	}
 
-	if version.Version != 3 {
-		t.Errorf("Version = %d, want 3", version.Version)
+	if version.Version != 4 {
+		t.Errorf("Version = %d, want 4", version.Version)
 	}
 
 	if version.Dirty {
@@ -155,7 +155,7 @@ func TestSQLiteDBPath(t *testing.T) {
 	}
 }
 
-func TestListOnTimeFlights(t *testing.T) {
+func TestRouteStats(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
@@ -168,40 +168,37 @@ func TestListOnTimeFlights(t *testing.T) {
 	defer s.Close()
 
 	seedOnTimeFlights(t, dbPath,
-		[]string{testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535"},
-		[]string{testFlightDate20260424, testAirportORD, testAirportAVP, "UA", "4546", "1805"},
-		[]string{testFlightDate20260425, testAirportLAX, testAirportSFO, "UA", "100", "0900"},
+		[]string{testFlightDate20260424, "3", testAirportORD, testAirportBHM, "UA", "4547", "1535", testFloatNo, testFloatNo, testFloatNo, testFloatNo, testFloatNo, "", testFloatNo},
+		[]string{testFlightDate20260424, "3", testAirportORD, testAirportAVP, "UA", "4546", "1805", "20.00", "5.00", testFloatYes, testFloatNo, testFloatNo, "", testFloatNo},
+		[]string{testFlightDate20260425, "4", testAirportLAX, testAirportSFO, "UA", "100", "0900", testFloatNo, testFloatNo, testFloatNo, testFloatNo, testFloatNo, "", testFloatNo},
 	)
 
-	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{
-		FlightDate: testFlightDate20260424,
-		Origin:     testAirportORD,
-		Dest:       testAirportBHM,
-		Limit:      100,
+	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    testAirportORD,
+		Dest:      testAirportBHM,
+		StartDate: testFlightDate20260424,
+		EndDate:   testFlightDate20260424,
 	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() error = %v", err)
+		t.Fatalf("RouteStats() error = %v", err)
 	}
 
-	if len(flights) != 1 {
-		t.Fatalf("len(flights) = %d, want 1", len(flights))
+	if stats.Flights != 1 || stats.OnTime != 1 {
+		t.Fatalf("stats = %+v, want 1 on-time flight", stats)
 	}
 
-	if flights[0].Flight_Number_Marketing_Airline != "4547" {
-		t.Errorf("Flight_Number_Marketing_Airline = %q, want 4547", flights[0].Flight_Number_Marketing_Airline)
-	}
-
-	all, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{Limit: 2, Offset: 1})
+	route, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    testAirportORD,
+		Dest:      testAirportAVP,
+		StartDate: testFlightDate20260424,
+		EndDate:   testFlightDate20260424,
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() paginated error = %v", err)
+		t.Fatalf("RouteStats() delayed error = %v", err)
 	}
 
-	if len(all) != 2 {
-		t.Fatalf("len(all) = %d, want 2", len(all))
-	}
-
-	if all[0].Origin != testAirportORD {
-		t.Errorf("Origin = %q, want ORD", all[0].Origin)
+	if route.Delayed != 1 || route.AvgArrivalDelayWhenDelayed != 20 {
+		t.Fatalf("delayed stats = %+v, want 1 delayed with avg 20", route)
 	}
 }
 
@@ -216,13 +213,17 @@ func seedOnTimeFlights(t *testing.T, dbPath string, rows ...[]string) {
 
 	const insert = `
 		INSERT INTO on_time_flights (
-			flight_date, origin, dest,
+			flight_date, day_of_week, origin, dest,
 			iata_code_marketing_airline, flight_number_marketing_airline,
-			crs_dep_time
-		) VALUES (?, ?, ?, ?, ?, ?)`
+			crs_dep_time, arr_delay_minutes, dep_delay_minutes, arr_del15, dep_del15,
+			cancelled, cancellation_code, diverted
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	for _, row := range rows {
-		if _, err := db.Exec(insert, row[0], row[1], row[2], row[3], row[4], row[5]); err != nil {
+		if _, err := db.Exec(insert,
+			row[0], row[1], row[2], row[3], row[4], row[5], row[6],
+			row[7], row[8], row[9], row[10], row[11], row[12], row[13],
+		); err != nil {
 			t.Fatalf("insert flight: %v", err)
 		}
 	}
