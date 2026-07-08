@@ -23,6 +23,8 @@ const (
 	testAirportAVP         = "AVP"
 	testAirportLAX         = "LAX"
 	testAirportSFO         = "SFO"
+	testFloatNo            = "0.00"
+	testFloatYes           = "1.00"
 )
 
 func openTestStore(t *testing.T) store.Store {
@@ -318,18 +320,18 @@ func TestReplaceOnTimeFlightsByMonthRollback(t *testing.T) {
 		t.Fatal("ReplaceOnTimeFlightsByMonth() expected error for invalid column")
 	}
 
-	flights, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{
-		FlightDate: testFlightDate20260424,
-		Origin:     testAirportORD,
-		Dest:       testAirportBHM,
-		Limit:      100,
+	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    testAirportORD,
+		Dest:      testAirportBHM,
+		StartDate: testFlightDate20260424,
+		EndDate:   testFlightDate20260424,
 	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() error = %v", err)
+		t.Fatalf("RouteStats() error = %v", err)
 	}
 
-	if len(flights) != 1 {
-		t.Fatalf("len(flights) = %d, want 1 after failed replace", len(flights))
+	if stats.Flights != 1 {
+		t.Fatalf("flights = %d, want 1 after failed replace", stats.Flights)
 	}
 }
 
@@ -349,21 +351,31 @@ func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
 		t.Fatalf("replacement replace error = %v", err)
 	}
 
-	oldMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260424, Limit: 100})
+	oldStats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    testAirportORD,
+		Dest:      testAirportBHM,
+		StartDate: testFlightDate20260424,
+		EndDate:   testFlightDate20260424,
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() error = %v", err)
+		t.Fatalf("RouteStats() error = %v", err)
 	}
 
-	if len(oldMonth) != 0 {
-		t.Fatalf("len(oldMonth) = %d, want 0 after replace", len(oldMonth))
+	if oldStats.Flights != 0 {
+		t.Fatalf("old flights = %d, want 0 after replace", oldStats.Flights)
 	}
 
-	newMonth, err := s.ListOnTimeFlights(ctx, store.OnTimeFlightFilter{FlightDate: testFlightDate20260430, Limit: 100})
+	newStats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+		Origin:    testAirportLAX,
+		Dest:      testAirportSFO,
+		StartDate: testFlightDate20260430,
+		EndDate:   testFlightDate20260430,
+	})
 	if err != nil {
-		t.Fatalf("ListOnTimeFlights() new error = %v", err)
+		t.Fatalf("RouteStats() new error = %v", err)
 	}
 
-	if len(newMonth) != 1 {
-		t.Fatalf("len(newMonth) = %d, want 1", len(newMonth))
+	if newStats.Flights != 1 {
+		t.Fatalf("new flights = %d, want 1", newStats.Flights)
 	}
 }

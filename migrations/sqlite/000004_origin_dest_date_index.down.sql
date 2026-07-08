@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_on_time_flights_origin_dest_date;

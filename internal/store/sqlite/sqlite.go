@@ -136,36 +136,52 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	return err
 }
 
-func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlightFilter) ([]*model.OnTimeFlight, error) {
-	limit := filter.Limit
-	offset := filter.Offset
-
-	query := store.QueryListOnTimeFlightsBase
-	args := make([]any, 0, 5)
-	where := make([]string, 0, 3)
-
-	if filter.FlightDate != "" {
-		where = append(where, "flight_date = ?")
-		args = append(args, filter.FlightDate)
+func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+	rows, err := s.queryFlightPerf(ctx, filter.Origin, filter.Dest, filter.StartDate, filter.EndDate, filter.Carrier, filter.FlightNumber)
+	if err != nil {
+		return nil, err
 	}
 
-	if filter.Origin != "" {
-		where = append(where, "origin = ?")
-		args = append(args, filter.Origin)
+	return store.AggregateRouteStats(filter, rows), nil
+}
+
+func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+	rows, err := s.queryFlightPerf(ctx, filter.Origin, filter.Dest, "", "", filter.Carrier, "")
+	if err != nil {
+		return nil, err
 	}
 
-	if filter.Dest != "" {
-		where = append(where, "dest = ?")
-		args = append(args, filter.Dest)
+	return store.AggregateRouteOutlook(filter, rows), nil
+}
+
+func (s *Store) queryFlightPerf(ctx context.Context, origin, dest, startDate, endDate, carrier, flightNumber string) ([]store.FlightPerf, error) {
+	query := store.QueryRoutePerfBase
+	args := make([]any, 0, 6)
+	where := []string{"origin = ?", "dest = ?"}
+
+	args = append(args, origin, dest)
+
+	if startDate != "" {
+		where = append(where, "flight_date >= ?")
+		args = append(args, startDate)
 	}
 
-	if len(where) > 0 {
-		query += "\n\t\tWHERE " + strings.Join(where, " AND ")
+	if endDate != "" {
+		where = append(where, "flight_date <= ?")
+		args = append(args, endDate)
 	}
 
-	query += "\n\t\tORDER BY flight_date, origin, crs_dep_time\n\t\tLIMIT ? OFFSET ?"
+	if carrier != "" {
+		where = append(where, "iata_code_marketing_airline = ?")
+		args = append(args, carrier)
+	}
 
-	args = append(args, limit, offset)
+	if flightNumber != "" {
+		where = append(where, "flight_number_marketing_airline = ?")
+		args = append(args, flightNumber)
+	}
+
+	query += "\n\t\tWHERE " + strings.Join(where, " AND ")
 
 	rows, err := s.db.QueryxContext(ctx, query, args...)
 	if err != nil {
@@ -173,18 +189,18 @@ func (s *Store) ListOnTimeFlights(ctx context.Context, filter store.OnTimeFlight
 	}
 	defer rows.Close()
 
-	var flights []*model.OnTimeFlight
+	var out []store.FlightPerf
 
 	for rows.Next() {
-		flight, err := scanOnTimeFlight(rows)
+		perf, err := scanFlightPerf(rows)
 		if err != nil {
 			return nil, err
 		}
 
-		flights = append(flights, flight)
+		out = append(out, perf)
 	}
 
-	return flights, rows.Err()
+	return out, rows.Err()
 }
 
 type rowScanner interface {
@@ -252,64 +268,90 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	return &job, nil
 }
 
-func scanOnTimeFlight(row rowScanner) (*model.OnTimeFlight, error) {
+func scanFlightPerf(row rowScanner) (store.FlightPerf, error) {
 	var (
-		flightDate         sql.NullString
-		origin             sql.NullString
-		dest               sql.NullString
-		iataMarketing      sql.NullString
-		flightNumMarketing sql.NullString
-		iataOperating      sql.NullString
-		flightNumOperating sql.NullString
-		crsDep             sql.NullString
-		depTime            sql.NullString
-		depDelay           sql.NullString
-		crsArr             sql.NullString
-		arrTime            sql.NullString
-		arrDelay           sql.NullString
-		cancelled          sql.NullString
-		diverted           sql.NullString
-		distance           sql.NullString
+		flightDate        sql.NullString
+		dayOfWeek         sql.NullString
+		origin            sql.NullString
+		dest              sql.NullString
+		carrier           sql.NullString
+		flightNumber      sql.NullString
+		crsDep            sql.NullString
+		arrDelayMinutes   sql.NullString
+		depDelayMinutes   sql.NullString
+		arrDel15          sql.NullString
+		depDel15          sql.NullString
+		cancelled         sql.NullString
+		cancellationCode  sql.NullString
+		diverted          sql.NullString
+		carrierDelay      sql.NullString
+		weatherDelay      sql.NullString
+		nasDelay          sql.NullString
+		securityDelay     sql.NullString
+		lateAircraftDelay sql.NullString
+		div1              sql.NullString
+		div2              sql.NullString
+		div3              sql.NullString
+		div4              sql.NullString
+		div5              sql.NullString
 	)
 
 	if err := row.Scan(
 		&flightDate,
+		&dayOfWeek,
 		&origin,
 		&dest,
-		&iataMarketing,
-		&flightNumMarketing,
-		&iataOperating,
-		&flightNumOperating,
+		&carrier,
+		&flightNumber,
 		&crsDep,
-		&depTime,
-		&depDelay,
-		&crsArr,
-		&arrTime,
-		&arrDelay,
+		&arrDelayMinutes,
+		&depDelayMinutes,
+		&arrDel15,
+		&depDel15,
 		&cancelled,
+		&cancellationCode,
 		&diverted,
-		&distance,
+		&carrierDelay,
+		&weatherDelay,
+		&nasDelay,
+		&securityDelay,
+		&lateAircraftDelay,
+		&div1,
+		&div2,
+		&div3,
+		&div4,
+		&div5,
 	); err != nil {
-		return nil, err
+		return store.FlightPerf{}, err
 	}
 
-	return &model.OnTimeFlight{
-		FlightDate:                      nullString(flightDate),
-		Origin:                          nullString(origin),
-		Dest:                            nullString(dest),
-		IATA_Code_Marketing_Airline:     nullString(iataMarketing),
-		Flight_Number_Marketing_Airline: nullString(flightNumMarketing),
-		IATA_Code_Operating_Airline:     nullString(iataOperating),
-		Flight_Number_Operating_Airline: nullString(flightNumOperating),
-		CRSDepTime:                      nullString(crsDep),
-		DepTime:                         nullString(depTime),
-		DepDelay:                        nullString(depDelay),
-		CRSArrTime:                      nullString(crsArr),
-		ArrTime:                         nullString(arrTime),
-		ArrDelay:                        nullString(arrDelay),
-		Cancelled:                       nullString(cancelled),
-		Diverted:                        nullString(diverted),
-		Distance:                        nullString(distance),
+	return store.FlightPerf{
+		FlightDate:        nullString(flightDate),
+		DayOfWeek:         nullString(dayOfWeek),
+		Origin:            nullString(origin),
+		Dest:              nullString(dest),
+		Carrier:           nullString(carrier),
+		FlightNumber:      nullString(flightNumber),
+		CRSDepTime:        nullString(crsDep),
+		ArrDelayMinutes:   nullString(arrDelayMinutes),
+		DepDelayMinutes:   nullString(depDelayMinutes),
+		ArrDel15:          nullString(arrDel15),
+		DepDel15:          nullString(depDel15),
+		Cancelled:         nullString(cancelled),
+		CancellationCode:  nullString(cancellationCode),
+		Diverted:          nullString(diverted),
+		CarrierDelay:      nullString(carrierDelay),
+		WeatherDelay:      nullString(weatherDelay),
+		NASDelay:          nullString(nasDelay),
+		SecurityDelay:     nullString(securityDelay),
+		LateAircraftDelay: nullString(lateAircraftDelay),
+		DivAirports: [5]string{
+			nullString(div1),
+			nullString(div2),
+			nullString(div3),
+			nullString(div4),
+			nullString(div5),
+		},
 	}, nil
 }
 

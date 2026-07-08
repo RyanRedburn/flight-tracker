@@ -21,7 +21,7 @@ type Server struct {
 func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Handler {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
-	flights := handlers.NewFlightsHandler(s)
+	routes := handlers.NewRoutesHandler(s)
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 
 	r := chi.NewRouter()
@@ -36,7 +36,8 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 		r.Post("/ingest", ingestHandler.Create)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
-		r.Get("/flights", flights.List)
+		r.Get("/routes/stats", routes.Stats)
+		r.Get("/routes/outlook", routes.Outlook)
 	})
 
 	return r

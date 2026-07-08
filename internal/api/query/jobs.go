@@ -2,44 +2,32 @@ package query
 
 import (
 	"net/http"
-	"strconv"
+)
 
-	"github.com/RyanRedburn/flight-tracker/internal/validation"
+const (
+	DefaultListLimit = 50
+	MaxListLimit     = 500
 )
 
 type jobsListQuery struct {
-	Limit string `query:"limit" validate:"omitempty,query_int"`
-}
-
-type jobsListPagination struct {
-	Limit int `validate:"list_limit"`
+	Limit *int `query:"limit" validate:"omitempty,list_limit"`
 }
 
 func ParseJobsList(r *http.Request) (int, error) {
-	q := jobsListQuery{
-		Limit: r.URL.Query().Get("limit"),
-	}
-
-	if err := validation.Validate(q); err != nil {
+	var q jobsListQuery
+	if err := BindQuery(r, &q); err != nil {
 		return 0, err
 	}
 
-	limit := DefaultListLimit
-
-	if q.Limit != "" {
-		parsed, err := strconv.Atoi(q.Limit)
-		if err != nil {
-			return 0, err
-		}
-
-		limit = parsed
-	}
-
-	if err := validation.Validate(jobsListPagination{Limit: limit}); err != nil {
+	if err := Validate(q); err != nil {
 		return 0, err
 	}
 
-	return limit, nil
+	if q.Limit == nil {
+		return DefaultListLimit, nil
+	}
+
+	return *q.Limit, nil
 }
 
 type jobIDParam struct {
@@ -47,5 +35,5 @@ type jobIDParam struct {
 }
 
 func ParseJobID(id string) error {
-	return validation.Validate(jobIDParam{ID: id})
+	return Validate(jobIDParam{ID: id})
 }

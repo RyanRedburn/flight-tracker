@@ -301,8 +301,32 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 			flight.ArrDelay = row[idx]
 		}
 
+		if idx, ok := colIndex["day_of_week"]; ok {
+			flight.DayOfWeek = row[idx]
+		}
+
+		if idx, ok := colIndex["dep_delay_minutes"]; ok {
+			flight.DepDelayMinutes = row[idx]
+		}
+
+		if idx, ok := colIndex["dep_del15"]; ok {
+			flight.DepDel15 = row[idx]
+		}
+
+		if idx, ok := colIndex["arr_delay_minutes"]; ok {
+			flight.ArrDelayMinutes = row[idx]
+		}
+
+		if idx, ok := colIndex["arr_del15"]; ok {
+			flight.ArrDel15 = row[idx]
+		}
+
 		if idx, ok := colIndex["cancelled"]; ok {
 			flight.Cancelled = row[idx]
+		}
+
+		if idx, ok := colIndex["cancellation_code"]; ok {
+			flight.CancellationCode = row[idx]
 		}
 
 		if idx, ok := colIndex["diverted"]; ok {
@@ -311,6 +335,46 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 
 		if idx, ok := colIndex["distance"]; ok {
 			flight.Distance = row[idx]
+		}
+
+		if idx, ok := colIndex["carrier_delay"]; ok {
+			flight.CarrierDelay = row[idx]
+		}
+
+		if idx, ok := colIndex["weather_delay"]; ok {
+			flight.WeatherDelay = row[idx]
+		}
+
+		if idx, ok := colIndex["nas_delay"]; ok {
+			flight.NASDelay = row[idx]
+		}
+
+		if idx, ok := colIndex["security_delay"]; ok {
+			flight.SecurityDelay = row[idx]
+		}
+
+		if idx, ok := colIndex["late_aircraft_delay"]; ok {
+			flight.LateAircraftDelay = row[idx]
+		}
+
+		if idx, ok := colIndex["div1_airport"]; ok {
+			flight.Div1Airport = row[idx]
+		}
+
+		if idx, ok := colIndex["div2_airport"]; ok {
+			flight.Div2Airport = row[idx]
+		}
+
+		if idx, ok := colIndex["div3_airport"]; ok {
+			flight.Div3Airport = row[idx]
+		}
+
+		if idx, ok := colIndex["div4_airport"]; ok {
+			flight.Div4Airport = row[idx]
+		}
+
+		if idx, ok := colIndex["div5_airport"]; ok {
+			flight.Div5Airport = row[idx]
 		}
 
 		remaining = append(remaining, flight)

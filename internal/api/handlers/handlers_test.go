@@ -14,6 +14,16 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+const (
+	testFlightDate20260401 = "2026-04-01"
+	testFlightDate20260424 = "2026-04-24"
+	testAirportORD         = "ORD"
+	testAirportBHM         = "BHM"
+	testAirportLAX         = "LAX"
+	testFloatNo            = "0.00"
+	testFloatYes           = "1.00"
+)
+
 func newTestJobsHandler(t *testing.T) (*JobsHandler, *mem.Store) {
 	t.Helper()
 
