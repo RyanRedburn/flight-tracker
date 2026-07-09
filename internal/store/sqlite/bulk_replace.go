@@ -11,7 +11,7 @@ import (
 
 const bulkReplaceBatchSize = 500
 
-func replaceTableRows(ctx context.Context, tx *sqlx.Tx, table string, columns []string, rows [][]string) error {
+func replaceTableRows(ctx context.Context, tx *sqlx.Tx, table string, columns []string, rows [][]string, nullEmpty bool) error {
 	if len(columns) == 0 {
 		return errors.New("columns required")
 	}
@@ -43,6 +43,11 @@ func replaceTableRows(ctx context.Context, tx *sqlx.Tx, table string, columns []
 
 			args := make([]any, len(row))
 			for i, v := range row {
+				if nullEmpty && v == "" {
+					args[i] = nil
+					continue
+				}
+
 				args[i] = v
 			}
 

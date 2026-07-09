@@ -79,6 +79,14 @@ const (
 		DELETE FROM on_time_flights
 		WHERE year = ? AND month = ?`
 
+	QueryDeleteAllCountries = `DELETE FROM countries`
+	QueryDeleteAllRegions   = `DELETE FROM regions`
+	QueryDeleteAllAirports  = `DELETE FROM airports`
+
+	QueryHasCountriesData = `SELECT 1 FROM countries LIMIT 1`
+	QueryHasRegionsData   = `SELECT 1 FROM regions LIMIT 1`
+	QueryHasAirportsData  = `SELECT 1 FROM airports LIMIT 1`
+
 	QueryMigrationVersion = `
 		SELECT version, dirty
 		FROM schema_migrations

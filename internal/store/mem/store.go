@@ -12,11 +12,12 @@ import (
 )
 
 type Store struct {
-	mu        sync.Mutex
-	jobs      map[string]*model.Job
-	btsIngest map[string]model.BTSIngestJob
-	flights   []*model.OnTimeFlight
-	ping      func(context.Context) error
+	mu          sync.Mutex
+	jobs        map[string]*model.Job
+	btsIngest   map[string]model.BTSIngestJob
+	flights     []*model.OnTimeFlight
+	ourAirports map[store.OurAirportsDataset]ourAirportsTable
+	ping        func(context.Context) error
 }
 
 func New() *Store {

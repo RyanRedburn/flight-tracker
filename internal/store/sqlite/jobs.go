@@ -286,7 +286,7 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 		return tx.Commit()
 	}
 
-	if err := replaceTableRows(ctx, tx, "on_time_flights", columns, rows); err != nil {
+	if err := replaceTableRows(ctx, tx, "on_time_flights", columns, rows, false); err != nil {
 		return err
 	}
 
