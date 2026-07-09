@@ -3,7 +3,6 @@ package bts
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -21,8 +20,8 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Fatalf("ImportMonth() error = %v", err)
 	}
 
-	if result.RowsImported != TestdataRowCount {
-		t.Fatalf("RowsImported = %d, want %d", result.RowsImported, TestdataRowCount)
+	if result.RowsImported != testdataRowCount {
+		t.Fatalf("RowsImported = %d, want %d", result.RowsImported, testdataRowCount)
 	}
 
 	if result.Year != 2026 || result.Month != 4 {
@@ -117,16 +116,5 @@ func TestImportResultJSON(t *testing.T) {
 
 	if decoded[jsonKeyRows] != float64(42) {
 		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
-	}
-}
-
-func TestTestdataCSVResolvable(t *testing.T) {
-	path, err := TestdataCSV()
-	if err != nil {
-		t.Fatalf("TestdataCSV() error = %v", err)
-	}
-
-	if filepath.Base(path) != "on_time_2026_04.csv" {
-		t.Errorf("basename = %q, want on_time_2026_04.csv", filepath.Base(path))
 	}
 }

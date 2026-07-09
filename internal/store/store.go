@@ -31,6 +31,7 @@ type Store interface {
 	FailJob(ctx context.Context, id, errMsg string) error
 	ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error)
 	ActiveBTSIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ActiveIngestJob(ctx context.Context, jobType string) (bool, error)
 	MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)

@@ -255,6 +255,33 @@ func TestActiveBTSIngestMonths(t *testing.T) {
 	}
 }
 
+func TestActiveIngestJob(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active job before create")
+	}
+
+	if _, err := s.CreateBTSIngestJob(ctx, 2026, 4); err != nil {
+		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	}
+
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if !active {
+		t.Fatal("expected active job after create")
+	}
+}
+
 func testFlightColumns() []string {
 	return []string{
 		"year", "month", "flight_date", "origin", "dest",

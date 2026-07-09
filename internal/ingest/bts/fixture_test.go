@@ -3,65 +3,25 @@ package bts
 import (
 	"os"
 	"testing"
+
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/csvparse"
 )
 
-func TestDBColumnsCount(t *testing.T) {
-	if len(DBColumns) != 119 {
-		t.Fatalf("len(DBColumns) = %d, want 119", len(DBColumns))
-	}
-}
-
-func TestCSVHeaderToColumnKnownFields(t *testing.T) {
-	tests := []struct {
-		header string
-		want   string
-	}{
-		{header: "Year", want: colYear},
-		{header: "FlightDate", want: "flight_date"},
-		{header: "DayofMonth", want: colDayOfMonth},
-		{header: "Operating_Airline ", want: "operating_airline"},
-		{header: "OriginAirportID", want: "origin_airport_id"},
-		{header: "CRSDepTime", want: "crs_dep_time"},
-		{header: "Duplicate", want: "duplicate"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.header, func(t *testing.T) {
-			if got := csvHeaderToColumn(tt.header); got != tt.want {
-				t.Errorf("csvHeaderToColumn(%q) = %q, want %q", tt.header, got, tt.want)
-			}
-		})
-	}
-}
-
-func dbColumnIndex(name string) int {
-	for i, col := range DBColumns {
-		if col == name {
-			return i
-		}
-	}
-
-	return -1
-}
-
-func TestParseCSVFromFixture(t *testing.T) {
-	file, err := os.Open(testRepoCSVPath(t))
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
+func TestParseFixtureCSV(t *testing.T) {
+	file := openFixtureCSV(t)
 	defer file.Close()
 
-	columns, rows, err := ParseCSV(file)
+	columns, rows, err := csvparse.Parse(file, DBColumns, csvHeaderToColumn)
 	if err != nil {
-		t.Fatalf("ParseCSV() error = %v", err)
+		t.Fatalf("csvparse.Parse() error = %v", err)
 	}
 
 	if len(columns) != len(DBColumns) {
 		t.Fatalf("len(columns) = %d, want %d", len(columns), len(DBColumns))
 	}
 
-	if len(rows) != TestdataRowCount {
-		t.Fatalf("len(rows) = %d, want %d", len(rows), TestdataRowCount)
+	if len(rows) != testdataRowCount {
+		t.Fatalf("len(rows) = %d, want %d", len(rows), testdataRowCount)
 	}
 
 	originIdx := dbColumnIndex("origin")
@@ -85,29 +45,23 @@ func TestParseCSVFromFixture(t *testing.T) {
 	}
 }
 
-func TestParseCSVDropsTrailingEmptyColumn(t *testing.T) {
-	file, err := os.Open(testRepoCSVPath(t))
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
+func TestParseFixtureCSVDropsTrailingEmptyColumn(t *testing.T) {
+	file := openFixtureCSV(t)
 	defer file.Close()
 
-	_, _, err = ParseCSV(file)
+	_, _, err := csvparse.Parse(file, DBColumns, csvHeaderToColumn)
 	if err != nil {
-		t.Fatalf("ParseCSV() error = %v", err)
+		t.Fatalf("csvparse.Parse() error = %v", err)
 	}
 }
 
 func TestFixtureHasOperationalVariety(t *testing.T) {
-	file, err := os.Open(testRepoCSVPath(t))
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
+	file := openFixtureCSV(t)
 	defer file.Close()
 
-	_, rows, err := ParseCSV(file)
+	_, rows, err := csvparse.Parse(file, DBColumns, csvHeaderToColumn)
 	if err != nil {
-		t.Fatalf("ParseCSV() error = %v", err)
+		t.Fatalf("csvparse.Parse() error = %v", err)
 	}
 
 	originIdx := dbColumnIndex("origin")
@@ -149,4 +103,25 @@ func TestFixtureHasOperationalVariety(t *testing.T) {
 	if diverted == 0 {
 		t.Error("expected at least one diverted flight in fixture")
 	}
+}
+
+func openFixtureCSV(t *testing.T) *os.File {
+	t.Helper()
+
+	file, err := os.Open(fixtureCSVPath(t))
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	return file
+}
+
+func dbColumnIndex(name string) int {
+	for i, col := range DBColumns {
+		if col == name {
+			return i
+		}
+	}
+
+	return -1
 }

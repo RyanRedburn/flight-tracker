@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/csvparse"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -58,7 +59,7 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResul
 	}
 	defer file.Close()
 
-	columns, rows, err := ParseCSV(file)
+	columns, rows, err := csvparse.Parse(file, DBColumns, csvHeaderToColumn)
 	if err != nil {
 		return ImportResult{}, fmt.Errorf("parse csv: %w", err)
 	}

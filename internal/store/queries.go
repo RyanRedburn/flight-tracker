@@ -63,6 +63,12 @@ const (
 		INNER JOIN jobs j ON j.id = b.job_id
 		WHERE j.status IN (?, ?)`
 
+	QueryActiveIngestJob = `
+		SELECT 1
+		FROM jobs
+		WHERE type = ? AND status IN (?, ?)
+		LIMIT 1`
+
 	QueryMonthsWithOnTimeFlightData = `
 		SELECT 1
 		FROM on_time_flights

@@ -195,6 +195,23 @@ func (s *Store) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMo
 	return active, nil
 }
 
+func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, job := range s.jobs {
+		if job.Type != jobType {
+			continue
+		}
+
+		if job.Status == model.JobStatusPending || job.Status == model.JobStatusRunning {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (s *Store) MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
