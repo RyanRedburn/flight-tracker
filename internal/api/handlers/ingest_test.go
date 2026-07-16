@@ -64,7 +64,7 @@ func TestIngestSingleMonth(t *testing.T) {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var resp ingestResponse
+	var resp IngestResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestIngestRange(t *testing.T) {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var resp ingestResponse
+	var resp IngestResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestIngestStoresQueryableJobs(t *testing.T) {
 		jsonStartMonth: 5,
 	})
 
-	var created ingestResponse
+	var created IngestResponse
 	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
 		t.Fatalf("decode create response: %v", err)
 	}

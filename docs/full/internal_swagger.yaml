@@ -5,10 +5,139 @@ definitions:
       error:
         type: string
     type: object
+  handlers.FlightScheduleIngestConflictResponse:
+    properties:
+      active_ingest_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+      error:
+        type: string
+      existing_data_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+    type: object
+  handlers.IngestJobResponse:
+    properties:
+      id:
+        type: string
+      month:
+        type: integer
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      year:
+        type: integer
+    type: object
+  handlers.IngestResponse:
+    properties:
+      jobs:
+        items:
+          $ref: '#/definitions/handlers.IngestJobResponse'
+        type: array
+      months_requested:
+        type: integer
+    type: object
+  handlers.JobResponse:
+    properties:
+      created_at:
+        type: string
+      ended_at:
+        type: string
+      error:
+        type: string
+      id:
+        type: string
+      month:
+        type: integer
+      result:
+        items:
+          type: integer
+        type: array
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        type: string
+      updated_at:
+        type: string
+      year:
+        type: integer
+    type: object
+  handlers.ReferenceIngestConflictResponse:
+    properties:
+      dataset:
+        type: string
+      error:
+        type: string
+      job_type:
+        type: string
+    type: object
+  handlers.ReferenceIngestJobResponse:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        type: string
+    type: object
+  handlers.ReferenceIngestResponse:
+    properties:
+      job:
+        $ref: '#/definitions/handlers.ReferenceIngestJobResponse'
+    type: object
   handlers.StatusResponse:
     properties:
       status:
         type: string
+    type: object
+  model.ForceIngestRequest:
+    properties:
+      force:
+        type: boolean
+    type: object
+  model.IngestRequest:
+    properties:
+      end_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      end_year:
+        minimum: 2018
+        type: integer
+      force:
+        type: boolean
+      start_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      start_year:
+        minimum: 2018
+        type: integer
+    required:
+    - start_month
+    - start_year
+    type: object
+  model.JobStatus:
+    enum:
+    - pending
+    - running
+    - completed
+    - failed
+    type: string
+    x-enum-varnames:
+    - JobStatusPending
+    - JobStatusRunning
+    - JobStatusCompleted
+    - JobStatusFailed
+  model.YearMonth:
+    properties:
+      month:
+        type: integer
+      year:
+        type: integer
     type: object
   store.MigrationVersion:
     properties:
@@ -24,6 +153,209 @@ info:
   title: flight-tracker API
   version: "1.0"
 paths:
+  /api/v1/ingest:
+    post:
+      consumes:
+      - application/json
+      description: Queues one import job per month in the requested range. Omit end_year/end_month
+        for a single month. Set force=true to re-import months that already have data.
+      parameters:
+      - description: Ingest range
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.IngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.FlightScheduleIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue flight schedule data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/airports:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of airports reference data. An empty body is treated
+        as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue airports reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/countries:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of countries reference data. An empty body is
+        treated as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue countries reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/regions:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of regions reference data. An empty body is treated
+        as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue regions reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/jobs:
+    get:
+      description: Returns the most recent background jobs, newest first.
+      parameters:
+      - description: Max jobs to return (1-500, default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.JobResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List jobs
+      tags:
+      - jobs
+      - internal
+  /api/v1/jobs/{id}:
+    get:
+      description: Returns status and details for a background job. Flight-schedule
+        jobs include year and month when available.
+      parameters:
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.JobResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get job by ID
+      tags:
+      - jobs
+      - internal
   /db/version:
     get:
       description: Returns the current schema migration version and dirty flag.

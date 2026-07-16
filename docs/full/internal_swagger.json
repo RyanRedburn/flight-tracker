@@ -9,6 +9,307 @@
     "host": "localhost:8080",
     "basePath": "/",
     "paths": {
+        "/api/v1/ingest": {
+            "post": {
+                "description": "Queues one import job per month in the requested range. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue flight schedule data ingest",
+                "parameters": [
+                    {
+                        "description": "Ingest range",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.IngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.IngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.FlightScheduleIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ingest/airports": {
+            "post": {
+                "description": "Queues an import of airports reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue airports reference data ingest",
+                "parameters": [
+                    {
+                        "description": "Optional force flag",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/model.ForceIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ingest/countries": {
+            "post": {
+                "description": "Queues an import of countries reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue countries reference data ingest",
+                "parameters": [
+                    {
+                        "description": "Optional force flag",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/model.ForceIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ingest/regions": {
+            "post": {
+                "description": "Queues an import of regions reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue regions reference data ingest",
+                "parameters": [
+                    {
+                        "description": "Optional force flag",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/model.ForceIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/jobs": {
+            "get": {
+                "description": "Returns the most recent background jobs, newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs",
+                    "internal"
+                ],
+                "summary": "List jobs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Max jobs to return (1-500, default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.JobResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/jobs/{id}": {
+            "get": {
+                "description": "Returns status and details for a background job. Flight-schedule jobs include year and month when available.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs",
+                    "internal"
+                ],
+                "summary": "Get job by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.JobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/db/version": {
             "get": {
                 "description": "Returns the current schema migration version and dirty flag.",
@@ -94,11 +395,203 @@
                 }
             }
         },
+        "handlers.FlightScheduleIngestConflictResponse": {
+            "type": "object",
+            "properties": {
+                "active_ingest_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.YearMonth"
+                    }
+                },
+                "error": {
+                    "type": "string"
+                },
+                "existing_data_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.YearMonth"
+                    }
+                }
+            }
+        },
+        "handlers.IngestJobResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.IngestResponse": {
+            "type": "object",
+            "properties": {
+                "jobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.IngestJobResponse"
+                    }
+                },
+                "months_requested": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.JobResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "ended_at": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "result": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ReferenceIngestConflictResponse": {
+            "type": "object",
+            "properties": {
+                "dataset": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "job_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ReferenceIngestJobResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ReferenceIngestResponse": {
+            "type": "object",
+            "properties": {
+                "job": {
+                    "$ref": "#/definitions/handlers.ReferenceIngestJobResponse"
+                }
+            }
+        },
         "handlers.StatusResponse": {
             "type": "object",
             "properties": {
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "model.ForceIngestRequest": {
+            "type": "object",
+            "properties": {
+                "force": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "model.IngestRequest": {
+            "type": "object",
+            "required": [
+                "start_month",
+                "start_year"
+            ],
+            "properties": {
+                "end_month": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 1
+                },
+                "end_year": {
+                    "type": "integer",
+                    "minimum": 2018
+                },
+                "force": {
+                    "type": "boolean"
+                },
+                "start_month": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 1
+                },
+                "start_year": {
+                    "type": "integer",
+                    "minimum": 2018
+                }
+            }
+        },
+        "model.JobStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "JobStatusPending",
+                "JobStatusRunning",
+                "JobStatusCompleted",
+                "JobStatusFailed"
+            ]
+        },
+        "model.YearMonth": {
+            "type": "object",
+            "properties": {
+                "month": {
+                    "type": "integer"
+                },
+                "year": {
+                    "type": "integer"
                 }
             }
         },

@@ -22,7 +22,8 @@ func NewJobsHandler(s store.Store) *JobsHandler {
 	return &JobsHandler{store: s}
 }
 
-type jobResponse struct {
+// JobResponse is a background job as returned by the jobs API.
+type JobResponse struct {
 	ID        string          `json:"id"`
 	Type      string          `json:"type"`
 	Status    model.JobStatus `json:"status"`
@@ -36,57 +37,80 @@ type jobResponse struct {
 	EndedAt   *string         `json:"ended_at,omitempty"`
 }
 
+// Get returns a single job by ID.
+//
+//	@Summary		Get job by ID
+//	@Description	Returns status and details for a background job. Flight-schedule jobs include year and month when available.
+//	@Tags			jobs,internal
+//	@Produce		json
+//	@Param			id	path		string	true	"Job ID"
+//	@Success		200	{object}	JobResponse
+//	@Failure		400	{object}	ErrorResponse
+//	@Failure		404	{object}	ErrorResponse
+//	@Failure		500	{object}	ErrorResponse
+//	@Router			/api/v1/jobs/{id} [get]
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := query.ParseJobID(id); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	job, err := h.store.GetJob(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{jsonErrKey: "job not found"})
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "job not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to get job"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get job"})
 
 		return
 	}
 
 	resp, err := h.toJobResponse(r.Context(), job)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to load job details"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load job details"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// List returns recent jobs.
+//
+//	@Summary		List jobs
+//	@Description	Returns the most recent background jobs, newest first.
+//	@Tags			jobs,internal
+//	@Produce		json
+//	@Param			limit	query		int	false	"Max jobs to return (1-500, default 50)"
+//	@Success		200		{array}		JobResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/api/v1/jobs [get]
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit, err := query.ParseJobsList(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: err.Error()})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	jobs, err := h.store.ListJobs(r.Context(), limit)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to list jobs"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list jobs"})
 		return
 	}
 
 	if jobs == nil {
-		writeJSON(w, http.StatusOK, []jobResponse{})
+		writeJSON(w, http.StatusOK, []JobResponse{})
 		return
 	}
 
-	responses := make([]jobResponse, 0, len(jobs))
+	responses := make([]JobResponse, 0, len(jobs))
 	for _, job := range jobs {
 		resp, err := h.toJobResponse(r.Context(), job)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to load job details"})
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load job details"})
 			return
 		}
 
@@ -96,8 +120,8 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, responses)
 }
 
-func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (jobResponse, error) {
-	resp := jobResponse{
+func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobResponse, error) {
+	resp := JobResponse{
 		ID:        job.ID,
 		Type:      job.Type,
 		Status:    job.Status,
@@ -123,7 +147,7 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (jobRes
 
 	detail, err := h.store.GetBTSIngestJob(ctx, job.ID)
 	if err != nil {
-		return jobResponse{}, err
+		return JobResponse{}, err
 	}
 
 	year := detail.Year

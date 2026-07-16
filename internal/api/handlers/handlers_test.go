@@ -135,7 +135,7 @@ func TestJobsGetEnrichedBTSIngest(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 
-	var body jobResponse
+	var body JobResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestJobsList(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 
-	var jobs []jobResponse
+	var jobs []JobResponse
 	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}

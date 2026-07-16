@@ -19,24 +19,65 @@ func NewOurAirportsIngestHandler(s store.Store) *OurAirportsIngestHandler {
 	return &OurAirportsIngestHandler{store: s}
 }
 
-type ourAirportsIngestJobResponse struct {
+// ReferenceIngestJobResponse is the queued reference-data ingest job.
+type ReferenceIngestJobResponse struct {
 	ID     string          `json:"id"`
 	Type   string          `json:"type"`
 	Status model.JobStatus `json:"status"`
 }
 
-type ourAirportsIngestResponse struct {
-	Job ourAirportsIngestJobResponse `json:"job"`
+// ReferenceIngestResponse is returned after successfully queueing a reference-data ingest job.
+type ReferenceIngestResponse struct {
+	Job ReferenceIngestJobResponse `json:"job"`
 }
 
+// CreateCountries queues a countries reference data ingest job.
+//
+//	@Summary		Queue countries reference data ingest
+//	@Description	Queues an import of countries reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/api/v1/ingest/countries [post]
 func (h *OurAirportsIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, store.OurAirportsCountries)
 }
 
+// CreateRegions queues a regions reference data ingest job.
+//
+//	@Summary		Queue regions reference data ingest
+//	@Description	Queues an import of regions reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/api/v1/ingest/regions [post]
 func (h *OurAirportsIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, store.OurAirportsRegions)
 }
 
+// CreateAirports queues an airports reference data ingest job.
+//
+//	@Summary		Queue airports reference data ingest
+//	@Description	Queues an import of airports reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/api/v1/ingest/airports [post]
 func (h *OurAirportsIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, store.OurAirportsAirports)
 }
@@ -44,13 +85,13 @@ func (h *OurAirportsIngestHandler) CreateAirports(w http.ResponseWriter, r *http
 func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request, dataset store.OurAirportsDataset) {
 	var req model.ForceIngestRequest
 	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{jsonErrKey: "invalid json body"})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid json body"})
 		return
 	}
 
 	jobType, err := ourairports.JobType(dataset)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "invalid dataset"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "invalid dataset"})
 		return
 	}
 
@@ -58,14 +99,14 @@ func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request
 
 	active, err := h.store.ActiveIngestJob(ctx, jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to check active ingest jobs"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check active ingest jobs"})
 		return
 	}
 
 	if active {
-		writeJSON(w, http.StatusConflict, map[string]any{
-			jsonErrKey: "ingest job already pending or running for this dataset",
-			"job_type": jobType,
+		writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+			Error:   "ingest job already pending or running for this dataset",
+			JobType: jobType,
 		})
 
 		return
@@ -74,14 +115,14 @@ func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request
 	if !req.Force {
 		hasData, err := h.store.HasOurAirportsData(ctx, dataset)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to check existing data"})
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing data"})
 			return
 		}
 
 		if hasData {
-			writeJSON(w, http.StatusConflict, map[string]any{
-				jsonErrKey: "data already exists for this dataset; set force=true to re-import",
-				"dataset":  string(dataset),
+			writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+				Error:   "data already exists for this dataset; set force=true to re-import",
+				Dataset: string(dataset),
 			})
 
 			return
@@ -90,12 +131,12 @@ func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request
 
 	job, err := h.store.CreateOurAirportsIngestJob(ctx, jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{jsonErrKey: "failed to create ingest job"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create ingest job"})
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, ourAirportsIngestResponse{
-		Job: ourAirportsIngestJobResponse{
+	writeJSON(w, http.StatusCreated, ReferenceIngestResponse{
+		Job: ReferenceIngestJobResponse{
 			ID:     job.ID,
 			Type:   job.Type,
 			Status: job.Status,
