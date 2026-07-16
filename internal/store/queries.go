@@ -63,6 +63,12 @@ const (
 		INNER JOIN jobs j ON j.id = b.job_id
 		WHERE j.status IN (?, ?)`
 
+	QueryActiveIngestJob = `
+		SELECT 1
+		FROM jobs
+		WHERE type = ? AND status IN (?, ?)
+		LIMIT 1`
+
 	QueryMonthsWithOnTimeFlightData = `
 		SELECT 1
 		FROM on_time_flights
@@ -72,6 +78,14 @@ const (
 	QueryDeleteOnTimeFlightsByMonth = `
 		DELETE FROM on_time_flights
 		WHERE year = ? AND month = ?`
+
+	QueryDeleteAllCountries = `DELETE FROM countries`
+	QueryDeleteAllRegions   = `DELETE FROM regions`
+	QueryDeleteAllAirports  = `DELETE FROM airports`
+
+	QueryHasCountriesData = `SELECT 1 FROM countries LIMIT 1`
+	QueryHasRegionsData   = `SELECT 1 FROM regions LIMIT 1`
+	QueryHasAirportsData  = `SELECT 1 FROM airports LIMIT 1`
 
 	QueryMigrationVersion = `
 		SELECT version, dirty

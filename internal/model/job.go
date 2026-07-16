@@ -16,6 +16,12 @@ const (
 
 const JobTypeImportBTSOnTime = "import_bts_on_time"
 
+const (
+	JobTypeImportOurAirportsCountries = "import_ourairports_countries"
+	JobTypeImportOurAirportsRegions   = "import_ourairports_regions"
+	JobTypeImportOurAirportsAirports  = "import_ourairports_airports"
+)
+
 type Job struct {
 	ID        string          `json:"id"`
 	Type      string          `json:"type"`

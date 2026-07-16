@@ -57,6 +57,69 @@ func TestMemActiveBTSIngestMonths(t *testing.T) {
 	}
 }
 
+func TestMemActiveIngestJob(t *testing.T) {
+	ctx := context.Background()
+	s := New()
+
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active job before create")
+	}
+
+	if _, err := s.CreateBTSIngestJob(ctx, 2026, 1); err != nil {
+		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	}
+
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if !active {
+		t.Fatal("expected active job after create")
+	}
+
+	active, err = s.ActiveIngestJob(ctx, "other_job_type")
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active job for unrelated type")
+	}
+}
+
+func TestMemActiveIngestJobOurAirports(t *testing.T) {
+	ctx := context.Background()
+	s := New()
+
+	if _, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsCountries); err != nil {
+		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
+	}
+
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if !active {
+		t.Fatal("expected active ourairports countries job")
+	}
+
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsRegions)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active regions job when only countries is pending")
+	}
+}
+
 func TestMemCompleteJobStatusConflict(t *testing.T) {
 	ctx := context.Background()
 	s := New()

@@ -1,4 +1,4 @@
-package bts
+package csvparse
 
 import (
 	"encoding/csv"
@@ -13,7 +13,11 @@ var (
 	ErrUnexpectedCSV  = errors.New("unexpected csv row width")
 )
 
-func ParseCSV(r io.Reader) (columns []string, rows [][]string, err error) {
+// HeaderMapper converts a raw CSV header cell to a canonical column name.
+// Return an empty string to skip a header cell.
+type HeaderMapper func(raw string) string
+
+func Parse(r io.Reader, columns []string, mapper HeaderMapper) (cols []string, rows [][]string, err error) {
 	reader := csv.NewReader(r)
 	reader.ReuseRecord = true
 	reader.FieldsPerRecord = -1
@@ -23,12 +27,12 @@ func ParseCSV(r io.Reader) (columns []string, rows [][]string, err error) {
 		return nil, nil, fmt.Errorf("read csv header: %w", err)
 	}
 
-	indexByColumn, err := buildColumnIndex(header)
+	indexByColumn, err := buildColumnIndex(header, columns, mapper)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	columns = append([]string(nil), DBColumns...)
+	cols = append([]string(nil), columns...)
 	rows = make([][]string, 0, 1024)
 
 	for {
@@ -41,8 +45,8 @@ func ParseCSV(r io.Reader) (columns []string, rows [][]string, err error) {
 			return nil, nil, fmt.Errorf("read csv row: %w", err)
 		}
 
-		row := make([]string, len(DBColumns))
-		for i, col := range DBColumns {
+		row := make([]string, len(columns))
+		for i, col := range columns {
 			idx, ok := indexByColumn[col]
 			if !ok {
 				return nil, nil, fmt.Errorf("%w: %s", ErrMissingColumns, col)
@@ -58,14 +62,14 @@ func ParseCSV(r io.Reader) (columns []string, rows [][]string, err error) {
 		rows = append(rows, row)
 	}
 
-	return columns, rows, nil
+	return cols, rows, nil
 }
 
-func buildColumnIndex(header []string) (map[string]int, error) {
+func buildColumnIndex(header []string, columns []string, mapper HeaderMapper) (map[string]int, error) {
 	indexByColumn := make(map[string]int, len(header))
 
 	for i, raw := range header {
-		col := csvHeaderToColumn(raw)
+		col := mapper(raw)
 		if col == "" {
 			continue
 		}
@@ -77,7 +81,7 @@ func buildColumnIndex(header []string) (map[string]int, error) {
 		indexByColumn[col] = i
 	}
 
-	for _, required := range DBColumns {
+	for _, required := range columns {
 		if _, ok := indexByColumn[required]; !ok {
 			return nil, fmt.Errorf("%w: %s", ErrMissingColumns, required)
 		}

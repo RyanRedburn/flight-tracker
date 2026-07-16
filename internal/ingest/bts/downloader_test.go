@@ -137,28 +137,3 @@ func TestDownloaderFollowsRedirect(t *testing.T) {
 	}
 	defer cleanup()
 }
-
-func testRepoCSVPath(t *testing.T) string {
-	t.Helper()
-
-	path, err := TestdataCSV()
-	if err != nil {
-		t.Fatalf("TestdataCSV() error = %v", err)
-	}
-
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("testdata csv missing at %s: %v", path, err)
-	}
-
-	return path
-}
-
-func minimalCSVOpener(t *testing.T) CSVOpener {
-	t.Helper()
-
-	path := testRepoCSVPath(t)
-
-	return func(context.Context, int, int) (string, func(), error) {
-		return path, func() {}, nil
-	}
-}

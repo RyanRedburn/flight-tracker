@@ -110,8 +110,8 @@ func TestMigrationVersion(t *testing.T) {
 		t.Fatalf("MigrationVersion() error = %v", err)
 	}
 
-	if version.Version != 4 {
-		t.Errorf("Version = %d, want 4", version.Version)
+	if version.Version != 5 {
+		t.Errorf("Version = %d, want 5", version.Version)
 	}
 
 	if version.Dirty {

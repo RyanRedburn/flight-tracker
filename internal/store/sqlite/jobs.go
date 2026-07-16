@@ -221,6 +221,25 @@ func (s *Store) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMo
 	return active, rows.Err()
 }
 
+func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
+	var exists int
+
+	err := s.db.QueryRowContext(ctx, store.QueryActiveIngestJob,
+		jobType,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (s *Store) MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
 	var withData []model.YearMonth
 
@@ -267,40 +286,8 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 		return tx.Commit()
 	}
 
-	quotedCols := make([]string, len(columns))
-	for i, col := range columns {
-		quotedCols[i] = quoteSQLiteIdent(col)
-	}
-
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(columns)), ",")
-	insertSQL := fmt.Sprintf(
-		"INSERT INTO on_time_flights (%s) VALUES (%s)",
-		strings.Join(quotedCols, ", "),
-		placeholders,
-	)
-
-	const batchSize = 500
-
-	for start := 0; start < len(rows); start += batchSize {
-		end := start + batchSize
-		if end > len(rows) {
-			end = len(rows)
-		}
-
-		for _, row := range rows[start:end] {
-			if len(row) != len(columns) {
-				return fmt.Errorf("row width %d does not match columns %d", len(row), len(columns))
-			}
-
-			args := make([]any, len(row))
-			for i, v := range row {
-				args[i] = v
-			}
-
-			if _, err := tx.ExecContext(ctx, insertSQL, args...); err != nil {
-				return fmt.Errorf("insert row: %w", err)
-			}
-		}
+	if err := replaceTableRows(ctx, tx, "on_time_flights", columns, rows, false); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {

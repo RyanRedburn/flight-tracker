@@ -13,17 +13,19 @@ import (
 )
 
 type Config struct {
-	HTTPAddr           string        `env:"HTTP_ADDR" envDefault:":8080"`
-	DatabaseDriver     string        `env:"DATABASE_DRIVER" envDefault:"sqlite"`
-	DatabaseURL        string        `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
-	MigrationsPath     string        `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
-	WorkerConcurrency  int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
-	WorkerPollInterval time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
-	StaleJobThreshold  time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
-	BTSDownloadTimeout time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
-	BTSBaseURL         string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
-	MaxIngestMonths    int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
-	LogLevel           slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
+	HTTPAddr                   string        `env:"HTTP_ADDR" envDefault:":8080"`
+	DatabaseDriver             string        `env:"DATABASE_DRIVER" envDefault:"sqlite"`
+	DatabaseURL                string        `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
+	MigrationsPath             string        `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
+	WorkerConcurrency          int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
+	WorkerPollInterval         time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
+	StaleJobThreshold          time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
+	BTSDownloadTimeout         time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
+	BTSBaseURL                 string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
+	OurAirportsBaseURL         string        `env:"OURAIRPORTS_BASE_URL" envDefault:"https://raw.githubusercontent.com/davidmegginson/ourairports-data/main"`
+	OurAirportsDownloadTimeout time.Duration `env:"OURAIRPORTS_DOWNLOAD_TIMEOUT" envDefault:"5m"`
+	MaxIngestMonths            int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
+	LogLevel                   slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 }
 
 func Load() (Config, error) {
