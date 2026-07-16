@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -52,6 +53,61 @@ func TestNewRouterRoutes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSwaggerSpecSurfaces(t *testing.T) {
+	handler := newRouter(mem.New(), testLogger(), 24)
+
+	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
+	if _, ok := external["/api/v1/routes/stats"]; !ok {
+		t.Fatal("external spec missing /api/v1/routes/stats")
+	}
+	if _, ok := external["/api/v1/routes/outlook"]; !ok {
+		t.Fatal("external spec missing /api/v1/routes/outlook")
+	}
+	if _, ok := external["/api/v1/ingest"]; ok {
+		t.Fatal("external spec must not include /api/v1/ingest")
+	}
+	if _, ok := external["/health"]; ok {
+		t.Fatal("external spec must not include /health")
+	}
+
+	internal := fetchSwaggerPaths(t, handler, "/swagger/internal/doc.json")
+	for _, path := range []string{
+		"/health",
+		"/api/v1/ingest",
+		"/api/v1/jobs",
+		"/api/v1/routes/stats",
+		"/api/v1/routes/outlook",
+	} {
+		if _, ok := internal[path]; !ok {
+			t.Fatalf("internal spec missing %s", path)
+		}
+	}
+}
+
+func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[string]json.RawMessage {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%s status = %d, want %d; body=%s", path, rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var spec struct {
+		Paths map[string]json.RawMessage `json:"paths"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	if spec.Paths == nil {
+		t.Fatalf("%s has nil paths", path)
+	}
+
+	return spec.Paths
 }
 
 func TestServerShutdown(t *testing.T) {

@@ -57,6 +57,13 @@ Regenerate docs after changing swag annotations (uses pinned `swag` `v1.16.6` vi
 make swagger
 ```
 
+Visibility is controlled by swag tags on each handler:
+
+- `external` — included in the user-facing `/swagger/` docs (currently route stats and outlook only)
+- `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
+
+After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`.
+
 ### Tests
 
 ```bash
