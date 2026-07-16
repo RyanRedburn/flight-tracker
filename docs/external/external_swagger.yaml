@@ -1,0 +1,282 @@
+basePath: /
+definitions:
+  handlers.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  model.AirportCount:
+    properties:
+      airport:
+        type: string
+      count:
+        type: integer
+    type: object
+  model.CancellationCodeCount:
+    properties:
+      code:
+        type: string
+      count:
+        type: integer
+    type: object
+  model.DelayCausesAvgMinutes:
+    properties:
+      carrier:
+        type: number
+      late_aircraft:
+        type: number
+      nas:
+        type: number
+      security:
+        type: number
+      weather:
+        type: number
+    type: object
+  model.RouteOutlook:
+    properties:
+      analysis_end:
+        type: string
+      analysis_start:
+        type: string
+      cancellation_probability:
+        type: number
+      carrier:
+        type: string
+      day_of_week:
+        type: integer
+      delay_probability:
+        type: number
+      dep_time:
+        type: string
+      dep_time_window_minutes:
+        type: integer
+      dest:
+        type: string
+      diversion_probability:
+        type: number
+      insufficient_sample:
+        type: boolean
+      likely_arrival_delay_minutes:
+        type: number
+      likely_arrival_delay_when_delayed:
+        type: number
+      likely_departure_delay_minutes:
+        type: number
+      median_arrival_delay_minutes:
+        type: number
+      median_arrival_delay_when_delayed:
+        type: number
+      on_time_probability:
+        type: number
+      origin:
+        type: string
+      sample_size:
+        type: integer
+    type: object
+  model.RouteStats:
+    properties:
+      avg_arrival_delay_minutes:
+        type: number
+      avg_arrival_delay_when_delayed:
+        type: number
+      avg_departure_delay_minutes:
+        type: number
+      avg_departure_delay_when_delayed:
+        type: number
+      cancellation_codes:
+        items:
+          $ref: '#/definitions/model.CancellationCodeCount'
+        type: array
+      cancellation_rate:
+        type: number
+      cancelled:
+        type: integer
+      delay_causes_avg_minutes:
+        $ref: '#/definitions/model.DelayCausesAvgMinutes'
+      delay_rate:
+        type: number
+      delayed:
+        type: integer
+      dest:
+        type: string
+      diversion_airports:
+        items:
+          $ref: '#/definitions/model.AirportCount'
+        type: array
+      diversion_rate:
+        type: number
+      diverted:
+        type: integer
+      end_date:
+        type: string
+      filters:
+        $ref: '#/definitions/model.RouteStatsFilters'
+      flights:
+        type: integer
+      median_arrival_delay_minutes:
+        type: number
+      median_arrival_delay_when_delayed:
+        type: number
+      on_time:
+        type: integer
+      on_time_rate:
+        type: number
+      origin:
+        type: string
+      start_date:
+        type: string
+    type: object
+  model.RouteStatsFilters:
+    properties:
+      carrier:
+        type: string
+      days_of_week:
+        items:
+          type: integer
+        type: array
+      flight_number:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for flight data ingest, job status, and route performance.
+  title: flight-tracker API
+  version: "1.0"
+paths:
+  /api/v1/routes/outlook:
+    get:
+      description: On-time, delay, cancellation, and diversion probabilities for a
+        carrier/route/day/departure-time window, based on the trailing analysis period.
+        Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time
+        as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120).
+      parameters:
+      - description: Origin airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: origin
+        required: true
+        type: string
+      - description: Destination airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: dest
+        required: true
+        type: string
+      - description: Marketing carrier code
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        required: true
+        type: string
+      - description: Day of week (1=Mon … 7=Sun)
+        in: query
+        maximum: 7
+        minimum: 1
+        name: day_of_week
+        required: true
+        type: integer
+      - description: Scheduled departure time (HHmm)
+        in: query
+        name: dep_time
+        required: true
+        type: string
+      - description: Minutes around dep_time to include (default 30, max 120)
+        in: query
+        maximum: 120
+        minimum: 1
+        name: dep_time_window_minutes
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RouteOutlook'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Route booking outlook
+      tags:
+      - routes
+      - external
+  /api/v1/routes/stats:
+    get:
+      description: Aggregated on-time, delay, cancellation, and diversion stats for
+        a route over a date range (max 366 days). Origin and dest are 3-letter airport
+        codes. Days of week use 1=Monday through 7=Sunday.
+      parameters:
+      - description: Origin airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: origin
+        required: true
+        type: string
+      - description: Destination airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: dest
+        required: true
+        type: string
+      - description: Range start (YYYY-MM-DD)
+        format: date
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: Range end (YYYY-MM-DD), on or after start_date
+        format: date
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - description: Marketing carrier code (required if flight_number is set)
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        type: string
+      - description: Flight number (requires carrier)
+        in: query
+        name: flight_number
+        type: string
+      - collectionFormat: multi
+        description: Filter to these weekdays (1=Mon … 7=Sun)
+        in: query
+        items:
+          type: integer
+        maximum: 7
+        minimum: 1
+        name: days_of_week
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RouteStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Route performance stats
+      tags:
+      - routes
+      - external
+swagger: "2.0"

@@ -64,7 +64,7 @@ func TestOurAirportsIngestCreateCountries(t *testing.T) {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var resp ourAirportsIngestResponse
+	var resp ReferenceIngestResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestOurAirportsIngestCreateRegionsAndAirports(t *testing.T) {
 				t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 			}
 
-			var resp ourAirportsIngestResponse
+			var resp ReferenceIngestResponse
 			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 				t.Fatalf("decode body: %v", err)
 			}

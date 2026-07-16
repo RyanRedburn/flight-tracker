@@ -1,3 +1,22 @@
+// Package main is the flight-tracker HTTP server entrypoint.
+//
+//	@title						flight-tracker API
+//	@version					1.0
+//	@description				REST API for flight data ingest, job status, and route performance.
+//	@host						localhost:8080
+//	@BasePath					/
+//
+//	@tag.name					health
+//	@tag.description			Liveness, readiness, and database migration version
+//	@tag.name					ingest
+//	@tag.description			Queue flight schedule and reference data import jobs
+//	@tag.name					jobs
+//	@tag.description			Inspect background job status
+//	@tag.name					routes
+//	@tag.description			Route performance stats and booking outlook
+//
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/external --instanceName external --tags external --parseDependency --parseInternal
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/full --instanceName internal --parseDependency --parseInternal
 package main
 
 import (

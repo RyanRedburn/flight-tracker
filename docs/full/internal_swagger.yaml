@@ -1,0 +1,686 @@
+basePath: /
+definitions:
+  handlers.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handlers.FlightScheduleIngestConflictResponse:
+    properties:
+      active_ingest_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+      error:
+        type: string
+      existing_data_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+    type: object
+  handlers.IngestJobResponse:
+    properties:
+      id:
+        type: string
+      month:
+        type: integer
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      year:
+        type: integer
+    type: object
+  handlers.IngestResponse:
+    properties:
+      jobs:
+        items:
+          $ref: '#/definitions/handlers.IngestJobResponse'
+        type: array
+      months_requested:
+        type: integer
+    type: object
+  handlers.JobResponse:
+    properties:
+      created_at:
+        type: string
+      ended_at:
+        type: string
+      error:
+        type: string
+      id:
+        type: string
+      month:
+        type: integer
+      result:
+        items:
+          type: integer
+        type: array
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        type: string
+      updated_at:
+        type: string
+      year:
+        type: integer
+    type: object
+  handlers.ReferenceIngestConflictResponse:
+    properties:
+      dataset:
+        type: string
+      error:
+        type: string
+      job_type:
+        type: string
+    type: object
+  handlers.ReferenceIngestJobResponse:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        type: string
+    type: object
+  handlers.ReferenceIngestResponse:
+    properties:
+      job:
+        $ref: '#/definitions/handlers.ReferenceIngestJobResponse'
+    type: object
+  handlers.StatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  model.AirportCount:
+    properties:
+      airport:
+        type: string
+      count:
+        type: integer
+    type: object
+  model.CancellationCodeCount:
+    properties:
+      code:
+        type: string
+      count:
+        type: integer
+    type: object
+  model.DelayCausesAvgMinutes:
+    properties:
+      carrier:
+        type: number
+      late_aircraft:
+        type: number
+      nas:
+        type: number
+      security:
+        type: number
+      weather:
+        type: number
+    type: object
+  model.ForceIngestRequest:
+    properties:
+      force:
+        type: boolean
+    type: object
+  model.IngestRequest:
+    properties:
+      end_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      end_year:
+        minimum: 2018
+        type: integer
+      force:
+        type: boolean
+      start_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      start_year:
+        minimum: 2018
+        type: integer
+    required:
+    - start_month
+    - start_year
+    type: object
+  model.JobStatus:
+    enum:
+    - pending
+    - running
+    - completed
+    - failed
+    type: string
+    x-enum-varnames:
+    - JobStatusPending
+    - JobStatusRunning
+    - JobStatusCompleted
+    - JobStatusFailed
+  model.RouteOutlook:
+    properties:
+      analysis_end:
+        type: string
+      analysis_start:
+        type: string
+      cancellation_probability:
+        type: number
+      carrier:
+        type: string
+      day_of_week:
+        type: integer
+      delay_probability:
+        type: number
+      dep_time:
+        type: string
+      dep_time_window_minutes:
+        type: integer
+      dest:
+        type: string
+      diversion_probability:
+        type: number
+      insufficient_sample:
+        type: boolean
+      likely_arrival_delay_minutes:
+        type: number
+      likely_arrival_delay_when_delayed:
+        type: number
+      likely_departure_delay_minutes:
+        type: number
+      median_arrival_delay_minutes:
+        type: number
+      median_arrival_delay_when_delayed:
+        type: number
+      on_time_probability:
+        type: number
+      origin:
+        type: string
+      sample_size:
+        type: integer
+    type: object
+  model.RouteStats:
+    properties:
+      avg_arrival_delay_minutes:
+        type: number
+      avg_arrival_delay_when_delayed:
+        type: number
+      avg_departure_delay_minutes:
+        type: number
+      avg_departure_delay_when_delayed:
+        type: number
+      cancellation_codes:
+        items:
+          $ref: '#/definitions/model.CancellationCodeCount'
+        type: array
+      cancellation_rate:
+        type: number
+      cancelled:
+        type: integer
+      delay_causes_avg_minutes:
+        $ref: '#/definitions/model.DelayCausesAvgMinutes'
+      delay_rate:
+        type: number
+      delayed:
+        type: integer
+      dest:
+        type: string
+      diversion_airports:
+        items:
+          $ref: '#/definitions/model.AirportCount'
+        type: array
+      diversion_rate:
+        type: number
+      diverted:
+        type: integer
+      end_date:
+        type: string
+      filters:
+        $ref: '#/definitions/model.RouteStatsFilters'
+      flights:
+        type: integer
+      median_arrival_delay_minutes:
+        type: number
+      median_arrival_delay_when_delayed:
+        type: number
+      on_time:
+        type: integer
+      on_time_rate:
+        type: number
+      origin:
+        type: string
+      start_date:
+        type: string
+    type: object
+  model.RouteStatsFilters:
+    properties:
+      carrier:
+        type: string
+      days_of_week:
+        items:
+          type: integer
+        type: array
+      flight_number:
+        type: string
+    type: object
+  model.YearMonth:
+    properties:
+      month:
+        type: integer
+      year:
+        type: integer
+    type: object
+  store.MigrationVersion:
+    properties:
+      dirty:
+        type: boolean
+      version:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for flight data ingest, job status, and route performance.
+  title: flight-tracker API
+  version: "1.0"
+paths:
+  /api/v1/ingest:
+    post:
+      consumes:
+      - application/json
+      description: Queues one import job per month in the requested range. Omit end_year/end_month
+        for a single month. Set force=true to re-import months that already have data.
+      parameters:
+      - description: Ingest range
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.IngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.FlightScheduleIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue flight schedule data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/airports:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of airports reference data. An empty body is treated
+        as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue airports reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/countries:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of countries reference data. An empty body is
+        treated as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue countries reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/regions:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of regions reference data. An empty body is treated
+        as {"force":false}. Set force=true to replace existing data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue regions reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/jobs:
+    get:
+      description: Returns the most recent background jobs, newest first.
+      parameters:
+      - description: Max jobs to return (1-500, default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.JobResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: List jobs
+      tags:
+      - jobs
+      - internal
+  /api/v1/jobs/{id}:
+    get:
+      description: Returns status and details for a background job. Flight-schedule
+        jobs include year and month when available.
+      parameters:
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.JobResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get job by ID
+      tags:
+      - jobs
+      - internal
+  /api/v1/routes/outlook:
+    get:
+      description: On-time, delay, cancellation, and diversion probabilities for a
+        carrier/route/day/departure-time window, based on the trailing analysis period.
+        Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time
+        as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120).
+      parameters:
+      - description: Origin airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: origin
+        required: true
+        type: string
+      - description: Destination airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: dest
+        required: true
+        type: string
+      - description: Marketing carrier code
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        required: true
+        type: string
+      - description: Day of week (1=Mon … 7=Sun)
+        in: query
+        maximum: 7
+        minimum: 1
+        name: day_of_week
+        required: true
+        type: integer
+      - description: Scheduled departure time (HHmm)
+        in: query
+        name: dep_time
+        required: true
+        type: string
+      - description: Minutes around dep_time to include (default 30, max 120)
+        in: query
+        maximum: 120
+        minimum: 1
+        name: dep_time_window_minutes
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RouteOutlook'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Route booking outlook
+      tags:
+      - routes
+      - external
+  /api/v1/routes/stats:
+    get:
+      description: Aggregated on-time, delay, cancellation, and diversion stats for
+        a route over a date range (max 366 days). Origin and dest are 3-letter airport
+        codes. Days of week use 1=Monday through 7=Sunday.
+      parameters:
+      - description: Origin airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: origin
+        required: true
+        type: string
+      - description: Destination airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: dest
+        required: true
+        type: string
+      - description: Range start (YYYY-MM-DD)
+        format: date
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: Range end (YYYY-MM-DD), on or after start_date
+        format: date
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - description: Marketing carrier code (required if flight_number is set)
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        type: string
+      - description: Flight number (requires carrier)
+        in: query
+        name: flight_number
+        type: string
+      - collectionFormat: multi
+        description: Filter to these weekdays (1=Mon … 7=Sun)
+        in: query
+        items:
+          type: integer
+        maximum: 7
+        minimum: 1
+        name: days_of_week
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RouteStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Route performance stats
+      tags:
+      - routes
+      - external
+  /db/version:
+    get:
+      description: Returns the current schema migration version and dirty flag.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/store.MigrationVersion'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Database migration version
+      tags:
+      - health
+      - internal
+  /health:
+    get:
+      description: Returns ok when the HTTP server is up. Does not check the database.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+      summary: Liveness probe
+      tags:
+      - health
+      - internal
+  /ready:
+    get:
+      description: Returns ready when the database is reachable; otherwise returns
+        503.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - health
+      - internal
+swagger: "2.0"
+tags:
+- description: Liveness, readiness, and database migration version
+  name: health
+- description: Queue flight schedule and reference data import jobs
+  name: ingest
+- description: Inspect background job status
+  name: jobs
+- description: Route performance stats and booking outlook
+  name: routes

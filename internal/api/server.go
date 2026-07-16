@@ -6,12 +6,15 @@ import (
 	"net/http"
 	"time"
 
+	_ "github.com/RyanRedburn/flight-tracker/docs/external"
+	_ "github.com/RyanRedburn/flight-tracker/docs/full"
 	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
 	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 type Server struct {
@@ -28,6 +31,14 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.RequestLog(logger))
+
+	// Register the more specific internal UI path before /swagger/*.
+	r.Get("/swagger/internal/*", httpSwagger.Handler(
+		httpSwagger.InstanceName("internal"),
+	))
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.InstanceName("external"),
+	))
 
 	r.Get("/health", health.Liveness)
 	r.Get("/ready", health.Readiness)
