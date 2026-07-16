@@ -62,12 +62,15 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
 		t.Fatal("external spec missing /api/v1/routes/stats")
 	}
+
 	if _, ok := external["/api/v1/routes/outlook"]; !ok {
 		t.Fatal("external spec missing /api/v1/routes/outlook")
 	}
+
 	if _, ok := external["/api/v1/ingest"]; ok {
 		t.Fatal("external spec must not include /api/v1/ingest")
 	}
+
 	if _, ok := external["/health"]; ok {
 		t.Fatal("external spec must not include /health")
 	}
@@ -103,6 +106,7 @@ func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[stri
 	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
 		t.Fatalf("decode %s: %v", path, err)
 	}
+
 	if spec.Paths == nil {
 		t.Fatalf("%s has nil paths", path)
 	}

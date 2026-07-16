@@ -15,8 +15,6 @@ func NewHealthHandler(s store.Store) *HealthHandler {
 	return &HealthHandler{store: s}
 }
 
-const jsonErrKey = "error"
-
 // Liveness reports that the process is running.
 //
 //	@Summary		Liveness probe
