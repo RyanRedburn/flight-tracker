@@ -8,7 +8,112 @@
     },
     "host": "localhost:8080",
     "basePath": "/",
-    "paths": {},
+    "paths": {
+        "/db/version": {
+            "get": {
+                "description": "Returns the current schema migration version and dirty flag.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health",
+                    "internal"
+                ],
+                "summary": "Database migration version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/store.MigrationVersion"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns ok when the HTTP server is up. Does not check the database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health",
+                    "internal"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Returns ready when the database is reachable; otherwise returns 503.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health",
+                    "internal"
+                ],
+                "summary": "Readiness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.StatusResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.StatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.MigrationVersion": {
+            "type": "object",
+            "properties": {
+                "dirty": {
+                    "type": "boolean"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        }
+    },
     "tags": [
         {
             "description": "Liveness, readiness, and database migration version",

@@ -15,8 +15,8 @@
 //	@tag.name					routes
 //	@tag.description			Route performance stats and booking outlook
 //
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -o ../../docs/external --instanceName external --tags external --parseDependency --parseInternal
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -o ../../docs/full --instanceName internal --parseDependency --parseInternal
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/external --instanceName external --tags external --parseDependency --parseInternal
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/full --instanceName internal --parseDependency --parseInternal
 package main
 
 import (

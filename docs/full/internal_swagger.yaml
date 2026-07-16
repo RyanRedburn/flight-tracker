@@ -1,11 +1,80 @@
 basePath: /
+definitions:
+  handlers.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handlers.StatusResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  store.MigrationVersion:
+    properties:
+      dirty:
+        type: boolean
+      version:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
   description: REST API for flight data ingest, job status, and route performance.
   title: flight-tracker API
   version: "1.0"
-paths: {}
+paths:
+  /db/version:
+    get:
+      description: Returns the current schema migration version and dirty flag.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/store.MigrationVersion'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Database migration version
+      tags:
+      - health
+      - internal
+  /health:
+    get:
+      description: Returns ok when the HTTP server is up. Does not check the database.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+      summary: Liveness probe
+      tags:
+      - health
+      - internal
+  /ready:
+    get:
+      description: Returns ready when the database is reachable; otherwise returns
+        503.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StatusResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Readiness probe
+      tags:
+      - health
+      - internal
 swagger: "2.0"
 tags:
 - description: Liveness, readiness, and database migration version
