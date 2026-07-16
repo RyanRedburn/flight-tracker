@@ -33,11 +33,13 @@ func TestProcessorProcessSuccess(t *testing.T) {
 	result := json.RawMessage(`{"ok":true}`)
 
 	var completedID string
+
 	var completedResult json.RawMessage
 
 	st := &storetest.Stub{
 		CompleteJobFn: func(_ context.Context, id string, res json.RawMessage) error {
 			completedID = id
+
 			completedResult = append(json.RawMessage(nil), res...)
 
 			return nil

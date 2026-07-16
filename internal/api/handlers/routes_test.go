@@ -12,12 +12,17 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
+const (
+	testOriginORD = "ORD"
+	testDestLAX   = "LAX"
+)
+
 func TestRoutesStats(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
-				Origin:    "ORD",
-				Dest:      "LAX",
+				Origin:    testOriginORD,
+				Dest:      testDestLAX,
 				Flights:   5,
 				OnTime:    2,
 				Delayed:   1,
@@ -67,8 +72,8 @@ func TestRoutesStatsEmpty(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
-				Origin:            "ORD",
-				Dest:              "LAX",
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
 				DiversionAirports: []model.AirportCount{},
 				CancellationCodes: []model.CancellationCodeCount{},
 			}, nil
@@ -109,8 +114,8 @@ func TestRoutesOutlook(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			return &model.RouteOutlook{
-				Origin:             "ORD",
-				Dest:               "LAX",
+				Origin:             testOriginORD,
+				Dest:               testDestLAX,
 				Carrier:            "UA",
 				DayOfWeek:          3,
 				DepTime:            "0700",

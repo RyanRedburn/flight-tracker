@@ -64,7 +64,9 @@ func postIngest(t *testing.T, h *IngestHandler, body any) *httptest.ResponseReco
 
 func TestIngestSingleMonth(t *testing.T) {
 	st := ingestSuccessStub()
+
 	var createdYear, createdMonth int
+
 	st.CreateBTSIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
 		createdYear, createdMonth = year, month
 		now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
@@ -117,7 +119,9 @@ func TestIngestSingleMonth(t *testing.T) {
 
 func TestIngestRange(t *testing.T) {
 	st := ingestSuccessStub()
+
 	var createCalls int
+
 	st.CreateBTSIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
 		createCalls++
 		now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)

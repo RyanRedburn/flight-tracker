@@ -12,6 +12,7 @@ func TestServiceImportMonth(t *testing.T) {
 	ctx := context.Background()
 
 	var gotYear, gotMonth int
+
 	var gotRows int
 
 	st := &storetest.Stub{

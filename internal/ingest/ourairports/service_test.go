@@ -52,6 +52,7 @@ func TestServiceImportDatasets(t *testing.T) {
 	for _, dataset := range datasets {
 		t.Run(string(dataset), func(t *testing.T) {
 			var replaced store.OurAirportsDataset
+
 			var gotRows int
 
 			st := &storetest.Stub{

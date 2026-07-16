@@ -109,6 +109,7 @@ func TestJobsGetNotFound(t *testing.T) {
 
 func TestJobsGetEnrichedBTSIngest(t *testing.T) {
 	const jobID = "job-bts-1"
+
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 	h := NewJobsHandler(&storetest.Stub{

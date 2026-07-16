@@ -39,6 +39,7 @@ func TestBTSIngestHandlerProcess(t *testing.T) {
 	ctx := context.Background()
 
 	var replaceYear, replaceMonth int
+
 	var replaceRows int
 
 	st := &storetest.Stub{

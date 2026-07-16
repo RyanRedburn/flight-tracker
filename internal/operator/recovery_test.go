@@ -15,6 +15,7 @@ func TestRecoverStaleJobs(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	var gotCutoff time.Time
+
 	var called bool
 
 	st := &storetest.Stub{
@@ -27,9 +28,11 @@ func TestRecoverStaleJobs(t *testing.T) {
 	}
 
 	before := time.Now().UTC()
+
 	if err := RecoverStaleJobs(ctx, st, time.Hour, logger); err != nil {
 		t.Fatalf("RecoverStaleJobs() error = %v", err)
 	}
+
 	after := time.Now().UTC()
 
 	if !called {
