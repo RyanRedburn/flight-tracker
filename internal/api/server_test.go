@@ -37,6 +37,8 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},
+		{http.MethodGet, "/swagger/index.html", http.StatusOK},
+		{http.MethodGet, "/swagger/internal/index.html", http.StatusOK},
 	}
 
 	for _, tt := range tests {

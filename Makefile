@@ -1,4 +1,4 @@
-.PHONY: lint test test-all test-cover-html docker-build docker-run migrate-up migrate-down migrate-version db-shell clean-cover
+.PHONY: lint test test-all test-cover-html docker-build docker-run migrate-up migrate-down migrate-version db-shell clean-cover swagger
 
 # SQLite driver requires CGO; export works on Unix and Windows (GNU Make).
 export CGO_ENABLED := 1
@@ -6,8 +6,15 @@ export CGO_ENABLED := 1
 # Packages that do not import the SQLite driver (no C compiler required).
 TEST_UNIT_PKGS := ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/model/... ./internal/store ./internal/store/mem/...
 
+# Pin must match //go:generate in cmd/server/main.go and CI swagger workflow.
+SWAG_VERSION := v1.16.6
+
 lint:
 	golangci-lint run
+
+# Regenerate external + full (internal) OpenAPI docs via go:generate.
+swagger:
+	go generate ./cmd/server/...
 
 # Cross-platform unit tests (no C compiler required).
 test:

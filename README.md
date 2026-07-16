@@ -27,6 +27,7 @@ Go service with a REST API and an in-process background worker for importing BTS
 | Command | Description |
 | --------- | ------------- |
 | `make lint` | Run golangci-lint (uses `.golangci.yml`) |
+| `make swagger` | Regenerate OpenAPI docs (`docs/external`, `docs/full`) via `go generate` |
 | `make test` | Unit tests only — no C compiler required |
 | `make test-all` | Full suite including SQLite integration tests (requires CGO/gcc) |
 | `make test-cover-html` | Full suite with HTML coverage report (`coverage.html`) |
@@ -43,6 +44,17 @@ Go service with a REST API and an in-process background worker for importing BTS
 ```bash
 # Requires CGO (gcc). On Windows without a C compiler, use Docker instead.
 CGO_ENABLED=1 go run ./cmd/server
+```
+
+Swagger UI (after the server is running):
+
+- External (user-facing): [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
+- Internal (full API): [http://localhost:8080/swagger/internal/index.html](http://localhost:8080/swagger/internal/index.html)
+
+Regenerate docs after changing swag annotations (uses pinned `swag` `v1.16.6` via `go run`, no global install required):
+
+```bash
+make swagger
 ```
 
 ### Tests
@@ -207,6 +219,8 @@ migrate -path migrations/sqlite -database "sqlite3://./flight-tracker.db" up
 
 ```text
 cmd/server/           Entry point
+docs/external/        Generated OpenAPI (user-facing / external Swagger)
+docs/full/            Generated OpenAPI (full / internal Swagger)
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
 internal/database/    Store factory (driver selection)

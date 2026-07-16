@@ -1,0 +1,18 @@
+basePath: /
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for flight data ingest, job status, and route performance.
+  title: flight-tracker API
+  version: "1.0"
+paths: {}
+swagger: "2.0"
+tags:
+- description: Liveness, readiness, and database migration version
+  name: health
+- description: Queue flight schedule and reference data import jobs
+  name: ingest
+- description: Inspect background job status
+  name: jobs
+- description: Route performance stats and booking outlook
+  name: routes
