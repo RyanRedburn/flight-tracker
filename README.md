@@ -2,6 +2,7 @@
 
 ![Lint](https://github.com/RyanRedburn/flight-tracker/actions/workflows/lint.yml/badge.svg?branch=main)
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
+![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
 Go service with a REST API and an in-process background worker for importing BTS on-time flight data and OurAirports reference data (countries, regions, airports).
 
@@ -62,7 +63,7 @@ Visibility is controlled by swag tags on each handler:
 - `external` — included in the user-facing `/swagger/` docs (currently route stats and outlook only)
 - `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
 
-After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`.
+After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
 
 ### Tests
 

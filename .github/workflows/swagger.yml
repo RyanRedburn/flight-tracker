@@ -1,0 +1,26 @@
+name: Swagger
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  swagger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      # Regenerates docs/external and docs/full via go:generate (swag v1.16.6).
+      - name: Regenerate OpenAPI docs
+        run: make swagger
+      - name: Check swagger docs are up to date
+        run: |
+          if ! git diff --exit-code -- docs/; then
+            echo "::error::Swagger docs are out of date. Run 'make swagger' and commit the changes under docs/."
+            git --no-pager diff -- docs/
+            exit 1
+          fi
