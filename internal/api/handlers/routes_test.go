@@ -1,56 +1,37 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func newTestRoutesHandler(t *testing.T) *RoutesHandler {
-	t.Helper()
-
-	s := mem.New()
-	s.SetOnTimeFlights([]*model.OnTimeFlight{
-		{
-			FlightDate: testFlightDate20260401, DayOfWeek: "3", Origin: testAirportORD, Dest: testAirportLAX,
-			IATA_Code_Marketing_Airline: "UA", Flight_Number_Marketing_Airline: "100",
-			CRSDepTime: "0700", ArrDelayMinutes: testFloatNo, DepDelayMinutes: testFloatNo,
-			ArrDel15: testFloatNo, Cancelled: testFloatNo, Diverted: testFloatNo,
-		},
-		{
-			FlightDate: "2026-04-08", DayOfWeek: "3", Origin: testAirportORD, Dest: testAirportLAX,
-			IATA_Code_Marketing_Airline: "UA", Flight_Number_Marketing_Airline: "100",
-			CRSDepTime: "0705", ArrDelayMinutes: "25.00", DepDelayMinutes: "10.00",
-			ArrDel15: testFloatYes, Cancelled: testFloatNo, Diverted: testFloatNo,
-			CarrierDelay: "25.00",
-		},
-		{
-			FlightDate: "2026-04-15", DayOfWeek: "3", Origin: testAirportORD, Dest: testAirportLAX,
-			IATA_Code_Marketing_Airline: "UA", Flight_Number_Marketing_Airline: "100",
-			CRSDepTime: "0710", ArrDelayMinutes: testFloatNo, DepDelayMinutes: testFloatNo,
-			ArrDel15: testFloatNo, Cancelled: testFloatNo, Diverted: testFloatNo,
-		},
-		{
-			FlightDate: "2026-04-02", DayOfWeek: "4", Origin: testAirportORD, Dest: testAirportLAX,
-			IATA_Code_Marketing_Airline: "UA", Flight_Number_Marketing_Airline: "100",
-			CRSDepTime: "0700", Cancelled: testFloatYes, CancellationCode: "A", Diverted: testFloatNo,
-		},
-		{
-			FlightDate: "2026-04-03", DayOfWeek: "5", Origin: testAirportORD, Dest: testAirportLAX,
-			IATA_Code_Marketing_Airline: "UA", Flight_Number_Marketing_Airline: "100",
-			CRSDepTime: "0700", Cancelled: testFloatNo, Diverted: testFloatYes, Div1Airport: "MDW",
+func TestRoutesStats(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				Origin:    "ORD",
+				Dest:      "LAX",
+				Flights:   5,
+				OnTime:    2,
+				Delayed:   1,
+				Cancelled: 1,
+				Diverted:  1,
+				DiversionAirports: []model.AirportCount{
+					{Airport: "MDW", Count: 1},
+				},
+				CancellationCodes: []model.CancellationCodeCount{
+					{Code: "A", Count: 1},
+				},
+			}, nil
 		},
 	})
-
-	return NewRoutesHandler(s)
-}
-
-func TestRoutesStats(t *testing.T) {
-	h := newTestRoutesHandler(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ord&dest=lax&start_date=2026-04-01&end_date=2026-04-30&carrier=ua", nil)
 	rec := httptest.NewRecorder()
@@ -83,7 +64,16 @@ func TestRoutesStats(t *testing.T) {
 }
 
 func TestRoutesStatsEmpty(t *testing.T) {
-	h := NewRoutesHandler(mem.New())
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				Origin:            "ORD",
+				Dest:              "LAX",
+				DiversionAirports: []model.AirportCount{},
+				CancellationCodes: []model.CancellationCodeCount{},
+			}, nil
+		},
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
 	rec := httptest.NewRecorder()
@@ -104,7 +94,7 @@ func TestRoutesStatsEmpty(t *testing.T) {
 }
 
 func TestRoutesStatsBadRequest(t *testing.T) {
-	h := newTestRoutesHandler(t)
+	h := NewRoutesHandler(&storetest.Stub{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX", nil)
 	rec := httptest.NewRecorder()
@@ -116,7 +106,20 @@ func TestRoutesStatsBadRequest(t *testing.T) {
 }
 
 func TestRoutesOutlook(t *testing.T) {
-	h := newTestRoutesHandler(t)
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return &model.RouteOutlook{
+				Origin:             "ORD",
+				Dest:               "LAX",
+				Carrier:            "UA",
+				DayOfWeek:          3,
+				DepTime:            "0700",
+				SampleSize:         3,
+				InsufficientSample: true,
+				AnalysisEnd:        "2026-04-15",
+			}, nil
+		},
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
 	rec := httptest.NewRecorder()
@@ -145,7 +148,7 @@ func TestRoutesOutlook(t *testing.T) {
 }
 
 func TestRoutesOutlookBadRequest(t *testing.T) {
-	h := newTestRoutesHandler(t)
+	h := NewRoutesHandler(&storetest.Stub{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3", nil)
 	rec := httptest.NewRecorder()

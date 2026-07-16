@@ -7,18 +7,33 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func newTestOurAirportsIngestHandler(t *testing.T) (*OurAirportsIngestHandler, *mem.Store) {
-	t.Helper()
+func ourAirportsSuccessStub() *storetest.Stub {
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
-	s := mem.New()
-
-	return NewOurAirportsIngestHandler(s), s
+	return &storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return false, nil
+		},
+		HasOurAirportsDataFn: func(context.Context, store.OurAirportsDataset) (bool, error) {
+			return false, nil
+		},
+		CreateOurAirportsIngestJobFn: func(_ context.Context, jt string) (*model.Job, error) {
+			return &model.Job{
+				ID:        "job-oa-1",
+				Type:      jt,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+	}
 }
 
 func postOurAirportsIngest(t *testing.T, h *OurAirportsIngestHandler, path string, body any) *httptest.ResponseRecorder {
@@ -56,7 +71,7 @@ func postOurAirportsIngest(t *testing.T, h *OurAirportsIngestHandler, path strin
 }
 
 func TestOurAirportsIngestCreateCountries(t *testing.T) {
-	h, _ := newTestOurAirportsIngestHandler(t)
+	h := NewOurAirportsIngestHandler(ourAirportsSuccessStub())
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
 
@@ -83,8 +98,6 @@ func TestOurAirportsIngestCreateCountries(t *testing.T) {
 }
 
 func TestOurAirportsIngestCreateRegionsAndAirports(t *testing.T) {
-	h, _ := newTestOurAirportsIngestHandler(t)
-
 	tests := []struct {
 		path    string
 		jobType string
@@ -95,6 +108,8 @@ func TestOurAirportsIngestCreateRegionsAndAirports(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
+			h := NewOurAirportsIngestHandler(ourAirportsSuccessStub())
+
 			rec := postOurAirportsIngest(t, h, tt.path, map[string]any{})
 			if rec.Code != http.StatusCreated {
 				t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -113,12 +128,11 @@ func TestOurAirportsIngestCreateRegionsAndAirports(t *testing.T) {
 }
 
 func TestOurAirportsIngestActiveJobConflict(t *testing.T) {
-	h, s := newTestOurAirportsIngestHandler(t)
-	ctx := context.Background()
-
-	if _, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsCountries); err != nil {
-		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
-	}
+	h := NewOurAirportsIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return true, nil
+		},
+	})
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
 
@@ -137,15 +151,14 @@ func TestOurAirportsIngestActiveJobConflict(t *testing.T) {
 }
 
 func TestOurAirportsIngestExistingDataConflict(t *testing.T) {
-	h, s := newTestOurAirportsIngestHandler(t)
-	ctx := context.Background()
-
-	columns := []string{"id", "code", "name", "continent", "wikipedia_link", "keywords"}
-	rows := [][]string{{"1", "AD", "Andorra", "EU", "", ""}}
-
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, rows); err != nil {
-		t.Fatalf("ReplaceOurAirportsCountries() error = %v", err)
-	}
+	h := NewOurAirportsIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return false, nil
+		},
+		HasOurAirportsDataFn: func(context.Context, store.OurAirportsDataset) (bool, error) {
+			return true, nil
+		},
+	})
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", map[string]any{
 		jsonForce: false,
@@ -166,15 +179,7 @@ func TestOurAirportsIngestExistingDataConflict(t *testing.T) {
 }
 
 func TestOurAirportsIngestForceReimport(t *testing.T) {
-	h, s := newTestOurAirportsIngestHandler(t)
-	ctx := context.Background()
-
-	columns := []string{"id", "code", "name", "continent", "wikipedia_link", "keywords"}
-	rows := [][]string{{"1", "AD", "Andorra", "EU", "", ""}}
-
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, rows); err != nil {
-		t.Fatalf("ReplaceOurAirportsCountries() error = %v", err)
-	}
+	h := NewOurAirportsIngestHandler(ourAirportsSuccessStub())
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", map[string]any{
 		jsonForce: true,
@@ -186,7 +191,7 @@ func TestOurAirportsIngestForceReimport(t *testing.T) {
 }
 
 func TestOurAirportsIngestInvalidJSON(t *testing.T) {
-	h, _ := newTestOurAirportsIngestHandler(t)
+	h := NewOurAirportsIngestHandler(&storetest.Stub{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/countries", bytes.NewBufferString("{"))
 	rec := httptest.NewRecorder()
@@ -198,7 +203,7 @@ func TestOurAirportsIngestInvalidJSON(t *testing.T) {
 }
 
 func TestOurAirportsIngestEmptyBody(t *testing.T) {
-	h, _ := newTestOurAirportsIngestHandler(t)
+	h := NewOurAirportsIngestHandler(ourAirportsSuccessStub())
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", nil)
 
@@ -208,24 +213,8 @@ func TestOurAirportsIngestEmptyBody(t *testing.T) {
 }
 
 func TestOurAirportsIngestCompletedJobDoesNotBlock(t *testing.T) {
-	h, s := newTestOurAirportsIngestHandler(t)
-	ctx := context.Background()
-
-	job, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
-	if err != nil {
-		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
-	}
-
-	claimed, err := s.ClaimNextPendingJob(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPendingJob() error = %v", err)
-	}
-
-	if err := s.CompleteJob(ctx, claimed.ID, []byte(`{"rows_imported":1}`)); err != nil {
-		t.Fatalf("CompleteJob() error = %v", err)
-	}
-
-	_ = job
+	// Scenario: ActiveIngestJob reports no active job (completed jobs do not block).
+	h := NewOurAirportsIngestHandler(ourAirportsSuccessStub())
 
 	rec := postOurAirportsIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
 

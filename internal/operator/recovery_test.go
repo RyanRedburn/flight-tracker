@@ -7,43 +7,48 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
 func TestRecoverStaleJobs(t *testing.T) {
-	store := mem.New()
 	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	started := time.Now().UTC().Add(-2 * time.Hour)
+	var gotCutoff time.Time
+	var called bool
 
-	job := &model.Job{
-		ID:        "stale-job",
-		Type:      model.JobTypeImportBTSOnTime,
-		Status:    model.JobStatusRunning,
-		CreatedAt: started,
-		UpdatedAt: started,
-		StartedAt: &started,
-	}
-	if err := store.CreateJob(ctx, job); err != nil {
-		t.Fatalf("CreateJob() error = %v", err)
+	st := &storetest.Stub{
+		ResetStaleRunningJobsFn: func(_ context.Context, olderThan time.Time) (int64, error) {
+			called = true
+			gotCutoff = olderThan
+
+			return 1, nil
+		},
 	}
 
-	if err := RecoverStaleJobs(ctx, store, time.Hour, logger); err != nil {
+	before := time.Now().UTC()
+	if err := RecoverStaleJobs(ctx, st, time.Hour, logger); err != nil {
 		t.Fatalf("RecoverStaleJobs() error = %v", err)
 	}
+	after := time.Now().UTC()
 
-	got, err := store.GetJob(ctx, job.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
+	if !called {
+		t.Fatal("expected ResetStaleRunningJobs to be called")
 	}
 
-	if got.Status != model.JobStatusPending {
-		t.Errorf("Status = %q, want pending", got.Status)
-	}
+	wantMin := before.Add(-time.Hour)
+	wantMax := after.Add(-time.Hour)
 
-	if got.StartedAt != nil {
-		t.Error("StartedAt should be cleared")
+	if gotCutoff.Before(wantMin) || gotCutoff.After(wantMax) {
+		t.Errorf("olderThan = %v, want between %v and %v", gotCutoff, wantMin, wantMax)
+	}
+}
+
+func TestRecoverStaleJobsZeroThreshold(t *testing.T) {
+	st := &storetest.Stub{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if err := RecoverStaleJobs(context.Background(), st, 0, logger); err != nil {
+		t.Fatalf("RecoverStaleJobs() error = %v", err)
 	}
 }

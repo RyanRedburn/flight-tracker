@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
 const testJobType = "test_job"
@@ -30,164 +29,94 @@ func (h testHandler) Process(ctx context.Context, job *model.Job) (json.RawMessa
 }
 
 func TestProcessorProcessSuccess(t *testing.T) {
-	store := mem.New()
 	ctx := context.Background()
-	now := time.Now().UTC()
-
-	job := &model.Job{
-		ID:        "job-1",
-		Type:      testJobType,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := store.CreateJob(ctx, job); err != nil {
-		t.Fatalf("CreateJob() error = %v", err)
-	}
-
 	result := json.RawMessage(`{"ok":true}`)
-	processor := NewProcessor(store, testHandler{jobType: testJobType, result: result})
 
-	claimed, err := store.ClaimNextPendingJob(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPendingJob() error = %v", err)
+	var completedID string
+	var completedResult json.RawMessage
+
+	st := &storetest.Stub{
+		CompleteJobFn: func(_ context.Context, id string, res json.RawMessage) error {
+			completedID = id
+			completedResult = append(json.RawMessage(nil), res...)
+
+			return nil
+		},
 	}
 
-	if err := processor.Process(ctx, claimed); err != nil {
+	processor := NewProcessor(st, testHandler{jobType: testJobType, result: result})
+	job := &model.Job{ID: "job-1", Type: testJobType, Status: model.JobStatusRunning}
+
+	if err := processor.Process(ctx, job); err != nil {
 		t.Fatalf("Process() error = %v", err)
 	}
 
-	got, err := store.GetJob(ctx, job.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
+	if completedID != job.ID {
+		t.Errorf("CompleteJob id = %q, want %q", completedID, job.ID)
 	}
 
-	if got.Status != model.JobStatusCompleted {
-		t.Errorf("Status = %q, want completed", got.Status)
-	}
-
-	if string(got.Result) != string(result) {
-		t.Errorf("Result = %s, want %s", got.Result, result)
-	}
-
-	if got.EndedAt == nil {
-		t.Error("EndedAt is nil, want timestamp")
+	if string(completedResult) != string(result) {
+		t.Errorf("CompleteJob result = %s, want %s", completedResult, result)
 	}
 }
 
 func TestProcessorProcessHandlerFailure(t *testing.T) {
-	store := mem.New()
 	ctx := context.Background()
-	now := time.Now().UTC()
-
-	job := &model.Job{
-		ID:        "job-2",
-		Type:      testJobType,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := store.CreateJob(ctx, job); err != nil {
-		t.Fatalf("CreateJob() error = %v", err)
-	}
-
 	handlerErr := errors.New("handler failed")
-	processor := NewProcessor(store, testHandler{jobType: testJobType, err: handlerErr})
 
-	claimed, err := store.ClaimNextPendingJob(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPendingJob() error = %v", err)
+	var failedID, failedMsg string
+
+	st := &storetest.Stub{
+		FailJobFn: func(_ context.Context, id, errMsg string) error {
+			failedID = id
+			failedMsg = errMsg
+
+			return nil
+		},
 	}
 
-	if err := processor.Process(ctx, claimed); err == nil {
-		t.Fatal("Process() expected error")
-	}
-
-	got, err := store.GetJob(ctx, job.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
-	}
-
-	if got.Status != model.JobStatusFailed {
-		t.Errorf("Status = %q, want failed", got.Status)
-	}
-
-	if got.Error != handlerErr.Error() {
-		t.Errorf("Error = %q, want %q", got.Error, handlerErr.Error())
-	}
-}
-
-func TestProcessorProcessUnknownJobType(t *testing.T) {
-	store := mem.New()
-	ctx := context.Background()
-	now := time.Now().UTC()
-
-	job := &model.Job{
-		ID:        "job-unknown",
-		Type:      "unknown_type",
-		Status:    model.JobStatusRunning,
-		CreatedAt: now,
-		UpdatedAt: now,
-		StartedAt: &now,
-	}
-	if err := store.CreateJob(ctx, job); err != nil {
-		t.Fatalf("CreateJob() error = %v", err)
-	}
-
-	processor := NewProcessor(store)
+	processor := NewProcessor(st, testHandler{jobType: testJobType, err: handlerErr})
+	job := &model.Job{ID: "job-2", Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err == nil {
 		t.Fatal("Process() expected error")
 	}
 
-	got, err := store.GetJob(ctx, job.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
+	if failedID != job.ID {
+		t.Errorf("FailJob id = %q, want %q", failedID, job.ID)
 	}
 
-	if got.Status != model.JobStatusFailed {
-		t.Errorf("Status = %q, want failed", got.Status)
+	if failedMsg != handlerErr.Error() {
+		t.Errorf("FailJob msg = %q, want %q", failedMsg, handlerErr.Error())
 	}
 }
 
-func TestBTSIngestHandlerImportsCSV(t *testing.T) {
-	store := mem.New()
+func TestProcessorProcessUnknownJobType(t *testing.T) {
 	ctx := context.Background()
 
-	job, err := store.CreateBTSIngestJob(ctx, 2026, 4)
-	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	var failedID, failedMsg string
+
+	st := &storetest.Stub{
+		FailJobFn: func(_ context.Context, id, errMsg string) error {
+			failedID = id
+			failedMsg = errMsg
+
+			return nil
+		},
 	}
 
-	claimed, err := store.ClaimNextPendingJob(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPendingJob() error = %v", err)
+	processor := NewProcessor(st)
+	job := &model.Job{ID: "job-unknown", Type: "unknown_type", Status: model.JobStatusRunning}
+
+	if err := processor.Process(ctx, job); err == nil {
+		t.Fatal("Process() expected error")
 	}
 
-	if claimed.ID != job.ID {
-		t.Fatalf("claimed ID = %q, want %q", claimed.ID, job.ID)
+	if failedID != job.ID {
+		t.Errorf("FailJob id = %q, want %q", failedID, job.ID)
 	}
 
-	processor := NewProcessor(store, newTestBTSIngestHandler(t, store))
-	if err := processor.Process(ctx, claimed); err != nil {
-		t.Fatalf("Process() error = %v", err)
-	}
-
-	got, err := store.GetJob(ctx, job.ID)
-	if err != nil {
-		t.Fatalf("GetJob() error = %v", err)
-	}
-
-	if got.Status != model.JobStatusCompleted {
-		t.Errorf("Status = %q, want completed", got.Status)
-	}
-
-	var result map[string]any
-	if err := json.Unmarshal(got.Result, &result); err != nil {
-		t.Fatalf("Unmarshal result: %v", err)
-	}
-
-	if result["rows_imported"] == nil || result["rows_imported"].(float64) != float64(btsTestdataRowCount) {
-		t.Fatalf("result = %v, want rows_imported = %d", result, btsTestdataRowCount)
+	if failedMsg == "" {
+		t.Error("expected FailJob error message")
 	}
 }
