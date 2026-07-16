@@ -7,33 +7,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 
 	"github.com/go-chi/chi/v5"
 )
 
-const (
-	testFlightDate20260401 = "2026-04-01"
-	testFlightDate20260424 = "2026-04-24"
-	testAirportORD         = "ORD"
-	testAirportBHM         = "BHM"
-	testAirportLAX         = "LAX"
-	testFloatNo            = "0.00"
-	testFloatYes           = "1.00"
-)
-
-func newTestJobsHandler(t *testing.T) (*JobsHandler, *mem.Store) {
-	t.Helper()
-
-	store := mem.New()
-
-	return NewJobsHandler(store), store
-}
-
 func TestHealthLiveness(t *testing.T) {
-	h := NewHealthHandler(mem.New())
+	// Liveness does not call the store.
+	h := NewHealthHandler(&storetest.Stub{})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -54,8 +39,10 @@ func TestHealthLiveness(t *testing.T) {
 }
 
 func TestHealthReadiness(t *testing.T) {
-	store := mem.New()
-	h := NewHealthHandler(store)
+	st := &storetest.Stub{
+		PingFn: func(context.Context) error { return nil },
+	}
+	h := NewHealthHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 	rec := httptest.NewRecorder()
@@ -65,9 +52,7 @@ func TestHealthReadiness(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 
-	pingErr := errors.New("db unavailable")
-
-	store.SetPingHook(func(context.Context) error { return pingErr })
+	st.PingFn = func(context.Context) error { return errors.New("db unavailable") }
 
 	rec = httptest.NewRecorder()
 	h.Readiness(rec, req)
@@ -78,7 +63,11 @@ func TestHealthReadiness(t *testing.T) {
 }
 
 func TestHealthDatabaseVersion(t *testing.T) {
-	h := NewHealthHandler(mem.New())
+	h := NewHealthHandler(&storetest.Stub{
+		MigrationVersionFn: func(context.Context) (store.MigrationVersion, error) {
+			return store.MigrationVersion{}, nil
+		},
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/db/version", nil)
 	rec := httptest.NewRecorder()
@@ -99,7 +88,11 @@ func TestHealthDatabaseVersion(t *testing.T) {
 }
 
 func TestJobsGetNotFound(t *testing.T) {
-	h, _ := newTestJobsHandler(t)
+	h := NewJobsHandler(&storetest.Stub{
+		GetJobFn: func(context.Context, string) (*model.Job, error) {
+			return nil, store.ErrNotFound
+		},
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/missing", nil)
 	rctx := chi.NewRouteContext()
@@ -115,17 +108,28 @@ func TestJobsGetNotFound(t *testing.T) {
 }
 
 func TestJobsGetEnrichedBTSIngest(t *testing.T) {
-	h, store := newTestJobsHandler(t)
-	ctx := context.Background()
+	const jobID = "job-bts-1"
 
-	job, err := store.CreateBTSIngestJob(ctx, 2026, 4)
-	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
-	}
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+job.ID, nil)
+	h := NewJobsHandler(&storetest.Stub{
+		GetJobFn: func(_ context.Context, id string) (*model.Job, error) {
+			return &model.Job{
+				ID:        id,
+				Type:      model.JobTypeImportBTSOnTime,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+		GetBTSIngestJobFn: func(_ context.Context, id string) (*model.BTSIngestJob, error) {
+			return &model.BTSIngestJob{JobID: id, Year: 2026, Month: 4}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobID, nil)
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", job.ID)
+	rctx.URLParams.Add("id", jobID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	rec := httptest.NewRecorder()
@@ -150,14 +154,25 @@ func TestJobsGetEnrichedBTSIngest(t *testing.T) {
 }
 
 func TestJobsList(t *testing.T) {
-	h, store := newTestJobsHandler(t)
-	ctx := context.Background()
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
-	for range 2 {
-		if _, err := store.CreateBTSIngestJob(ctx, 2026, 4); err != nil {
-			t.Fatalf("CreateBTSIngestJob() error = %v", err)
-		}
-	}
+	h := NewJobsHandler(&storetest.Stub{
+		ListJobsFn: func(context.Context, int) ([]*model.Job, error) {
+			// Scenario: store already returns the limited page.
+			return []*model.Job{
+				{
+					ID:        "job-1",
+					Type:      model.JobTypeImportBTSOnTime,
+					Status:    model.JobStatusPending,
+					CreatedAt: now,
+					UpdatedAt: now,
+				},
+			}, nil
+		},
+		GetBTSIngestJobFn: func(_ context.Context, jobID string) (*model.BTSIngestJob, error) {
+			return &model.BTSIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		},
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=1", nil)
 	rec := httptest.NewRecorder()
@@ -178,7 +193,8 @@ func TestJobsList(t *testing.T) {
 }
 
 func TestJobsListInvalidLimit(t *testing.T) {
-	h, _ := newTestJobsHandler(t)
+	// Invalid limit is rejected before any store call.
+	h := NewJobsHandler(&storetest.Stub{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=0", nil)
 	rec := httptest.NewRecorder()

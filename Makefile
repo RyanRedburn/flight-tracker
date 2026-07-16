@@ -4,7 +4,7 @@
 export CGO_ENABLED := 1
 
 # Packages that do not import the SQLite driver (no C compiler required).
-TEST_UNIT_PKGS := ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/model/... ./internal/store ./internal/store/mem/...
+TEST_UNIT_PKGS := ./internal/config/... ./internal/operator/... ./internal/api/... ./internal/ingest/... ./internal/model/... ./internal/store ./internal/store/storetest/...
 
 # Pin must match //go:generate in cmd/server/main.go and CI swagger workflow.
 SWAG_VERSION := v1.16.6

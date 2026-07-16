@@ -5,15 +5,25 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
 func TestServiceImportMonth(t *testing.T) {
 	ctx := context.Background()
-	s := mem.New()
-	svc := NewService(s, nil).WithCSVOpener(minimalCSVOpener(t))
+
+	var gotYear, gotMonth int
+
+	var gotRows int
+
+	st := &storetest.Stub{
+		ReplaceOnTimeFlightsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
+			gotYear, gotMonth = year, month
+			gotRows = len(rows)
+
+			return nil
+		},
+	}
+	svc := NewService(st, nil).WithCSVOpener(minimalCSVOpener(t))
 
 	result, err := svc.ImportMonth(ctx, 2026, 4)
 	if err != nil {
@@ -28,13 +38,9 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Errorf("result = %+v, want year 2026 month 4", result)
 	}
 
-	withData, err := s.MonthsWithOnTimeFlightData(ctx, []model.YearMonth{{Year: 2026, Month: 4}})
-	if err != nil {
-		t.Fatalf("MonthsWithOnTimeFlightData() error = %v", err)
-	}
-
-	if len(withData) != 1 {
-		t.Fatalf("len(withData) = %d, want 1", len(withData))
+	if gotYear != 2026 || gotMonth != 4 || gotRows != testdataRowCount {
+		t.Errorf("ReplaceOnTimeFlightsByMonth = %d-%d rows=%d, want 2026-4 rows=%d",
+			gotYear, gotMonth, gotRows, testdataRowCount)
 	}
 
 	payload, err := json.Marshal(result)
@@ -52,50 +58,8 @@ func TestServiceImportMonth(t *testing.T) {
 	}
 }
 
-func TestServiceImportMonthReplace(t *testing.T) {
-	ctx := context.Background()
-	s := mem.New()
-	svc := NewService(s, nil).WithCSVOpener(minimalCSVOpener(t))
-
-	if _, err := svc.ImportMonth(ctx, 2026, 4); err != nil {
-		t.Fatalf("first ImportMonth() error = %v", err)
-	}
-
-	first, err := s.RouteStats(ctx, store.RouteStatsFilter{
-		Origin:    "JFK",
-		Dest:      "FLL",
-		StartDate: "2026-04-01",
-		EndDate:   "2026-04-30",
-	})
-	if err != nil {
-		t.Fatalf("RouteStats() error = %v", err)
-	}
-
-	if first.Flights == 0 {
-		t.Fatal("expected flights after first import")
-	}
-
-	if _, err := svc.ImportMonth(ctx, 2026, 4); err != nil {
-		t.Fatalf("second ImportMonth() error = %v", err)
-	}
-
-	second, err := s.RouteStats(ctx, store.RouteStatsFilter{
-		Origin:    "JFK",
-		Dest:      "FLL",
-		StartDate: "2026-04-01",
-		EndDate:   "2026-04-30",
-	})
-	if err != nil {
-		t.Fatalf("RouteStats() after replace error = %v", err)
-	}
-
-	if second.Flights == 0 {
-		t.Fatal("expected flights after replace import")
-	}
-}
-
 func TestServiceImportMonthWithoutDownloader(t *testing.T) {
-	svc := NewService(mem.New(), nil)
+	svc := NewService(&storetest.Stub{}, nil)
 
 	_, err := svc.ImportMonth(context.Background(), 2026, 4)
 	if err == nil {

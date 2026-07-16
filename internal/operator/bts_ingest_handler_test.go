@@ -2,16 +2,16 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
-
-const btsTestdataRowCount = 20
 
 func btsFixtureCSVPath(t *testing.T) string {
 	t.Helper()
@@ -35,16 +35,48 @@ func btsFixtureCSVPath(t *testing.T) string {
 	return path
 }
 
-func newTestBTSIngestHandler(t *testing.T, store *mem.Store) *BTSIngestHandler {
-	t.Helper()
+func TestBTSIngestHandlerProcess(t *testing.T) {
+	ctx := context.Background()
 
-	path := btsFixtureCSVPath(t)
+	var replaceYear, replaceMonth int
 
-	opener := func(context.Context, int, int) (string, func(), error) {
-		return path, func() {}, nil
+	var replaceRows int
+
+	st := &storetest.Stub{
+		GetBTSIngestJobFn: func(_ context.Context, jobID string) (*model.BTSIngestJob, error) {
+			return &model.BTSIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		},
+		ReplaceOnTimeFlightsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
+			replaceYear, replaceMonth = year, month
+			replaceRows = len(rows)
+
+			return nil
+		},
 	}
 
-	svc := bts.NewService(store, nil).WithCSVOpener(opener)
+	path := btsFixtureCSVPath(t)
+	svc := bts.NewService(st, nil).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
+		return path, func() {}, nil
+	})
 
-	return NewBTSIngestHandler(store, svc)
+	h := NewBTSIngestHandler(st, svc)
+	job := &model.Job{ID: "job-1", Type: model.JobTypeImportBTSOnTime}
+
+	payload, err := h.Process(ctx, job)
+	if err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	if replaceYear != 2026 || replaceMonth != 4 {
+		t.Errorf("ReplaceOnTimeFlightsByMonth = %d-%d, want 2026-4", replaceYear, replaceMonth)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("Unmarshal result: %v", err)
+	}
+
+	if result["rows_imported"] == nil || result["rows_imported"].(float64) != float64(replaceRows) {
+		t.Fatalf("result = %v, want rows_imported = %d", result, replaceRows)
+	}
 }

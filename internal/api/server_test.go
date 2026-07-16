@@ -12,15 +12,56 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
 func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// routerStub returns success for routes exercised by router smoke tests.
+func routerStub() *storetest.Stub {
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	return &storetest.Stub{
+		PingFn: func(context.Context) error { return nil },
+		MigrationVersionFn: func(context.Context) (store.MigrationVersion, error) {
+			return store.MigrationVersion{}, nil
+		},
+		ListJobsFn: func(context.Context, int) ([]*model.Job, error) {
+			return []*model.Job{}, nil
+		},
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return false, nil
+		},
+		HasOurAirportsDataFn: func(context.Context, store.OurAirportsDataset) (bool, error) {
+			return false, nil
+		},
+		CreateOurAirportsIngestJobFn: func(_ context.Context, jobType string) (*model.Job, error) {
+			return &model.Job{
+				ID:        "job-oa",
+				Type:      jobType,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				DiversionAirports: []model.AirportCount{},
+				CancellationCodes: []model.CancellationCodeCount{},
+			}, nil
+		},
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return &model.RouteOutlook{}, nil
+		},
+	}
+}
+
 func TestNewRouterRoutes(t *testing.T) {
-	handler := newRouter(mem.New(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24)
 
 	tests := []struct {
 		method     string
@@ -56,7 +97,7 @@ func TestNewRouterRoutes(t *testing.T) {
 }
 
 func TestSwaggerSpecSurfaces(t *testing.T) {
-	handler := newRouter(mem.New(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24)
 
 	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
@@ -115,7 +156,7 @@ func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[stri
 }
 
 func TestServerShutdown(t *testing.T) {
-	s := NewServer("unused", mem.New(), testLogger(), 24)
+	s := NewServer("unused", routerStub(), testLogger(), 24)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

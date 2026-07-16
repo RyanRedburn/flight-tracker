@@ -235,7 +235,7 @@ internal/database/    Store factory (driver selection)
 internal/ingest/      Ingest range expansion; BTS and OurAirports download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
-internal/store/       Store interface, queries, SQLite + in-memory implementations
+internal/store/       Store interface, queries, SQLite implementation, test stub
 docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/shell)
 migrations/           Per-driver SQL migrations (sqlite/, postgres/)
 ```

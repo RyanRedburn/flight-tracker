@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/store"
-	"github.com/RyanRedburn/flight-tracker/internal/store/mem"
+	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
 func TestDownloaderDownloadsCSV(t *testing.T) {
@@ -42,8 +42,6 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 
 func TestServiceImportDatasets(t *testing.T) {
 	ctx := context.Background()
-	s := mem.New()
-	svc := NewService(s, nil).WithCSVOpener(fixtureCSVOpener(t))
 
 	datasets := []store.OurAirportsDataset{
 		store.OurAirportsCountries,
@@ -53,6 +51,32 @@ func TestServiceImportDatasets(t *testing.T) {
 
 	for _, dataset := range datasets {
 		t.Run(string(dataset), func(t *testing.T) {
+			var replaced store.OurAirportsDataset
+
+			var gotRows int
+
+			st := &storetest.Stub{
+				ReplaceOurAirportsCountriesFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.OurAirportsCountries
+					gotRows = len(rows)
+
+					return nil
+				},
+				ReplaceOurAirportsRegionsFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.OurAirportsRegions
+					gotRows = len(rows)
+
+					return nil
+				},
+				ReplaceOurAirportsAirportsFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.OurAirportsAirports
+					gotRows = len(rows)
+
+					return nil
+				},
+			}
+			svc := NewService(st, nil).WithCSVOpener(fixtureCSVOpener(t))
+
 			result, err := svc.Import(ctx, dataset)
 			if err != nil {
 				t.Fatalf("Import() error = %v", err)
@@ -66,43 +90,15 @@ func TestServiceImportDatasets(t *testing.T) {
 				t.Errorf("Dataset = %q, want %q", result.Dataset, dataset)
 			}
 
-			hasData, err := s.HasOurAirportsData(ctx, dataset)
-			if err != nil {
-				t.Fatalf("HasOurAirportsData() error = %v", err)
-			}
-
-			if !hasData {
-				t.Fatal("expected data after import")
+			if replaced != dataset || gotRows != testdataRowCount {
+				t.Errorf("replace = %q rows=%d, want %q rows=%d", replaced, gotRows, dataset, testdataRowCount)
 			}
 		})
 	}
 }
 
-func TestServiceImportReplace(t *testing.T) {
-	ctx := context.Background()
-	s := mem.New()
-	svc := NewService(s, nil).WithCSVOpener(fixtureCSVOpener(t))
-
-	if _, err := svc.Import(ctx, store.OurAirportsCountries); err != nil {
-		t.Fatalf("first Import() error = %v", err)
-	}
-
-	if _, err := svc.Import(ctx, store.OurAirportsCountries); err != nil {
-		t.Fatalf("second Import() error = %v", err)
-	}
-
-	hasData, err := s.HasOurAirportsData(ctx, store.OurAirportsCountries)
-	if err != nil {
-		t.Fatalf("HasOurAirportsData() error = %v", err)
-	}
-
-	if !hasData {
-		t.Fatal("expected countries data after replace import")
-	}
-}
-
 func TestServiceImportWithoutDownloader(t *testing.T) {
-	svc := NewService(mem.New(), nil)
+	svc := NewService(&storetest.Stub{}, nil)
 
 	_, err := svc.Import(context.Background(), store.OurAirportsCountries)
 	if err == nil {
