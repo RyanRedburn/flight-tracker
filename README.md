@@ -3,12 +3,13 @@
 ![Lint](https://github.com/RyanRedburn/flight-tracker/actions/workflows/lint.yml/badge.svg?branch=main)
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing BTS on-time flight data.
+Go service with a REST API and an in-process background worker for importing BTS on-time flight data and OurAirports reference data (countries, regions, airports).
 
 ## Features
 
 - `POST /api/v1/ingest` to queue per-month BTS import jobs
-- Poll-based background workers that download, parse, and load flight data into SQLite
+- `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue OurAirports reference data imports
+- Poll-based background workers that download, parse, and load data into SQLite
 - REST API for route performance stats, booking outlook probabilities, and job status
 - Per-driver SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker deployment with persistent SQLite volume
@@ -64,7 +65,9 @@ Environment variables (defaults shown):
 | `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
 | `BTS_DOWNLOAD_TIMEOUT` | `10m` | HTTP timeout for BTS zip downloads |
 | `BTS_BASE_URL` | `https://transtats.bts.gov/PREZIP` | BTS zip base URL (override in tests) |
-| `MAX_INGEST_MONTHS` | `24` | Max months per ingest request |
+| `OURAIRPORTS_BASE_URL` | `https://raw.githubusercontent.com/davidmegginson/ourairports-data/main` | OurAirports CSV base URL |
+| `OURAIRPORTS_DOWNLOAD_TIMEOUT` | `5m` | HTTP timeout for OurAirports CSV downloads |
+| `MAX_INGEST_MONTHS` | `24` | Max months per BTS ingest request |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Docker
@@ -106,6 +109,24 @@ curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4,"force":true}'
 
+# Queue OurAirports reference data imports (recommended order: countries → regions → airports)
+curl -X POST http://localhost:8080/api/v1/ingest/countries \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+curl -X POST http://localhost:8080/api/v1/ingest/regions \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+curl -X POST http://localhost:8080/api/v1/ingest/airports \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Re-import OurAirports data that already exists
+curl -X POST http://localhost:8080/api/v1/ingest/airports \
+  -H "Content-Type: application/json" \
+  -d '{"force":true}'
+
 # Get job status
 curl http://localhost:8080/api/v1/jobs/<job-id>
 
@@ -123,6 +144,8 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 
 ### Ingest behavior
 
+#### BTS on-time flights (`POST /api/v1/ingest`)
+
 - Creates one `import_bts_on_time` job per month in the requested range.
 - Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
 - `start_year` must be >= 2018 (earliest BTS on-time data in this service).
@@ -133,6 +156,16 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 - Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
 
 `internal/ingest/bts/testdata/` contains a small BTS CSV sample (header plus 20 diverse April 2026 rows) used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
+
+#### OurAirports reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
+
+- Creates one job per request (`import_ourairports_countries`, `import_ourairports_regions`, or `import_ourairports_airports`).
+- Workers download the CSV from the OurAirports GitHub data dump and full-replace the matching table.
+- Returns **409** if a pending/running job already exists for that dataset.
+- Returns **409** if the table already has rows and `force` is not set.
+- `force: true` skips the data-exists check; workers always replace the full table on import.
+- Recommended load order: **countries → regions → airports** (no FK constraints; order is for data consistency only).
+- Source: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
 
 ## Migrations
 
@@ -177,7 +210,7 @@ cmd/server/           Entry point
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
 internal/database/    Store factory (driver selection)
-internal/ingest/      Ingest range expansion; BTS download/parse/load (ingest/bts/)
+internal/ingest/      Ingest range expansion; BTS and OurAirports download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, SQLite + in-memory implementations

@@ -93,6 +93,33 @@ func TestMemActiveIngestJob(t *testing.T) {
 	}
 }
 
+func TestMemActiveIngestJobOurAirports(t *testing.T) {
+	ctx := context.Background()
+	s := New()
+
+	if _, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsCountries); err != nil {
+		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
+	}
+
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if !active {
+		t.Fatal("expected active ourairports countries job")
+	}
+
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsRegions)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active regions job when only countries is pending")
+	}
+}
+
 func TestMemCompleteJobStatusConflict(t *testing.T) {
 	ctx := context.Background()
 	s := New()

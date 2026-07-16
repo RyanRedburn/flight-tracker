@@ -282,6 +282,33 @@ func TestActiveIngestJob(t *testing.T) {
 	}
 }
 
+func TestActiveIngestJobOurAirports(t *testing.T) {
+	ctx := context.Background()
+	s := openTestStore(t)
+
+	if _, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsAirports); err != nil {
+		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
+	}
+
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsAirports)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if !active {
+		t.Fatal("expected active ourairports airports job")
+	}
+
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
+	if err != nil {
+		t.Fatalf("ActiveIngestJob() error = %v", err)
+	}
+
+	if active {
+		t.Fatal("expected no active countries job when only airports is pending")
+	}
+}
+
 func testFlightColumns() []string {
 	return []string{
 		"year", "month", "flight_date", "origin", "dest",

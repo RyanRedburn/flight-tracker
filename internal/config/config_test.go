@@ -16,6 +16,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("STALE_JOB_THRESHOLD", "")
 	t.Setenv("BTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("BTS_BASE_URL", "")
+	t.Setenv("OURAIRPORTS_BASE_URL", "")
+	t.Setenv("OURAIRPORTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("MAX_INGEST_MONTHS", "")
 	t.Setenv("LOG_LEVEL", "")
 
@@ -58,6 +60,14 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.BTSBaseURL != "https://transtats.bts.gov/PREZIP" {
 		t.Errorf("BTSBaseURL = %q, want default transtats URL", cfg.BTSBaseURL)
+	}
+
+	if cfg.OurAirportsBaseURL != "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main" {
+		t.Errorf("OurAirportsBaseURL = %q, want default ourairports URL", cfg.OurAirportsBaseURL)
+	}
+
+	if cfg.OurAirportsDownloadTimeout != 5*time.Minute {
+		t.Errorf("OurAirportsDownloadTimeout = %v, want 5m", cfg.OurAirportsDownloadTimeout)
 	}
 
 	if cfg.MaxIngestMonths != 24 {

@@ -25,6 +25,10 @@ func init() {
 	ingestValidate.RegisterStructValidation(validateIngestRequest, IngestRequest{})
 }
 
+type ForceIngestRequest struct {
+	Force bool `json:"force"`
+}
+
 type IngestRequest struct {
 	StartYear  int  `json:"start_year" validate:"required,gte=2018"`
 	StartMonth int  `json:"start_month" validate:"required,gte=1,lte=12"`

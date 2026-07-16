@@ -14,6 +14,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/config"
 	"github.com/RyanRedburn/flight-tracker/internal/database"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/operator"
 )
 
@@ -52,7 +53,15 @@ func run() int {
 	btsDownloader := bts.NewDownloader(cfg.BTSBaseURL, cfg.BTSDownloadTimeout)
 	btsIngest := bts.NewService(st, btsDownloader)
 
-	processor := operator.NewProcessor(st, operator.NewBTSIngestHandler(st, btsIngest))
+	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
+	oaIngest := ourairports.NewService(st, oaDownloader)
+
+	processor := operator.NewProcessor(st,
+		operator.NewBTSIngestHandler(st, btsIngest),
+		operator.NewCountriesHandler(oaIngest),
+		operator.NewRegionsHandler(oaIngest),
+		operator.NewAirportsHandler(oaIngest),
+	)
 	worker := operator.NewWorker(st, processor, cfg.WorkerConcurrency, cfg.WorkerPollInterval, logger)
 
 	worker.Start(ctx)

@@ -23,6 +23,7 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 	jobs := handlers.NewJobsHandler(s)
 	routes := handlers.NewRoutesHandler(s)
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
+	oaIngest := handlers.NewOurAirportsIngestHandler(s)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
@@ -34,6 +35,9 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/ingest", ingestHandler.Create)
+		r.Post("/ingest/countries", oaIngest.CreateCountries)
+		r.Post("/ingest/regions", oaIngest.CreateRegions)
+		r.Post("/ingest/airports", oaIngest.CreateAirports)
 		r.Get("/jobs", jobs.List)
 		r.Get("/jobs/{id}", jobs.Get)
 		r.Get("/routes/stats", routes.Stats)

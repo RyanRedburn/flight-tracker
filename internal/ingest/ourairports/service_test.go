@@ -40,31 +40,41 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 	}
 }
 
-func TestServiceImportCountries(t *testing.T) {
+func TestServiceImportDatasets(t *testing.T) {
 	ctx := context.Background()
 	s := mem.New()
 	svc := NewService(s, nil).WithCSVOpener(fixtureCSVOpener(t))
 
-	result, err := svc.Import(ctx, store.OurAirportsCountries)
-	if err != nil {
-		t.Fatalf("Import() error = %v", err)
+	datasets := []store.OurAirportsDataset{
+		store.OurAirportsCountries,
+		store.OurAirportsRegions,
+		store.OurAirportsAirports,
 	}
 
-	if result.RowsImported != testdataRowCount {
-		t.Fatalf("RowsImported = %d, want %d", result.RowsImported, testdataRowCount)
-	}
+	for _, dataset := range datasets {
+		t.Run(string(dataset), func(t *testing.T) {
+			result, err := svc.Import(ctx, dataset)
+			if err != nil {
+				t.Fatalf("Import() error = %v", err)
+			}
 
-	if result.Dataset != store.OurAirportsCountries {
-		t.Errorf("Dataset = %q, want %q", result.Dataset, store.OurAirportsCountries)
-	}
+			if result.RowsImported != testdataRowCount {
+				t.Fatalf("RowsImported = %d, want %d", result.RowsImported, testdataRowCount)
+			}
 
-	hasData, err := s.HasOurAirportsData(ctx, store.OurAirportsCountries)
-	if err != nil {
-		t.Fatalf("HasOurAirportsData() error = %v", err)
-	}
+			if result.Dataset != dataset {
+				t.Errorf("Dataset = %q, want %q", result.Dataset, dataset)
+			}
 
-	if !hasData {
-		t.Fatal("expected countries data after import")
+			hasData, err := s.HasOurAirportsData(ctx, dataset)
+			if err != nil {
+				t.Fatalf("HasOurAirportsData() error = %v", err)
+			}
+
+			if !hasData {
+				t.Fatal("expected data after import")
+			}
+		})
 	}
 }
 
