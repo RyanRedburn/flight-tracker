@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS airports;
-DROP TABLE IF EXISTS regions;
-DROP TABLE IF EXISTS countries;

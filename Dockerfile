@@ -2,6 +2,7 @@
 
 FROM golang:1.25-bookworm AS build
 
+# CGO remains until the SQLite store package is removed (later phase).
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,10 +24,9 @@ COPY --from=build /server /server
 COPY migrations /migrations
 
 EXPOSE 8080
-VOLUME ["/data"]
 
-ENV DATABASE_DRIVER=sqlite
-ENV DATABASE_URL=file:/data/flight-tracker.db
-ENV MIGRATIONS_PATH=/migrations/sqlite
+ENV DATABASE_DRIVER=postgres
+ENV DATABASE_URL=postgres://flight:flight@postgres:5432/flight_tracker?sslmode=disable
+ENV MIGRATIONS_PATH=/migrations/postgres
 
 ENTRYPOINT ["/server"]
