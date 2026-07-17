@@ -30,16 +30,17 @@ func TestLoadDefaults(t *testing.T) {
 		t.Errorf("HTTPAddr = %q, want :8080", cfg.HTTPAddr)
 	}
 
-	if cfg.DatabaseDriver != "sqlite" {
-		t.Errorf("DatabaseDriver = %q, want sqlite", cfg.DatabaseDriver)
+	if cfg.DatabaseDriver != "postgres" {
+		t.Errorf("DatabaseDriver = %q, want postgres", cfg.DatabaseDriver)
 	}
 
-	if cfg.DatabaseURL != "file:flight-tracker.db" {
-		t.Errorf("DatabaseURL = %q, want file:flight-tracker.db", cfg.DatabaseURL)
+	wantURL := "postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable" //nolint:gosec // G101: local-dev default DSN
+	if cfg.DatabaseURL != wantURL {
+		t.Errorf("DatabaseURL = %q, want %q", cfg.DatabaseURL, wantURL)
 	}
 
-	if cfg.MigrationsPath != "migrations/sqlite" {
-		t.Errorf("MigrationsPath = %q, want migrations/sqlite", cfg.MigrationsPath)
+	if cfg.MigrationsPath != "migrations/postgres" {
+		t.Errorf("MigrationsPath = %q, want migrations/postgres", cfg.MigrationsPath)
 	}
 
 	if cfg.WorkerConcurrency != 2 {
@@ -81,9 +82,9 @@ func TestLoadDefaults(t *testing.T) {
 
 func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("HTTP_ADDR", ":9090")
-	t.Setenv("DATABASE_DRIVER", "sqlite")
-	t.Setenv("DATABASE_URL", "file:/tmp/test.db")
-	t.Setenv("MIGRATIONS_PATH", "migrations/sqlite")
+	t.Setenv("DATABASE_DRIVER", "postgres")
+	t.Setenv("DATABASE_URL", "postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable")
+	t.Setenv("MIGRATIONS_PATH", "migrations/postgres")
 	t.Setenv("WORKER_CONCURRENCY", "4")
 	t.Setenv("LOG_LEVEL", "debug")
 

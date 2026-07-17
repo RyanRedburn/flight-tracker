@@ -20,8 +20,7 @@ Go service with a REST API and an in-process background worker for importing fli
 - Go 1.25+
 - [GNU Make](https://www.gnu.org/software/make/) (Git Bash, WSL, or `choco install make` on Windows)
 - [golangci-lint](https://golangci-lint.run/) v2 (for `make lint`)
-- C compiler (CGO) for local SQLite builds and the full test suite, **or** use Docker
-- Docker & Docker Compose (optional)
+- Docker & Docker Compose (for Postgres and optional containerized runs)
 
 ## Makefile
 
@@ -41,10 +40,14 @@ Go service with a REST API and an in-process background worker for importing fli
 
 ## Local development
 
+Start Postgres (Compose), then run the server locally:
+
 ```bash
-# Requires CGO (gcc). On Windows without a C compiler, use Docker instead.
-CGO_ENABLED=1 go run ./cmd/server
+docker compose up -d postgres
+go run ./cmd/server
 ```
+
+Defaults expect Postgres at `localhost:5432` with the credentials in [`.env.example`](.env.example). Or run the full stack with `make docker-run`.
 
 Swagger UI (after the server is running):
 
@@ -75,9 +78,9 @@ Environment variables (defaults shown):
 | Variable | Default | Description |
 | ---------- | --------- | ------------- |
 | `HTTP_ADDR` | `:8080` | API listen address |
-| `DATABASE_DRIVER` | `sqlite` | `sqlite` or `postgres` (Compose defaults to `postgres`) |
-| `DATABASE_URL` | `file:flight-tracker.db` | Database DSN |
-| `MIGRATIONS_PATH` | `migrations/sqlite` | Migration folder for the active driver |
+| `DATABASE_DRIVER` | `postgres` | Database driver (`postgres` only) |
+| `DATABASE_URL` | `postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable` | Database DSN |
+| `MIGRATIONS_PATH` | `migrations/postgres` | Migration folder |
 | `WORKER_CONCURRENCY` | `2` | Background worker goroutines |
 | `WORKER_POLL_INTERVAL` | `5s` | How often workers poll for pending jobs |
 | `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
