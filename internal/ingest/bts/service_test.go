@@ -16,7 +16,7 @@ func TestServiceImportMonth(t *testing.T) {
 	var gotRows int
 
 	st := &storetest.Stub{
-		ReplaceOnTimeFlightsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
+		ReplaceFlightPerformanceByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
 			gotYear, gotMonth = year, month
 			gotRows = len(rows)
 
@@ -39,7 +39,7 @@ func TestServiceImportMonth(t *testing.T) {
 	}
 
 	if gotYear != 2026 || gotMonth != 4 || gotRows != testdataRowCount {
-		t.Errorf("ReplaceOnTimeFlightsByMonth = %d-%d rows=%d, want 2026-4 rows=%d",
+		t.Errorf("ReplaceFlightPerformanceByMonth = %d-%d rows=%d, want 2026-4 rows=%d",
 			gotYear, gotMonth, gotRows, testdataRowCount)
 	}
 

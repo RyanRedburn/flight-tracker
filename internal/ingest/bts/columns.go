@@ -12,7 +12,7 @@ const (
 	jsonKeyRows   = "rows_imported"
 )
 
-// DBColumns is the canonical on_time_flights column order (snake_case).
+// DBColumns is the canonical flight_performance column order (snake_case).
 var DBColumns = []string{
 	colYear,
 	"quarter",

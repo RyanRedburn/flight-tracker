@@ -19,7 +19,7 @@ func NewIngestHandler(s store.Store, maxIngestMonths int) *IngestHandler {
 	return &IngestHandler{store: s, maxIngestMonths: maxIngestMonths}
 }
 
-// IngestJobResponse is one queued flight-schedule ingest job.
+// IngestJobResponse is one queued flight-performance ingest job.
 type IngestJobResponse struct {
 	ID     string          `json:"id"`
 	Year   int             `json:"year"`
@@ -27,15 +27,15 @@ type IngestJobResponse struct {
 	Status model.JobStatus `json:"status"`
 }
 
-// IngestResponse is returned after successfully queueing flight-schedule ingest jobs.
+// IngestResponse is returned after successfully queueing flight-performance ingest jobs.
 type IngestResponse struct {
 	Jobs            []IngestJobResponse `json:"jobs"`
 	MonthsRequested int                 `json:"months_requested"`
 }
 
-// Create queues flight schedule data ingest jobs for a month range.
+// Create queues flight performance data ingest jobs for a month range.
 //
-//	@Summary		Queue flight schedule data ingest
+//	@Summary		Queue flight performance data ingest
 //	@Description	Queues one import job per month in the requested range. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.
 //	@Tags			ingest,internal
 //	@Accept			json
@@ -43,7 +43,7 @@ type IngestResponse struct {
 //	@Param			body	body		model.IngestRequest	true	"Ingest range"
 //	@Success		201		{object}	IngestResponse
 //	@Failure		400		{object}	ErrorResponse
-//	@Failure		409		{object}	FlightScheduleIngestConflictResponse
+//	@Failure		409		{object}	FlightPerformanceIngestConflictResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest [post]
 func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -71,14 +71,14 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	active, err := h.store.ActiveBTSIngestMonths(ctx, months)
+	active, err := h.store.ActiveFlightPerformanceIngestMonths(ctx, months)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check active ingest jobs"})
 		return
 	}
 
 	if len(active) > 0 {
-		writeJSON(w, http.StatusConflict, FlightScheduleIngestConflictResponse{
+		writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
 			Error:              "ingest jobs already pending or running for one or more requested months",
 			ActiveIngestMonths: active,
 		})
@@ -87,14 +87,14 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !req.Force {
-		existing, err := h.store.MonthsWithOnTimeFlightData(ctx, months)
+		existing, err := h.store.MonthsWithFlightPerformanceData(ctx, months)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing flight data"})
 			return
 		}
 
 		if len(existing) > 0 {
-			writeJSON(w, http.StatusConflict, FlightScheduleIngestConflictResponse{
+			writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
 				Error:              "flight data already exists for one or more requested months; set force=true to re-import",
 				ExistingDataMonths: existing,
 			})
@@ -106,7 +106,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	jobs := make([]IngestJobResponse, 0, len(months))
 
 	for _, ym := range months {
-		job, err := h.store.CreateBTSIngestJob(ctx, ym.Year, ym.Month)
+		job, err := h.store.CreateFlightPerformanceIngestJob(ctx, ym.Year, ym.Month)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create ingest job"})
 			return

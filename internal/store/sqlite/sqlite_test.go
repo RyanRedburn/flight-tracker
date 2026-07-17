@@ -31,7 +31,7 @@ func TestOpenCRUD(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	job := &model.Job{
 		ID:        "sqlite-job-1",
-		Type:      model.JobTypeImportBTSOnTime,
+		Type:      model.JobTypeImportFlightPerformance,
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -110,8 +110,8 @@ func TestMigrationVersion(t *testing.T) {
 		t.Fatalf("MigrationVersion() error = %v", err)
 	}
 
-	if version.Version != 5 {
-		t.Errorf("Version = %d, want 5", version.Version)
+	if version.Version != 6 {
+		t.Errorf("Version = %d, want 6", version.Version)
 	}
 
 	if version.Dirty {
@@ -167,7 +167,7 @@ func TestRouteStats(t *testing.T) {
 	}
 	defer s.Close()
 
-	seedOnTimeFlights(t, dbPath,
+	seedFlightPerformances(t, dbPath,
 		[]string{testFlightDate20260424, "3", testAirportORD, testAirportBHM, "UA", "4547", "1535", testFloatNo, testFloatNo, testFloatNo, testFloatNo, testFloatNo, "", testFloatNo},
 		[]string{testFlightDate20260424, "3", testAirportORD, testAirportAVP, "UA", "4546", "1805", "20.00", "5.00", testFloatYes, testFloatNo, testFloatNo, "", testFloatNo},
 		[]string{testFlightDate20260425, "4", testAirportLAX, testAirportSFO, "UA", "100", "0900", testFloatNo, testFloatNo, testFloatNo, testFloatNo, testFloatNo, "", testFloatNo},
@@ -202,7 +202,7 @@ func TestRouteStats(t *testing.T) {
 	}
 }
 
-func seedOnTimeFlights(t *testing.T, dbPath string, rows ...[]string) {
+func seedFlightPerformances(t *testing.T, dbPath string, rows ...[]string) {
 	t.Helper()
 
 	db, err := sql.Open("sqlite3", dbPath)
@@ -212,7 +212,7 @@ func seedOnTimeFlights(t *testing.T, dbPath string, rows ...[]string) {
 	defer db.Close()
 
 	const insert = `
-		INSERT INTO on_time_flights (
+		INSERT INTO flight_performance (
 			flight_date, day_of_week, origin, dest,
 			iata_code_marketing_airline, flight_number_marketing_airline,
 			crs_dep_time, arr_delay_minutes, dep_delay_minutes, arr_del15, dep_del15,

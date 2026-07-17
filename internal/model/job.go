@@ -14,12 +14,12 @@ const (
 	JobStatusFailed    JobStatus = "failed"
 )
 
-const JobTypeImportBTSOnTime = "import_bts_on_time"
+const JobTypeImportFlightPerformance = "import_flight_performance"
 
 const (
-	JobTypeImportOurAirportsCountries = "import_ourairports_countries"
-	JobTypeImportOurAirportsRegions   = "import_ourairports_regions"
-	JobTypeImportOurAirportsAirports  = "import_ourairports_airports"
+	JobTypeImportCountries = "import_countries"
+	JobTypeImportRegions   = "import_regions"
+	JobTypeImportAirports  = "import_airports"
 )
 
 type Job struct {
@@ -39,7 +39,7 @@ type YearMonth struct {
 	Month int `json:"month"`
 }
 
-type BTSIngestJob struct {
+type FlightPerformanceIngestJob struct {
 	JobID string `json:"job_id"`
 	Year  int    `json:"year"`
 	Month int    `json:"month"`

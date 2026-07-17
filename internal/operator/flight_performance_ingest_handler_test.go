@@ -35,7 +35,7 @@ func btsFixtureCSVPath(t *testing.T) string {
 	return path
 }
 
-func TestBTSIngestHandlerProcess(t *testing.T) {
+func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 	ctx := context.Background()
 
 	var replaceYear, replaceMonth int
@@ -43,10 +43,10 @@ func TestBTSIngestHandlerProcess(t *testing.T) {
 	var replaceRows int
 
 	st := &storetest.Stub{
-		GetBTSIngestJobFn: func(_ context.Context, jobID string) (*model.BTSIngestJob, error) {
-			return &model.BTSIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
 		},
-		ReplaceOnTimeFlightsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
+		ReplaceFlightPerformanceByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
 			replaceYear, replaceMonth = year, month
 			replaceRows = len(rows)
 
@@ -59,8 +59,8 @@ func TestBTSIngestHandlerProcess(t *testing.T) {
 		return path, func() {}, nil
 	})
 
-	h := NewBTSIngestHandler(st, svc)
-	job := &model.Job{ID: "job-1", Type: model.JobTypeImportBTSOnTime}
+	h := NewFlightPerformanceIngestHandler(st, svc)
+	job := &model.Job{ID: "job-1", Type: model.JobTypeImportFlightPerformance}
 
 	payload, err := h.Process(ctx, job)
 	if err != nil {
@@ -68,7 +68,7 @@ func TestBTSIngestHandlerProcess(t *testing.T) {
 	}
 
 	if replaceYear != 2026 || replaceMonth != 4 {
-		t.Errorf("ReplaceOnTimeFlightsByMonth = %d-%d, want 2026-4", replaceYear, replaceMonth)
+		t.Errorf("ReplaceFlightPerformanceByMonth = %d-%d, want 2026-4", replaceYear, replaceMonth)
 	}
 
 	var result map[string]any

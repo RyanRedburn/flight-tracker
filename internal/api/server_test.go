@@ -36,10 +36,10 @@ func routerStub() *storetest.Stub {
 		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
 			return false, nil
 		},
-		HasOurAirportsDataFn: func(context.Context, store.OurAirportsDataset) (bool, error) {
+		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
 			return false, nil
 		},
-		CreateOurAirportsIngestJobFn: func(_ context.Context, jobType string) (*model.Job, error) {
+		CreateReferenceIngestJobFn: func(_ context.Context, jobType string) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-oa",
 				Type:      jobType,

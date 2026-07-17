@@ -8,7 +8,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func TestOurAirportsHandlerTypes(t *testing.T) {
+func TestReferenceHandlerTypes(t *testing.T) {
 	svc := ourairports.NewService(&storetest.Stub{}, nil)
 
 	tests := []struct {
@@ -16,9 +16,9 @@ func TestOurAirportsHandlerTypes(t *testing.T) {
 		handler JobHandler
 		want    string
 	}{
-		{"countries", NewCountriesHandler(svc), model.JobTypeImportOurAirportsCountries},
-		{"regions", NewRegionsHandler(svc), model.JobTypeImportOurAirportsRegions},
-		{"airports", NewAirportsHandler(svc), model.JobTypeImportOurAirportsAirports},
+		{"countries", NewCountriesHandler(svc), model.JobTypeImportCountries},
+		{"regions", NewRegionsHandler(svc), model.JobTypeImportRegions},
+		{"airports", NewAirportsHandler(svc), model.JobTypeImportAirports},
 	}
 
 	for _, tt := range tests {

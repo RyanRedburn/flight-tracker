@@ -45,26 +45,26 @@ func openTestStore(t *testing.T) store.Store {
 	return s
 }
 
-func TestCreateBTSIngestJob(t *testing.T) {
+func TestCreateFlightPerformanceIngestJob(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	job, err := s.CreateBTSIngestJob(ctx, 2026, 4)
+	job, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 4)
 	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
-	if job.Type != model.JobTypeImportBTSOnTime {
-		t.Errorf("Type = %q, want %q", job.Type, model.JobTypeImportBTSOnTime)
+	if job.Type != model.JobTypeImportFlightPerformance {
+		t.Errorf("Type = %q, want %q", job.Type, model.JobTypeImportFlightPerformance)
 	}
 
 	if job.Status != model.JobStatusPending {
 		t.Errorf("Status = %q, want pending", job.Status)
 	}
 
-	detail, err := s.GetBTSIngestJob(ctx, job.ID)
+	detail, err := s.GetFlightPerformanceIngestJob(ctx, job.ID)
 	if err != nil {
-		t.Fatalf("GetBTSIngestJob() error = %v", err)
+		t.Fatalf("GetFlightPerformanceIngestJob() error = %v", err)
 	}
 
 	if detail.Year != 2026 || detail.Month != 4 {
@@ -80,9 +80,9 @@ func TestClaimNextPendingJob(t *testing.T) {
 		t.Fatalf("ClaimNextPendingJob() error = %v, want ErrNotFound", err)
 	}
 
-	created, err := s.CreateBTSIngestJob(ctx, 2026, 1)
+	created, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 1)
 	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
 	claimed, err := s.ClaimNextPendingJob(ctx)
@@ -112,8 +112,8 @@ func TestClaimNextPendingJobConcurrent(t *testing.T) {
 	s := openTestStore(t)
 
 	for range 3 {
-		if _, err := s.CreateBTSIngestJob(ctx, 2026, 1); err != nil {
-			t.Fatalf("CreateBTSIngestJob() error = %v", err)
+		if _, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 1); err != nil {
+			t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 		}
 	}
 
@@ -163,9 +163,9 @@ func TestCompleteAndFailJob(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	job, err := s.CreateBTSIngestJob(ctx, 2026, 2)
+	job, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 2)
 	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
 	claimed, err := s.ClaimNextPendingJob(ctx)
@@ -195,9 +195,9 @@ func TestCompleteAndFailJob(t *testing.T) {
 		t.Fatal("EndedAt is nil, want timestamp")
 	}
 
-	failJob, err := s.CreateBTSIngestJob(ctx, 2026, 3)
+	failJob, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 3)
 	if err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
 	if _, err := s.ClaimNextPendingJob(ctx); err != nil {
@@ -222,28 +222,28 @@ func TestCompleteAndFailJob(t *testing.T) {
 	}
 }
 
-func TestActiveBTSIngestMonths(t *testing.T) {
+func TestActiveFlightPerformanceIngestMonths(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	months := []model.YearMonth{{Year: 2026, Month: 4}, {Year: 2026, Month: 5}}
 
-	active, err := s.ActiveBTSIngestMonths(ctx, months)
+	active, err := s.ActiveFlightPerformanceIngestMonths(ctx, months)
 	if err != nil {
-		t.Fatalf("ActiveBTSIngestMonths() error = %v", err)
+		t.Fatalf("ActiveFlightPerformanceIngestMonths() error = %v", err)
 	}
 
 	if len(active) != 0 {
 		t.Fatalf("len(active) = %d, want 0", len(active))
 	}
 
-	if _, err := s.CreateBTSIngestJob(ctx, 2026, 4); err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	if _, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 4); err != nil {
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
-	active, err = s.ActiveBTSIngestMonths(ctx, months)
+	active, err = s.ActiveFlightPerformanceIngestMonths(ctx, months)
 	if err != nil {
-		t.Fatalf("ActiveBTSIngestMonths() error = %v", err)
+		t.Fatalf("ActiveFlightPerformanceIngestMonths() error = %v", err)
 	}
 
 	if len(active) != 1 {
@@ -259,7 +259,7 @@ func TestActiveIngestJob(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportFlightPerformance)
 	if err != nil {
 		t.Fatalf("ActiveIngestJob() error = %v", err)
 	}
@@ -268,11 +268,11 @@ func TestActiveIngestJob(t *testing.T) {
 		t.Fatal("expected no active job before create")
 	}
 
-	if _, err := s.CreateBTSIngestJob(ctx, 2026, 4); err != nil {
-		t.Fatalf("CreateBTSIngestJob() error = %v", err)
+	if _, err := s.CreateFlightPerformanceIngestJob(ctx, 2026, 4); err != nil {
+		t.Fatalf("CreateFlightPerformanceIngestJob() error = %v", err)
 	}
 
-	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportBTSOnTime)
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportFlightPerformance)
 	if err != nil {
 		t.Fatalf("ActiveIngestJob() error = %v", err)
 	}
@@ -282,24 +282,24 @@ func TestActiveIngestJob(t *testing.T) {
 	}
 }
 
-func TestActiveIngestJobOurAirports(t *testing.T) {
+func TestActiveIngestJobReference(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	if _, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsAirports); err != nil {
-		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
+	if _, err := s.CreateReferenceIngestJob(ctx, model.JobTypeImportAirports); err != nil {
+		t.Fatalf("CreateReferenceIngestJob() error = %v", err)
 	}
 
-	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsAirports)
+	active, err := s.ActiveIngestJob(ctx, model.JobTypeImportAirports)
 	if err != nil {
 		t.Fatalf("ActiveIngestJob() error = %v", err)
 	}
 
 	if !active {
-		t.Fatal("expected active ourairports airports job")
+		t.Fatal("expected active reference airports job")
 	}
 
-	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
+	active, err = s.ActiveIngestJob(ctx, model.JobTypeImportCountries)
 	if err != nil {
 		t.Fatalf("ActiveIngestJob() error = %v", err)
 	}
@@ -329,22 +329,22 @@ func testFlightRow(flightDate, origin, dest, airline, flightNum, crsDep string) 
 	}
 }
 
-func TestMonthsWithOnTimeFlightData(t *testing.T) {
+func TestMonthsWithFlightPerformanceData(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
 
 	rows := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
-	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, rows); err != nil {
-		t.Fatalf("ReplaceOnTimeFlightsByMonth() error = %v", err)
+	if err := s.ReplaceFlightPerformanceByMonth(ctx, 2026, 4, columns, rows); err != nil {
+		t.Fatalf("ReplaceFlightPerformanceByMonth() error = %v", err)
 	}
 
 	months := []model.YearMonth{{Year: 2026, Month: 4}, {Year: 2026, Month: 5}}
 
-	withData, err := s.MonthsWithOnTimeFlightData(ctx, months)
+	withData, err := s.MonthsWithFlightPerformanceData(ctx, months)
 	if err != nil {
-		t.Fatalf("MonthsWithOnTimeFlightData() error = %v", err)
+		t.Fatalf("MonthsWithFlightPerformanceData() error = %v", err)
 	}
 
 	if len(withData) != 1 {
@@ -356,22 +356,22 @@ func TestMonthsWithOnTimeFlightData(t *testing.T) {
 	}
 }
 
-func TestReplaceOnTimeFlightsByMonthRollback(t *testing.T) {
+func TestReplaceFlightPerformanceByMonthRollback(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
 
 	seed := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
-	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, seed); err != nil {
-		t.Fatalf("seed ReplaceOnTimeFlightsByMonth() error = %v", err)
+	if err := s.ReplaceFlightPerformanceByMonth(ctx, 2026, 4, columns, seed); err != nil {
+		t.Fatalf("seed ReplaceFlightPerformanceByMonth() error = %v", err)
 	}
 
 	badColumns := []string{"flight_date", "not_a_column"}
 
 	badRows := [][]string{{testFlightDate20260425, testAirportLAX}}
-	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, badColumns, badRows); err == nil {
-		t.Fatal("ReplaceOnTimeFlightsByMonth() expected error for invalid column")
+	if err := s.ReplaceFlightPerformanceByMonth(ctx, 2026, 4, badColumns, badRows); err == nil {
+		t.Fatal("ReplaceFlightPerformanceByMonth() expected error for invalid column")
 	}
 
 	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
@@ -389,19 +389,19 @@ func TestReplaceOnTimeFlightsByMonthRollback(t *testing.T) {
 	}
 }
 
-func TestReplaceOnTimeFlightsByMonthReplacesMonth(t *testing.T) {
+func TestReplaceFlightPerformanceByMonthReplacesMonth(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	columns := testFlightColumns()
 
 	initial := [][]string{testFlightRow(testFlightDate20260424, testAirportORD, testAirportBHM, "UA", "4547", "1535")}
-	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, initial); err != nil {
+	if err := s.ReplaceFlightPerformanceByMonth(ctx, 2026, 4, columns, initial); err != nil {
 		t.Fatalf("initial replace error = %v", err)
 	}
 
 	replacement := [][]string{testFlightRow(testFlightDate20260430, testAirportLAX, testAirportSFO, "UA", "100", "0900")}
-	if err := s.ReplaceOnTimeFlightsByMonth(ctx, 2026, 4, columns, replacement); err != nil {
+	if err := s.ReplaceFlightPerformanceByMonth(ctx, 2026, 4, columns, replacement); err != nil {
 		t.Fatalf("replacement replace error = %v", err)
 	}
 

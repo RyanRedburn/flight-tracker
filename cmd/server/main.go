@@ -9,7 +9,7 @@
 //	@tag.name					health
 //	@tag.description			Liveness, readiness, and database migration version
 //	@tag.name					ingest
-//	@tag.description			Queue flight schedule and reference data import jobs
+//	@tag.description			Queue flight performance and reference data import jobs
 //	@tag.name					jobs
 //	@tag.description			Inspect background job status
 //	@tag.name					routes
@@ -70,13 +70,13 @@ func run() int {
 	}
 
 	btsDownloader := bts.NewDownloader(cfg.BTSBaseURL, cfg.BTSDownloadTimeout)
-	btsIngest := bts.NewService(st, btsDownloader)
+	flightPerformanceIngest := bts.NewService(st, btsDownloader)
 
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)
 
 	processor := operator.NewProcessor(st,
-		operator.NewBTSIngestHandler(st, btsIngest),
+		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
 		operator.NewCountriesHandler(oaIngest),
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),

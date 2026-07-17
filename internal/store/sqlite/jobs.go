@@ -16,11 +16,11 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Store) CreateBTSIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
 	now := time.Now().UTC()
 	job := &model.Job{
 		ID:        uuid.NewString(),
-		Type:      model.JobTypeImportBTSOnTime,
+		Type:      model.JobTypeImportFlightPerformance,
 		Status:    model.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -36,8 +36,8 @@ func (s *Store) CreateBTSIngestJob(ctx context.Context, year, month int) (*model
 		return nil, err
 	}
 
-	if _, err := tx.ExecContext(ctx, store.QueryCreateBTSIngestJob, job.ID, year, month); err != nil {
-		return nil, fmt.Errorf("insert bts_ingest_jobs: %w", err)
+	if _, err := tx.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, job.ID, year, month); err != nil {
+		return nil, fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -47,16 +47,16 @@ func (s *Store) CreateBTSIngestJob(ctx context.Context, year, month int) (*model
 	return job, nil
 }
 
-func (s *Store) GetBTSIngestJob(ctx context.Context, jobID string) (*model.BTSIngestJob, error) {
-	var detail model.BTSIngestJob
+func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+	var detail model.FlightPerformanceIngestJob
 
-	err := s.db.QueryRowxContext(ctx, store.QueryGetBTSIngestJob, jobID).Scan(
+	err := s.db.QueryRowxContext(ctx, store.QueryGetFlightPerformanceIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("bts ingest job %q: %w", jobID, store.ErrNotFound)
+		return nil, fmt.Errorf("flight performance ingest job %q: %w", jobID, store.ErrNotFound)
 	}
 
 	if err != nil {
@@ -177,12 +177,12 @@ func (s *Store) ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) 
 	return res.RowsAffected()
 }
 
-func (s *Store) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
 	if len(months) == 0 {
 		return nil, nil
 	}
 
-	rows, err := s.db.QueryxContext(ctx, store.QueryActiveBTSIngestMonths,
+	rows, err := s.db.QueryxContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
 	)
@@ -240,13 +240,13 @@ func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, erro
 	return true, nil
 }
 
-func (s *Store) MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
 	var withData []model.YearMonth
 
 	for _, ym := range months {
 		var exists int
 
-		err := s.db.QueryRowContext(ctx, store.QueryMonthsWithOnTimeFlightData,
+		err := s.db.QueryRowContext(ctx, store.QueryMonthsWithFlightPerformanceData,
 			strconv.Itoa(ym.Year),
 			strconv.Itoa(ym.Month),
 		).Scan(&exists)
@@ -264,7 +264,7 @@ func (s *Store) MonthsWithOnTimeFlightData(ctx context.Context, months []model.Y
 	return withData, nil
 }
 
-func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
+func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	if len(columns) == 0 {
 		return errors.New("columns required")
 	}
@@ -275,7 +275,7 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, store.QueryDeleteOnTimeFlightsByMonth,
+	if _, err := tx.ExecContext(ctx, store.QueryDeleteFlightPerformanceByMonth,
 		strconv.Itoa(year),
 		strconv.Itoa(month),
 	); err != nil {
@@ -286,7 +286,7 @@ func (s *Store) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int
 		return tx.Commit()
 	}
 
-	if err := replaceTableRows(ctx, tx, "on_time_flights", columns, rows, false); err != nil {
+	if err := replaceTableRows(ctx, tx, "flight_performance", columns, rows, false); err != nil {
 		return err
 	}
 

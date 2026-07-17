@@ -33,33 +33,33 @@ var (
 	}
 )
 
-func Columns(dataset store.OurAirportsDataset) ([]string, error) {
+func Columns(dataset store.ReferenceDataset) ([]string, error) {
 	switch dataset {
-	case store.OurAirportsCountries:
+	case store.ReferenceCountries:
 		return append([]string(nil), countryColumns...), nil
-	case store.OurAirportsRegions:
+	case store.ReferenceRegions:
 		return append([]string(nil), regionColumns...), nil
-	case store.OurAirportsAirports:
+	case store.ReferenceAirports:
 		return append([]string(nil), airportColumns...), nil
 	default:
-		return nil, fmt.Errorf("%w: %q", store.ErrInvalidOurAirportsDataset, dataset)
+		return nil, fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
 	}
 }
 
-func JobType(dataset store.OurAirportsDataset) (string, error) {
+func JobType(dataset store.ReferenceDataset) (string, error) {
 	switch dataset {
-	case store.OurAirportsCountries:
-		return model.JobTypeImportOurAirportsCountries, nil
-	case store.OurAirportsRegions:
-		return model.JobTypeImportOurAirportsRegions, nil
-	case store.OurAirportsAirports:
-		return model.JobTypeImportOurAirportsAirports, nil
+	case store.ReferenceCountries:
+		return model.JobTypeImportCountries, nil
+	case store.ReferenceRegions:
+		return model.JobTypeImportRegions, nil
+	case store.ReferenceAirports:
+		return model.JobTypeImportAirports, nil
 	default:
-		return "", fmt.Errorf("%w: %q", store.ErrInvalidOurAirportsDataset, dataset)
+		return "", fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
 	}
 }
 
-func CSVFilename(dataset store.OurAirportsDataset) (string, error) {
+func CSVFilename(dataset store.ReferenceDataset) (string, error) {
 	table, err := dataset.Table()
 	if err != nil {
 		return "", err

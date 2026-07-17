@@ -12,7 +12,7 @@ import (
 
 const testdataRowCount = 2
 
-func testdataCSVPath(t *testing.T, dataset store.OurAirportsDataset) string {
+func testdataCSVPath(t *testing.T, dataset store.ReferenceDataset) string {
 	t.Helper()
 
 	filename, err := CSVFilename(dataset)
@@ -42,7 +42,7 @@ func testdataCSVPath(t *testing.T, dataset store.OurAirportsDataset) string {
 func fixtureCSVOpener(t *testing.T) CSVOpener {
 	t.Helper()
 
-	return func(_ context.Context, dataset store.OurAirportsDataset) (string, func(), error) {
+	return func(_ context.Context, dataset store.ReferenceDataset) (string, func(), error) {
 		return testdataCSVPath(t, dataset), func() {}, nil
 	}
 }

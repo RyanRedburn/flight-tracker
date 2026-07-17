@@ -48,18 +48,18 @@ const (
 		SET status = ?, started_at = NULL, updated_at = ?
 		WHERE status = ? AND started_at IS NOT NULL AND started_at < ?`
 
-	QueryCreateBTSIngestJob = `
-		INSERT INTO bts_ingest_jobs (job_id, year, month)
+	QueryCreateFlightPerformanceIngestJob = `
+		INSERT INTO flight_performance_ingest_jobs (job_id, year, month)
 		VALUES (?, ?, ?)`
 
-	QueryGetBTSIngestJob = `
+	QueryGetFlightPerformanceIngestJob = `
 		SELECT job_id, year, month
-		FROM bts_ingest_jobs
+		FROM flight_performance_ingest_jobs
 		WHERE job_id = ?`
 
-	QueryActiveBTSIngestMonths = `
+	QueryActiveFlightPerformanceIngestMonths = `
 		SELECT b.year, b.month
-		FROM bts_ingest_jobs b
+		FROM flight_performance_ingest_jobs b
 		INNER JOIN jobs j ON j.id = b.job_id
 		WHERE j.status IN (?, ?)`
 
@@ -69,14 +69,14 @@ const (
 		WHERE type = ? AND status IN (?, ?)
 		LIMIT 1`
 
-	QueryMonthsWithOnTimeFlightData = `
+	QueryMonthsWithFlightPerformanceData = `
 		SELECT 1
-		FROM on_time_flights
+		FROM flight_performance
 		WHERE year = ? AND month = ?
 		LIMIT 1`
 
-	QueryDeleteOnTimeFlightsByMonth = `
-		DELETE FROM on_time_flights
+	QueryDeleteFlightPerformanceByMonth = `
+		DELETE FROM flight_performance
 		WHERE year = ? AND month = ?`
 
 	QueryDeleteAllCountries = `DELETE FROM countries`
@@ -118,5 +118,5 @@ const (
 			div3_airport,
 			div4_airport,
 			div5_airport
-		FROM on_time_flights`
+		FROM flight_performance`
 )

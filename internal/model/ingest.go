@@ -9,7 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-const MinBTSIngestYear = 2018
+const MinFlightPerformanceIngestYear = 2018
 
 var ingestValidate = validator.New()
 

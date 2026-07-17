@@ -60,7 +60,7 @@ type FlightPerf struct {
 	DivAirports       [5]string
 }
 
-func FlightPerfFromOnTime(f *model.OnTimeFlight) FlightPerf {
+func FlightPerfFromFlightPerformance(f *model.FlightPerformance) FlightPerf {
 	return FlightPerf{
 		FlightDate:        f.FlightDate,
 		DayOfWeek:         f.DayOfWeek,

@@ -24,7 +24,7 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 
 	d := NewDownloader(server.URL, time.Second)
 
-	path, cleanup, err := d.DownloadCSV(context.Background(), store.OurAirportsCountries)
+	path, cleanup, err := d.DownloadCSV(context.Background(), store.ReferenceCountries)
 	if err != nil {
 		t.Fatalf("DownloadCSV() error = %v", err)
 	}
@@ -43,33 +43,33 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 func TestServiceImportDatasets(t *testing.T) {
 	ctx := context.Background()
 
-	datasets := []store.OurAirportsDataset{
-		store.OurAirportsCountries,
-		store.OurAirportsRegions,
-		store.OurAirportsAirports,
+	datasets := []store.ReferenceDataset{
+		store.ReferenceCountries,
+		store.ReferenceRegions,
+		store.ReferenceAirports,
 	}
 
 	for _, dataset := range datasets {
 		t.Run(string(dataset), func(t *testing.T) {
-			var replaced store.OurAirportsDataset
+			var replaced store.ReferenceDataset
 
 			var gotRows int
 
 			st := &storetest.Stub{
-				ReplaceOurAirportsCountriesFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.OurAirportsCountries
+				ReplaceCountriesFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.ReferenceCountries
 					gotRows = len(rows)
 
 					return nil
 				},
-				ReplaceOurAirportsRegionsFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.OurAirportsRegions
+				ReplaceRegionsFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.ReferenceRegions
 					gotRows = len(rows)
 
 					return nil
 				},
-				ReplaceOurAirportsAirportsFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.OurAirportsAirports
+				ReplaceAirportsFn: func(_ context.Context, _ []string, rows [][]string) error {
+					replaced = store.ReferenceAirports
 					gotRows = len(rows)
 
 					return nil
@@ -100,7 +100,7 @@ func TestServiceImportDatasets(t *testing.T) {
 func TestServiceImportWithoutDownloader(t *testing.T) {
 	svc := NewService(&storetest.Stub{}, nil)
 
-	_, err := svc.Import(context.Background(), store.OurAirportsCountries)
+	_, err := svc.Import(context.Background(), store.ReferenceCountries)
 	if err == nil {
 		t.Fatal("Import() expected error without downloader or opener")
 	}
@@ -108,7 +108,7 @@ func TestServiceImportWithoutDownloader(t *testing.T) {
 
 func TestImportResultJSON(t *testing.T) {
 	payload, err := ImportResult{
-		Dataset:      store.OurAirportsAirports,
+		Dataset:      store.ReferenceAirports,
 		RowsImported: 42,
 	}.MarshalJSON()
 	if err != nil {
@@ -120,7 +120,7 @@ func TestImportResultJSON(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	if decoded[jsonKeyDataset] != string(store.OurAirportsAirports) {
+	if decoded[jsonKeyDataset] != string(store.ReferenceAirports) {
 		t.Errorf("dataset = %v, want airports", decoded[jsonKeyDataset])
 	}
 
@@ -130,7 +130,7 @@ func TestImportResultJSON(t *testing.T) {
 }
 
 func TestDatasetHelpers(t *testing.T) {
-	jobType, err := JobType(store.OurAirportsRegions)
+	jobType, err := JobType(store.ReferenceRegions)
 	if err != nil {
 		t.Fatalf("JobType() error = %v", err)
 	}
@@ -139,7 +139,7 @@ func TestDatasetHelpers(t *testing.T) {
 		t.Fatal("expected job type")
 	}
 
-	filename, err := CSVFilename(store.OurAirportsRegions)
+	filename, err := CSVFilename(store.ReferenceRegions)
 	if err != nil {
 		t.Fatalf("CSVFilename() error = %v", err)
 	}

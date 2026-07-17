@@ -11,12 +11,12 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-type OurAirportsIngestHandler struct {
+type ReferenceIngestHandler struct {
 	store store.Store
 }
 
-func NewOurAirportsIngestHandler(s store.Store) *OurAirportsIngestHandler {
-	return &OurAirportsIngestHandler{store: s}
+func NewReferenceIngestHandler(s store.Store) *ReferenceIngestHandler {
+	return &ReferenceIngestHandler{store: s}
 }
 
 // ReferenceIngestJobResponse is the queued reference-data ingest job.
@@ -44,8 +44,8 @@ type ReferenceIngestResponse struct {
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/countries [post]
-func (h *OurAirportsIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.OurAirportsCountries)
+func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, store.ReferenceCountries)
 }
 
 // CreateRegions queues a regions reference data ingest job.
@@ -61,8 +61,8 @@ func (h *OurAirportsIngestHandler) CreateCountries(w http.ResponseWriter, r *htt
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/regions [post]
-func (h *OurAirportsIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.OurAirportsRegions)
+func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, store.ReferenceRegions)
 }
 
 // CreateAirports queues an airports reference data ingest job.
@@ -78,11 +78,11 @@ func (h *OurAirportsIngestHandler) CreateRegions(w http.ResponseWriter, r *http.
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/airports [post]
-func (h *OurAirportsIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.OurAirportsAirports)
+func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, store.ReferenceAirports)
 }
 
-func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request, dataset store.OurAirportsDataset) {
+func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, dataset store.ReferenceDataset) {
 	var req model.ForceIngestRequest
 	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid json body"})
@@ -113,7 +113,7 @@ func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request
 	}
 
 	if !req.Force {
-		hasData, err := h.store.HasOurAirportsData(ctx, dataset)
+		hasData, err := h.store.HasReferenceData(ctx, dataset)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing data"})
 			return
@@ -129,7 +129,7 @@ func (h *OurAirportsIngestHandler) create(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	job, err := h.store.CreateOurAirportsIngestJob(ctx, jobType)
+	job, err := h.store.CreateReferenceIngestJob(ctx, jobType)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create ingest job"})
 		return

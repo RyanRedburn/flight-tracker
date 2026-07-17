@@ -64,7 +64,7 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResul
 		return ImportResult{}, fmt.Errorf("parse csv: %w", err)
 	}
 
-	if err := s.store.ReplaceOnTimeFlightsByMonth(ctx, year, month, columns, rows); err != nil {
+	if err := s.store.ReplaceFlightPerformanceByMonth(ctx, year, month, columns, rows); err != nil {
 		return ImportResult{}, fmt.Errorf("load flights: %w", err)
 	}
 
