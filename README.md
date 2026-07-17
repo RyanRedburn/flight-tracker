@@ -10,18 +10,17 @@ Go service with a REST API and an in-process background worker for importing fli
 
 - `POST /api/v1/ingest` to queue per-month flight performance import jobs
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
-- Poll-based background workers that download, parse, and load data into SQLite
+- Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, booking outlook probabilities, and job status
-- Per-driver SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
-- Docker deployment with persistent SQLite volume
+- SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
+- Docker Compose with Postgres and a migrate sidecar
 
 ## Requirements
 
 - Go 1.25+
 - [GNU Make](https://www.gnu.org/software/make/) (Git Bash, WSL, or `choco install make` on Windows)
 - [golangci-lint](https://golangci-lint.run/) v2 (for `make lint`)
-- C compiler (CGO) for local SQLite builds and the full test suite, **or** use Docker
-- Docker & Docker Compose (optional)
+- Docker & Docker Compose (for Postgres and optional containerized runs)
 
 ## Makefile
 
@@ -29,23 +28,26 @@ Go service with a REST API and an in-process background worker for importing fli
 | --------- | ------------- |
 | `make lint` | Run golangci-lint (uses `.golangci.yml`) |
 | `make swagger` | Regenerate OpenAPI docs (`docs/external`, `docs/full`) via `go generate` |
-| `make test` | Unit tests only — no C compiler required |
-| `make test-all` | Full suite including SQLite integration tests (requires CGO/gcc) |
+| `make test` | Run all tests |
 | `make test-cover-html` | Full suite with HTML coverage report (`coverage.html`) |
 | `make docker-build` | Build Docker images |
 | `make docker-run` | Start the app via Docker Compose |
 | `make migrate-up` | Apply migrations via the migrate sidecar |
 | `make migrate-down` | Roll back one migration |
 | `make migrate-version` | Show current migration version |
-| `make db-shell` | Interactive SQLite shell against the Docker volume |
+| `make db-shell` | Interactive `psql` against Compose Postgres |
 | `make clean-cover` | Remove generated coverage files |
 
 ## Local development
 
+Start Postgres (Compose), then run the server locally:
+
 ```bash
-# Requires CGO (gcc). On Windows without a C compiler, use Docker instead.
-CGO_ENABLED=1 go run ./cmd/server
+docker compose up -d postgres
+go run ./cmd/server
 ```
+
+Defaults expect Postgres at `localhost:5432` with the credentials in [`.env.example`](.env.example). Or run the full stack with `make docker-run`.
 
 Swagger UI (after the server is running):
 
@@ -68,8 +70,7 @@ After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/.
 ### Tests
 
 ```bash
-make test       # unit tests (no C compiler)
-make test-all   # full suite including SQLite (requires CGO)
+make test
 ```
 
 Environment variables (defaults shown):
@@ -77,9 +78,9 @@ Environment variables (defaults shown):
 | Variable | Default | Description |
 | ---------- | --------- | ------------- |
 | `HTTP_ADDR` | `:8080` | API listen address |
-| `DATABASE_DRIVER` | `sqlite` | `sqlite` or `postgres` |
-| `DATABASE_URL` | `file:flight-tracker.db` | Database DSN |
-| `MIGRATIONS_PATH` | `migrations/sqlite` | Migration folder for the active driver |
+| `DATABASE_DRIVER` | `postgres` | Database driver (`postgres` only) |
+| `DATABASE_URL` | `postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable` | Database DSN |
+| `MIGRATIONS_PATH` | `migrations/postgres` | Migration folder |
 | `WORKER_CONCURRENCY` | `2` | Background worker goroutines |
 | `WORKER_POLL_INTERVAL` | `5s` | How often workers poll for pending jobs |
 | `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
@@ -92,15 +93,18 @@ Environment variables (defaults shown):
 
 ## Docker
 
-Compose defines two services: `app` (distroless API server) and `migrate` (migration CLI and SQLite shell). The app image has no shell or extra tools — use the migrate sidecar for manual migrations and database inspection.
+Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). The app image has no shell or extra tools — use the migrate sidecar for manual migrations and database inspection.
+
+Optional local overrides: copy [`.env.example`](.env.example) to `.env` (Compose defaults match the example credentials).
 
 ```bash
 make docker-build          # build images
-make docker-run            # start the app (foreground)
+docker compose up -d postgres   # start Postgres only
+make docker-run            # start the stack (foreground)
 docker compose up --build  # build and start in one step
 ```
 
-The app listens on port 8080 and stores SQLite data in the `flight-data` volume at `/data/flight-tracker.db`.
+The app listens on port 8080. Postgres data is stored in the `postgres-data` volume. Postgres is published on host port `5432` for local tooling.
 
 ## API examples
 
@@ -190,24 +194,23 @@ Source adapter: [OurAirports open data](https://ourairports.com/data/) (public d
 
 ## Migrations
 
-Migrations run automatically on server startup.
+Migrations run automatically on server startup (against `MIGRATIONS_PATH`).
 
 ### Via Docker (recommended)
 
-Uses the shared `flight-data` volume — the same database file the running app uses.
+Targets the Compose `postgres` service (same database the app uses).
 
 ```bash
+docker compose up -d postgres
 make migrate-up
 make migrate-version
 make db-shell
 ```
 
-Inside the SQLite shell, column headers are off by default. Turn them on with `.headers on` and `.mode column`.
-
 One-off query without opening a shell:
 
 ```bash
-docker compose run --rm --entrypoint sqlite3 migrate /data/flight-tracker.db "SELECT * FROM jobs;"
+docker compose exec postgres psql -U flight -d flight_tracker -c "SELECT 1;"
 ```
 
 ### Local CLI
@@ -215,13 +218,13 @@ docker compose run --rm --entrypoint sqlite3 migrate /data/flight-tracker.db "SE
 Install the migrate CLI:
 
 ```bash
-go install -tags 'sqlite3' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
-Then run manually:
+Then run manually (with Compose Postgres running):
 
 ```bash
-migrate -path migrations/sqlite -database "sqlite3://./flight-tracker.db" up
+migrate -path migrations/postgres -database "postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable" up
 ```
 
 ## Project layout
@@ -236,7 +239,7 @@ internal/database/    Store factory (driver selection)
 internal/ingest/      Ingest range expansion; provider adapters (BTS, OurAirports) download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
-internal/store/       Store interface, queries, SQLite implementation, test stub
-docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/shell)
-migrations/           Per-driver SQL migrations (sqlite/, postgres/)
+internal/store/       Store interface, queries, Postgres implementation, test stub
+docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/psql)
+migrations/           SQL migrations (postgres/)
 ```

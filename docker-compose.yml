@@ -1,26 +1,44 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flight}
+      POSTGRES_DB: ${POSTGRES_DB:-flight_tracker}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     image: flight-tracker:latest
     ports:
       - "8080:8080"
-    volumes:
-      - flight-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      DATABASE_DRIVER: sqlite
-      DATABASE_URL: file:/data/flight-tracker.db
-      MIGRATIONS_PATH: /migrations/sqlite
+      DATABASE_DRIVER: postgres
+      DATABASE_URL: postgres://${POSTGRES_USER:-flight}:${POSTGRES_PASSWORD:-flight}@postgres:5432/${POSTGRES_DB:-flight_tracker}?sslmode=disable
+      MIGRATIONS_PATH: /migrations/postgres
 
   migrate:
     build:
       context: .
       dockerfile: docker/migrate/Dockerfile
     image: flight-tracker-migrate:latest
-    volumes:
-      - flight-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      MIGRATIONS_PATH: /migrations/sqlite
-      DATABASE_URL: sqlite3:///data/flight-tracker.db
+      MIGRATIONS_PATH: /migrations/postgres
+      DATABASE_URL: postgres://${POSTGRES_USER:-flight}:${POSTGRES_PASSWORD:-flight}@postgres:5432/${POSTGRES_DB:-flight_tracker}?sslmode=disable
 
 volumes:
-  flight-data:
+  postgres-data:

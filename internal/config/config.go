@@ -14,9 +14,9 @@ import (
 
 type Config struct {
 	HTTPAddr                   string        `env:"HTTP_ADDR" envDefault:":8080"`
-	DatabaseDriver             string        `env:"DATABASE_DRIVER" envDefault:"sqlite"`
-	DatabaseURL                string        `env:"DATABASE_URL" envDefault:"file:flight-tracker.db"`
-	MigrationsPath             string        `env:"MIGRATIONS_PATH" envDefault:"migrations/sqlite"`
+	DatabaseDriver             string        `env:"DATABASE_DRIVER" envDefault:"postgres"`
+	DatabaseURL                string        `env:"DATABASE_URL" envDefault:"postgres://flight:flight@localhost:5432/flight_tracker?sslmode=disable"`
+	MigrationsPath             string        `env:"MIGRATIONS_PATH" envDefault:"migrations/postgres"`
 	WorkerConcurrency          int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
 	WorkerPollInterval         time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
 	StaleJobThreshold          time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`

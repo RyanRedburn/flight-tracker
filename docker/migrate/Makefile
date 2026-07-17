@@ -1,7 +1,6 @@
 MIGRATE ?= migrate
-MIGRATIONS_PATH ?= /migrations/sqlite
-DATABASE_URL ?= sqlite3:///data/flight-tracker.db
-SQLITE_DB ?= /data/flight-tracker.db
+MIGRATIONS_PATH ?= /migrations/postgres
+DATABASE_URL ?= postgres://flight:flight@postgres:5432/flight_tracker?sslmode=disable
 
 .PHONY: up down version force shell
 
@@ -20,4 +19,4 @@ force:
 	$(MIGRATE) -path $(MIGRATIONS_PATH) -database "$(DATABASE_URL)" force $(VERSION)
 
 shell:
-	sqlite3 $(SQLITE_DB)
+	psql "$(DATABASE_URL)"

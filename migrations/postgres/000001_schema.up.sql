@@ -1,4 +1,28 @@
-CREATE TABLE on_time_flights (
+CREATE TABLE jobs (
+    id         TEXT PRIMARY KEY,
+    type       TEXT NOT NULL,
+    status     TEXT NOT NULL,
+    result     JSONB,
+    error      TEXT,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    started_at TIMESTAMPTZ,
+    ended_at   TIMESTAMPTZ
+);
+
+CREATE INDEX idx_jobs_status ON jobs (status);
+CREATE INDEX idx_jobs_created_at ON jobs (created_at DESC);
+
+CREATE TABLE flight_performance_ingest_jobs (
+    job_id TEXT PRIMARY KEY REFERENCES jobs (id) ON DELETE CASCADE,
+    year   INTEGER NOT NULL,
+    month  INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12)
+);
+
+CREATE INDEX idx_flight_performance_ingest_jobs_year_month
+    ON flight_performance_ingest_jobs (year, month);
+
+CREATE TABLE flight_performance (
     year TEXT,
     quarter TEXT,
     month TEXT,
@@ -120,6 +144,56 @@ CREATE TABLE on_time_flights (
     duplicate TEXT
 );
 
-CREATE INDEX idx_on_time_flights_flight_date ON on_time_flights(flight_date);
-CREATE INDEX idx_on_time_flights_origin_dest ON on_time_flights(origin, dest);
-CREATE INDEX idx_on_time_flights_marketing_airline ON on_time_flights(iata_code_marketing_airline);
+CREATE INDEX idx_flight_performance_flight_date ON flight_performance (flight_date);
+CREATE INDEX idx_flight_performance_origin_dest ON flight_performance (origin, dest);
+CREATE INDEX idx_flight_performance_marketing_airline ON flight_performance (iata_code_marketing_airline);
+CREATE INDEX idx_flight_performance_year_month ON flight_performance (year, month);
+CREATE INDEX idx_flight_performance_origin_dest_date ON flight_performance (origin, dest, flight_date);
+
+CREATE TABLE countries (
+    id INTEGER PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    continent TEXT NOT NULL,
+    wikipedia_link TEXT,
+    keywords TEXT
+);
+
+CREATE TABLE regions (
+    id INTEGER PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    local_code TEXT,
+    name TEXT NOT NULL,
+    continent TEXT NOT NULL,
+    iso_country TEXT NOT NULL,
+    wikipedia_link TEXT,
+    keywords TEXT
+);
+
+CREATE INDEX idx_regions_iso_country ON regions (iso_country);
+
+CREATE TABLE airports (
+    id INTEGER PRIMARY KEY,
+    ident TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    latitude_deg DOUBLE PRECISION NOT NULL,
+    longitude_deg DOUBLE PRECISION NOT NULL,
+    elevation_ft INTEGER,
+    continent TEXT NOT NULL,
+    iso_country TEXT NOT NULL,
+    iso_region TEXT NOT NULL,
+    municipality TEXT,
+    scheduled_service TEXT NOT NULL,
+    icao_code TEXT,
+    iata_code TEXT,
+    gps_code TEXT,
+    local_code TEXT,
+    home_link TEXT,
+    wikipedia_link TEXT,
+    keywords TEXT
+);
+
+CREATE INDEX idx_airports_iata_code ON airports (iata_code);
+CREATE INDEX idx_airports_iso_country ON airports (iso_country);
+CREATE INDEX idx_airports_iso_region ON airports (iso_region);

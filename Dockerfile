@@ -2,9 +2,6 @@
 
 FROM golang:1.25-bookworm AS build
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /src
 
 COPY go.mod go.sum ./
@@ -12,10 +9,10 @@ RUN go mod download
 
 COPY . .
 
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 RUN go build -o /server ./cmd/server
 
-FROM gcr.io/distroless/base-debian12
+FROM gcr.io/distroless/static-debian12
 
 WORKDIR /
 
@@ -23,10 +20,9 @@ COPY --from=build /server /server
 COPY migrations /migrations
 
 EXPOSE 8080
-VOLUME ["/data"]
 
-ENV DATABASE_DRIVER=sqlite
-ENV DATABASE_URL=file:/data/flight-tracker.db
-ENV MIGRATIONS_PATH=/migrations/sqlite
+ENV DATABASE_DRIVER=postgres
+ENV DATABASE_URL=postgres://flight:flight@postgres:5432/flight_tracker?sslmode=disable
+ENV MIGRATIONS_PATH=/migrations/postgres
 
 ENTRYPOINT ["/server"]

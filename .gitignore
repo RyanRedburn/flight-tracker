@@ -7,13 +7,14 @@ coverage.html
 /server
 *.exe
 
-# SQLite databases
+# Local database files
 *.db
 *.db-journal
 
 # Environment
 .env
 .env.*
+!.env.example
 
 # IDE
 .idea/

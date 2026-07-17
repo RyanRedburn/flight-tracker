@@ -1,4 +1,4 @@
-package sqlite
+package postgres
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type Store struct {
@@ -25,25 +25,26 @@ type Store struct {
 }
 
 func Open(ctx context.Context, dsn, migrationsPath string) (store.Store, error) {
-	dbPath, err := sqliteDBPath(dsn)
-	if err != nil {
-		return nil, err
+	dsn = strings.TrimSpace(dsn)
+	if dsn == "" {
+		return nil, errors.New("empty postgres dsn")
 	}
 
-	if err := runMigrations(migrationsPath, dbPath); err != nil {
+	if err := runMigrations(migrationsPath, dsn); err != nil {
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
-	db, err := sqlx.Open("sqlite3", dbPath)
+	db, err := sqlx.Open("pgx", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite: %w", err)
+		return nil, fmt.Errorf("open postgres: %w", err)
 	}
 
-	db.SetMaxOpenConns(1)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
 
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("ping sqlite: %w", err)
+		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
 	return &Store{db: db}, nil
@@ -112,11 +113,6 @@ func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 }
 
 func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
-	var result sql.NullString
-	if len(job.Result) > 0 {
-		result = sql.NullString{String: string(job.Result), Valid: true}
-	}
-
 	var errMsg sql.NullString
 	if job.Error != "" {
 		errMsg = sql.NullString{String: job.Error, Valid: true}
@@ -125,11 +121,11 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	_, err := s.db.ExecContext(ctx, store.QueryUpdateJob,
 		job.Type,
 		string(job.Status),
-		result,
+		nullJSON(job.Result),
 		errMsg,
-		job.UpdatedAt.UTC().Format(time.RFC3339),
-		nullTimeString(job.StartedAt),
-		nullTimeString(job.EndedAt),
+		job.UpdatedAt.UTC(),
+		nullTime(job.StartedAt),
+		nullTime(job.EndedAt),
 		job.ID,
 	)
 
@@ -157,27 +153,37 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 func (s *Store) queryFlightPerf(ctx context.Context, origin, dest, startDate, endDate, carrier, flightNumber string) ([]store.FlightPerf, error) {
 	query := store.QueryRoutePerfBase
 	args := make([]any, 0, 6)
-	where := []string{"origin = ?", "dest = ?"}
+	where := make([]string, 0, 6)
+	n := 1
 
-	args = append(args, origin, dest)
+	where = append(where, fmt.Sprintf("origin = $%d", n))
+	args = append(args, origin)
+	n++
+
+	where = append(where, fmt.Sprintf("dest = $%d", n))
+	args = append(args, dest)
+	n++
 
 	if startDate != "" {
-		where = append(where, "flight_date >= ?")
+		where = append(where, fmt.Sprintf("flight_date >= $%d", n))
 		args = append(args, startDate)
+		n++
 	}
 
 	if endDate != "" {
-		where = append(where, "flight_date <= ?")
+		where = append(where, fmt.Sprintf("flight_date <= $%d", n))
 		args = append(args, endDate)
+		n++
 	}
 
 	if carrier != "" {
-		where = append(where, "iata_code_marketing_airline = ?")
+		where = append(where, fmt.Sprintf("iata_code_marketing_airline = $%d", n))
 		args = append(args, carrier)
+		n++
 	}
 
 	if flightNumber != "" {
-		where = append(where, "flight_number_marketing_airline = ?")
+		where = append(where, fmt.Sprintf("flight_number_marketing_airline = $%d", n))
 		args = append(args, flightNumber)
 	}
 
@@ -211,12 +217,12 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	var (
 		job       model.Job
 		status    string
-		result    sql.NullString
+		result    []byte
 		errMsg    sql.NullString
-		createdAt string
-		updatedAt string
-		startedAt sql.NullString
-		endedAt   sql.NullString
+		createdAt time.Time
+		updatedAt time.Time
+		startedAt sql.NullTime
+		endedAt   sql.NullTime
 	)
 
 	if err := row.Scan(
@@ -234,35 +240,25 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	}
 
 	job.Status = model.JobStatus(status)
+	job.CreatedAt = createdAt.UTC()
+	job.UpdatedAt = updatedAt.UTC()
 
-	if result.Valid {
-		job.Result = json.RawMessage(result.String)
+	if len(result) > 0 {
+		job.Result = json.RawMessage(result)
 	}
 
 	if errMsg.Valid {
 		job.Error = errMsg.String
 	}
 
-	var err error
-
-	job.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
-	if err != nil {
-		return nil, fmt.Errorf("parse created_at: %w", err)
+	if startedAt.Valid {
+		t := startedAt.Time.UTC()
+		job.StartedAt = &t
 	}
 
-	job.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("parse updated_at: %w", err)
-	}
-
-	job.StartedAt, err = parseOptionalTime(startedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	job.EndedAt, err = parseOptionalTime(endedAt)
-	if err != nil {
-		return nil, err
+	if endedAt.Valid {
+		t := endedAt.Time.UTC()
+		job.EndedAt = &t
 	}
 
 	return &job, nil
@@ -363,9 +359,24 @@ func nullString(s sql.NullString) string {
 	return ""
 }
 
-func runMigrations(migrationsPath, dbPath string) error {
+func nullJSON(b json.RawMessage) any {
+	if len(b) == 0 {
+		return nil
+	}
+
+	return []byte(b)
+}
+
+func nullTime(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{}
+	}
+
+	return sql.NullTime{Time: t.UTC(), Valid: true}
+}
+
+func runMigrations(migrationsPath, databaseURL string) error {
 	migrationsURL := toFileURL(migrationsPath)
-	databaseURL := "sqlite3://" + filepath.ToSlash(dbPath)
 
 	m, err := migrate.New(migrationsURL, databaseURL)
 	if err != nil {
@@ -378,31 +389,6 @@ func runMigrations(migrationsPath, dbPath string) error {
 	}
 
 	return nil
-}
-
-func sqliteDBPath(dsn string) (string, error) {
-	dsn = strings.TrimSpace(dsn)
-	if dsn == "" {
-		return "", errors.New("empty sqlite dsn")
-	}
-
-	if strings.HasPrefix(dsn, "file:") {
-		path := strings.TrimPrefix(dsn, "file:")
-
-		path = strings.TrimPrefix(path, "//")
-		if path == "" {
-			return "", errors.New("invalid sqlite file dsn")
-		}
-
-		return filepath.FromSlash(path), nil
-	}
-
-	if strings.HasPrefix(dsn, "sqlite3://") {
-		path := strings.TrimPrefix(dsn, "sqlite3://")
-		return filepath.FromSlash(path), nil
-	}
-
-	return dsn, nil
 }
 
 func toFileURL(path string) string {

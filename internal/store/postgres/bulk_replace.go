@@ -1,4 +1,4 @@
-package sqlite
+package postgres
 
 import (
 	"context"
@@ -22,15 +22,19 @@ func replaceTableRows(ctx context.Context, tx *sqlx.Tx, table string, columns []
 
 	quotedCols := make([]string, len(columns))
 	for i, col := range columns {
-		quotedCols[i] = quoteSQLiteIdent(col)
+		quotedCols[i] = quoteIdent(col)
 	}
 
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(columns)), ",")
+	placeholders := make([]string, len(columns))
+	for i := range columns {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
 	insertSQL := fmt.Sprintf(
 		"INSERT INTO %s (%s) VALUES (%s)",
-		quoteSQLiteIdent(table),
+		quoteIdent(table),
 		strings.Join(quotedCols, ", "),
-		placeholders,
+		strings.Join(placeholders, ", "),
 	)
 
 	for start := 0; start < len(rows); start += bulkReplaceBatchSize {

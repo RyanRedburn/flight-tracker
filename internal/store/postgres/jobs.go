@@ -1,4 +1,4 @@
-package sqlite
+package postgres
 
 import (
 	"context"
@@ -85,12 +85,11 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
 	}
 
 	now := time.Now().UTC()
-	nowStr := now.UTC().Format(time.RFC3339)
 
 	res, err := tx.ExecContext(ctx, store.QueryClaimNextPendingJobUpdate,
 		string(model.JobStatusRunning),
-		nowStr,
-		nowStr,
+		now,
+		now,
 		job.ID,
 		string(model.JobStatusPending),
 	)
@@ -119,17 +118,12 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
 }
 
 func (s *Store) CompleteJob(ctx context.Context, id string, result json.RawMessage) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	var resultVal sql.NullString
-	if len(result) > 0 {
-		resultVal = sql.NullString{String: string(result), Valid: true}
-	}
+	now := time.Now().UTC()
 
 	res, err := s.db.ExecContext(ctx, store.QueryCompleteJob,
 		string(model.JobStatusCompleted),
-		resultVal,
-		sql.NullString{},
+		nullJSON(result),
+		nil,
 		now,
 		now,
 		id,
@@ -143,7 +137,7 @@ func (s *Store) CompleteJob(ctx context.Context, id string, result json.RawMessa
 }
 
 func (s *Store) FailJob(ctx context.Context, id, errMsg string) error {
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now().UTC()
 
 	res, err := s.db.ExecContext(ctx, store.QueryFailJob,
 		string(model.JobStatusFailed),
@@ -161,14 +155,13 @@ func (s *Store) FailJob(ctx context.Context, id, errMsg string) error {
 }
 
 func (s *Store) ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
-	cutoff := olderThan.UTC().Format(time.RFC3339)
+	now := time.Now().UTC()
 
 	res, err := s.db.ExecContext(ctx, store.QueryResetStaleRunningJobs,
 		string(model.JobStatusPending),
 		now,
 		string(model.JobStatusRunning),
-		cutoff,
+		olderThan.UTC(),
 	)
 	if err != nil {
 		return 0, err
@@ -298,11 +291,6 @@ func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month
 }
 
 func execCreateJob(ctx context.Context, exec sqlExecContext, job *model.Job) error {
-	var result sql.NullString
-	if len(job.Result) > 0 {
-		result = sql.NullString{String: string(job.Result), Valid: true}
-	}
-
 	var errMsg sql.NullString
 	if job.Error != "" {
 		errMsg = sql.NullString{String: job.Error, Valid: true}
@@ -312,12 +300,12 @@ func execCreateJob(ctx context.Context, exec sqlExecContext, job *model.Job) err
 		job.ID,
 		job.Type,
 		string(job.Status),
-		result,
+		nullJSON(job.Result),
 		errMsg,
-		job.CreatedAt.UTC().Format(time.RFC3339),
-		job.UpdatedAt.UTC().Format(time.RFC3339),
-		nullTimeString(job.StartedAt),
-		nullTimeString(job.EndedAt),
+		job.CreatedAt.UTC(),
+		job.UpdatedAt.UTC(),
+		nullTime(job.StartedAt),
+		nullTime(job.EndedAt),
 	)
 
 	return err
@@ -340,29 +328,6 @@ func expectOneRowAffected(res sql.Result, conflictErr error) error {
 	return nil
 }
 
-func quoteSQLiteIdent(name string) string {
+func quoteIdent(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-}
-
-func nullTimeString(t *time.Time) sql.NullString {
-	if t == nil {
-		return sql.NullString{}
-	}
-
-	return sql.NullString{String: t.UTC().Format(time.RFC3339), Valid: true}
-}
-
-func parseOptionalTime(raw sql.NullString) (*time.Time, error) {
-	if !raw.Valid {
-		return nil, nil
-	}
-
-	parsed, err := time.Parse(time.RFC3339, raw.String)
-	if err != nil {
-		return nil, fmt.Errorf("parse time %q: %w", raw.String, err)
-	}
-
-	utc := parsed.UTC()
-
-	return &utc, nil
 }
