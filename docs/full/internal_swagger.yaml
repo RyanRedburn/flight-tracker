@@ -5,7 +5,7 @@ definitions:
       error:
         type: string
     type: object
-  handlers.FlightScheduleIngestConflictResponse:
+  handlers.FlightPerformanceIngestConflictResponse:
     properties:
       active_ingest_months:
         items:
@@ -312,12 +312,12 @@ paths:
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/handlers.FlightScheduleIngestConflictResponse'
+            $ref: '#/definitions/handlers.FlightPerformanceIngestConflictResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
-      summary: Queue flight schedule data ingest
+      summary: Queue flight performance data ingest
       tags:
       - ingest
       - internal
@@ -678,7 +678,7 @@ swagger: "2.0"
 tags:
 - description: Liveness, readiness, and database migration version
   name: health
-- description: Queue flight schedule and reference data import jobs
+- description: Queue flight performance and reference data import jobs
   name: ingest
 - description: Inspect background job status
   name: jobs

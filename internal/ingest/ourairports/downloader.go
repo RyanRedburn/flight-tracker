@@ -33,7 +33,7 @@ func NewDownloader(baseURL string, timeout time.Duration) *Downloader {
 	}
 }
 
-func (d *Downloader) DownloadCSV(ctx context.Context, dataset store.OurAirportsDataset) (path string, cleanup func(), err error) {
+func (d *Downloader) DownloadCSV(ctx context.Context, dataset store.ReferenceDataset) (path string, cleanup func(), err error) {
 	filename, err := CSVFilename(dataset)
 	if err != nil {
 		return "", nil, err

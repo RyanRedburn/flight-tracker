@@ -8,13 +8,13 @@ import (
 )
 
 func TestParseCountriesCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.OurAirportsCountries))
+	file, err := os.Open(testdataCSVPath(t, store.ReferenceCountries))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	columns, rows, err := ParseCSV(file, store.OurAirportsCountries)
+	columns, rows, err := ParseCSV(file, store.ReferenceCountries)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -33,13 +33,13 @@ func TestParseCountriesCSV(t *testing.T) {
 }
 
 func TestParseRegionsCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.OurAirportsRegions))
+	file, err := os.Open(testdataCSVPath(t, store.ReferenceRegions))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	_, rows, err := ParseCSV(file, store.OurAirportsRegions)
+	_, rows, err := ParseCSV(file, store.ReferenceRegions)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -50,13 +50,13 @@ func TestParseRegionsCSV(t *testing.T) {
 }
 
 func TestParseAirportsCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.OurAirportsAirports))
+	file, err := os.Open(testdataCSVPath(t, store.ReferenceAirports))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	_, rows, err := ParseCSV(file, store.OurAirportsAirports)
+	_, rows, err := ParseCSV(file, store.ReferenceAirports)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestParseAirportsCSV(t *testing.T) {
 }
 
 func TestParseCSVInvalidDataset(t *testing.T) {
-	_, _, err := ParseCSV(nil, store.OurAirportsDataset("invalid"))
+	_, _, err := ParseCSV(nil, store.ReferenceDataset("invalid"))
 	if err == nil {
 		t.Fatal("expected error for invalid dataset")
 	}

@@ -141,11 +141,11 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 		resp.EndedAt = &ended
 	}
 
-	if job.Type != model.JobTypeImportBTSOnTime {
+	if job.Type != model.JobTypeImportFlightPerformance {
 		return resp, nil
 	}
 
-	detail, err := h.store.GetBTSIngestJob(ctx, job.ID)
+	detail, err := h.store.GetFlightPerformanceIngestJob(ctx, job.ID)
 	if err != nil {
 		return JobResponse{}, err
 	}

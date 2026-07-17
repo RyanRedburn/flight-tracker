@@ -12,9 +12,9 @@ type StatusResponse struct {
 	Status string `json:"status"`
 }
 
-// FlightScheduleIngestConflictResponse is returned when schedule ingest conflicts
+// FlightPerformanceIngestConflictResponse is returned when flight-performance ingest conflicts
 // with active jobs (active_ingest_months) or existing data (existing_data_months).
-type FlightScheduleIngestConflictResponse struct {
+type FlightPerformanceIngestConflictResponse struct {
 	Error              string            `json:"error"`
 	ActiveIngestMonths []model.YearMonth `json:"active_ingest_months,omitempty"`
 	ExistingDataMonths []model.YearMonth `json:"existing_data_months,omitempty"`

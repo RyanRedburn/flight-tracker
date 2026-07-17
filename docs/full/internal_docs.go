@@ -28,7 +28,7 @@ const docTemplateinternal = `{
                     "ingest",
                     "internal"
                 ],
-                "summary": "Queue flight schedule data ingest",
+                "summary": "Queue flight performance data ingest",
                 "parameters": [
                     {
                         "description": "Ingest range",
@@ -56,7 +56,7 @@ const docTemplateinternal = `{
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/handlers.FlightScheduleIngestConflictResponse"
+                            "$ref": "#/definitions/handlers.FlightPerformanceIngestConflictResponse"
                         }
                     },
                     "500": {
@@ -582,7 +582,7 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "handlers.FlightScheduleIngestConflictResponse": {
+        "handlers.FlightPerformanceIngestConflictResponse": {
             "type": "object",
             "properties": {
                 "active_ingest_months": {
@@ -1001,7 +1001,7 @@ const docTemplateinternal = `{
             "name": "health"
         },
         {
-            "description": "Queue flight schedule and reference data import jobs",
+            "description": "Queue flight performance and reference data import jobs",
             "name": "ingest"
         },
         {

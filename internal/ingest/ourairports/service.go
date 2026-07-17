@@ -10,7 +10,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-type CSVOpener func(ctx context.Context, dataset store.OurAirportsDataset) (csvPath string, cleanup func(), err error)
+type CSVOpener func(ctx context.Context, dataset store.ReferenceDataset) (csvPath string, cleanup func(), err error)
 
 type Service struct {
 	store      store.Store
@@ -32,8 +32,8 @@ func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
 }
 
 type ImportResult struct {
-	Dataset      store.OurAirportsDataset `json:"dataset"`
-	RowsImported int                      `json:"rows_imported"`
+	Dataset      store.ReferenceDataset `json:"dataset"`
+	RowsImported int                    `json:"rows_imported"`
 }
 
 func (r ImportResult) MarshalJSON() ([]byte, error) {
@@ -43,7 +43,7 @@ func (r ImportResult) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (s *Service) Import(ctx context.Context, dataset store.OurAirportsDataset) (ImportResult, error) {
+func (s *Service) Import(ctx context.Context, dataset store.ReferenceDataset) (ImportResult, error) {
 	csvPath, cleanup, err := s.openCSVFile(ctx, dataset)
 	if err != nil {
 		return ImportResult{}, err
@@ -71,7 +71,7 @@ func (s *Service) Import(ctx context.Context, dataset store.OurAirportsDataset) 
 	}, nil
 }
 
-func (s *Service) openCSVFile(ctx context.Context, dataset store.OurAirportsDataset) (string, func(), error) {
+func (s *Service) openCSVFile(ctx context.Context, dataset store.ReferenceDataset) (string, func(), error) {
 	if s.openCSV != nil {
 		path, cleanup, err := s.openCSV(ctx, dataset)
 
@@ -85,15 +85,15 @@ func (s *Service) openCSVFile(ctx context.Context, dataset store.OurAirportsData
 	return s.downloader.DownloadCSV(ctx, dataset)
 }
 
-func (s *Service) replaceDataset(ctx context.Context, dataset store.OurAirportsDataset, columns []string, rows [][]string) error {
+func (s *Service) replaceDataset(ctx context.Context, dataset store.ReferenceDataset, columns []string, rows [][]string) error {
 	switch dataset {
-	case store.OurAirportsCountries:
-		return s.store.ReplaceOurAirportsCountries(ctx, columns, rows)
-	case store.OurAirportsRegions:
-		return s.store.ReplaceOurAirportsRegions(ctx, columns, rows)
-	case store.OurAirportsAirports:
-		return s.store.ReplaceOurAirportsAirports(ctx, columns, rows)
+	case store.ReferenceCountries:
+		return s.store.ReplaceCountries(ctx, columns, rows)
+	case store.ReferenceRegions:
+		return s.store.ReplaceRegions(ctx, columns, rows)
+	case store.ReferenceAirports:
+		return s.store.ReplaceAirports(ctx, columns, rows)
 	default:
-		return fmt.Errorf("%w: %q", store.ErrInvalidOurAirportsDataset, dataset)
+		return fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
 	}
 }

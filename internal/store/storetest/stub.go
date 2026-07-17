@@ -13,30 +13,30 @@ import (
 // Set Fn fields to hard-coded returns for the scenario under test.
 // Unset Fns panic so missing setup fails loudly.
 type Stub struct {
-	CreateJobFn                   func(ctx context.Context, job *model.Job) error
-	CreateBTSIngestJobFn          func(ctx context.Context, year, month int) (*model.Job, error)
-	GetJobFn                      func(ctx context.Context, id string) (*model.Job, error)
-	GetBTSIngestJobFn             func(ctx context.Context, jobID string) (*model.BTSIngestJob, error)
-	ListJobsFn                    func(ctx context.Context, limit int) ([]*model.Job, error)
-	UpdateJobFn                   func(ctx context.Context, job *model.Job) error
-	ClaimNextPendingJobFn         func(ctx context.Context) (*model.Job, error)
-	CompleteJobFn                 func(ctx context.Context, id string, result json.RawMessage) error
-	FailJobFn                     func(ctx context.Context, id, errMsg string) error
-	ResetStaleRunningJobsFn       func(ctx context.Context, olderThan time.Time) (int64, error)
-	ActiveBTSIngestMonthsFn       func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
-	ActiveIngestJobFn             func(ctx context.Context, jobType string) (bool, error)
-	CreateOurAirportsIngestJobFn  func(ctx context.Context, jobType string) (*model.Job, error)
-	HasOurAirportsDataFn          func(ctx context.Context, dataset store.OurAirportsDataset) (bool, error)
-	ReplaceOurAirportsCountriesFn func(ctx context.Context, columns []string, rows [][]string) error
-	ReplaceOurAirportsRegionsFn   func(ctx context.Context, columns []string, rows [][]string) error
-	ReplaceOurAirportsAirportsFn  func(ctx context.Context, columns []string, rows [][]string) error
-	MonthsWithOnTimeFlightDataFn  func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
-	ReplaceOnTimeFlightsByMonthFn func(ctx context.Context, year, month int, columns []string, rows [][]string) error
-	RouteStatsFn                  func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
-	RouteOutlookFn                func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
-	PingFn                        func(ctx context.Context) error
-	MigrationVersionFn            func(ctx context.Context) (store.MigrationVersion, error)
-	CloseFn                       func() error
+	CreateJobFn                           func(ctx context.Context, job *model.Job) error
+	CreateFlightPerformanceIngestJobFn    func(ctx context.Context, year, month int) (*model.Job, error)
+	GetJobFn                              func(ctx context.Context, id string) (*model.Job, error)
+	GetFlightPerformanceIngestJobFn       func(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
+	ListJobsFn                            func(ctx context.Context, limit int) ([]*model.Job, error)
+	UpdateJobFn                           func(ctx context.Context, job *model.Job) error
+	ClaimNextPendingJobFn                 func(ctx context.Context) (*model.Job, error)
+	CompleteJobFn                         func(ctx context.Context, id string, result json.RawMessage) error
+	FailJobFn                             func(ctx context.Context, id, errMsg string) error
+	ResetStaleRunningJobsFn               func(ctx context.Context, olderThan time.Time) (int64, error)
+	ActiveFlightPerformanceIngestMonthsFn func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ActiveIngestJobFn                     func(ctx context.Context, jobType string) (bool, error)
+	CreateReferenceIngestJobFn            func(ctx context.Context, jobType string) (*model.Job, error)
+	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
+	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
+	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
+	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
+	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ReplaceFlightPerformanceByMonthFn     func(ctx context.Context, year, month int, columns []string, rows [][]string) error
+	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
+	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
+	PingFn                                func(ctx context.Context) error
+	MigrationVersionFn                    func(ctx context.Context) (store.MigrationVersion, error)
+	CloseFn                               func() error
 }
 
 var _ store.Store = (*Stub)(nil)
@@ -49,12 +49,12 @@ func (s *Stub) CreateJob(ctx context.Context, job *model.Job) error {
 	return s.CreateJobFn(ctx, job)
 }
 
-func (s *Stub) CreateBTSIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
-	if s.CreateBTSIngestJobFn == nil {
-		panic("unexpected call: CreateBTSIngestJob")
+func (s *Stub) CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+	if s.CreateFlightPerformanceIngestJobFn == nil {
+		panic("unexpected call: CreateFlightPerformanceIngestJob")
 	}
 
-	return s.CreateBTSIngestJobFn(ctx, year, month)
+	return s.CreateFlightPerformanceIngestJobFn(ctx, year, month)
 }
 
 func (s *Stub) GetJob(ctx context.Context, id string) (*model.Job, error) {
@@ -65,12 +65,12 @@ func (s *Stub) GetJob(ctx context.Context, id string) (*model.Job, error) {
 	return s.GetJobFn(ctx, id)
 }
 
-func (s *Stub) GetBTSIngestJob(ctx context.Context, jobID string) (*model.BTSIngestJob, error) {
-	if s.GetBTSIngestJobFn == nil {
-		panic("unexpected call: GetBTSIngestJob")
+func (s *Stub) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+	if s.GetFlightPerformanceIngestJobFn == nil {
+		panic("unexpected call: GetFlightPerformanceIngestJob")
 	}
 
-	return s.GetBTSIngestJobFn(ctx, jobID)
+	return s.GetFlightPerformanceIngestJobFn(ctx, jobID)
 }
 
 func (s *Stub) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
@@ -121,12 +121,12 @@ func (s *Stub) ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (
 	return s.ResetStaleRunningJobsFn(ctx, olderThan)
 }
 
-func (s *Stub) ActiveBTSIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	if s.ActiveBTSIngestMonthsFn == nil {
-		panic("unexpected call: ActiveBTSIngestMonths")
+func (s *Stub) ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	if s.ActiveFlightPerformanceIngestMonthsFn == nil {
+		panic("unexpected call: ActiveFlightPerformanceIngestMonths")
 	}
 
-	return s.ActiveBTSIngestMonthsFn(ctx, months)
+	return s.ActiveFlightPerformanceIngestMonthsFn(ctx, months)
 }
 
 func (s *Stub) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
@@ -137,60 +137,60 @@ func (s *Stub) ActiveIngestJob(ctx context.Context, jobType string) (bool, error
 	return s.ActiveIngestJobFn(ctx, jobType)
 }
 
-func (s *Stub) CreateOurAirportsIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
-	if s.CreateOurAirportsIngestJobFn == nil {
-		panic("unexpected call: CreateOurAirportsIngestJob")
+func (s *Stub) CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
+	if s.CreateReferenceIngestJobFn == nil {
+		panic("unexpected call: CreateReferenceIngestJob")
 	}
 
-	return s.CreateOurAirportsIngestJobFn(ctx, jobType)
+	return s.CreateReferenceIngestJobFn(ctx, jobType)
 }
 
-func (s *Stub) HasOurAirportsData(ctx context.Context, dataset store.OurAirportsDataset) (bool, error) {
-	if s.HasOurAirportsDataFn == nil {
-		panic("unexpected call: HasOurAirportsData")
+func (s *Stub) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {
+	if s.HasReferenceDataFn == nil {
+		panic("unexpected call: HasReferenceData")
 	}
 
-	return s.HasOurAirportsDataFn(ctx, dataset)
+	return s.HasReferenceDataFn(ctx, dataset)
 }
 
-func (s *Stub) ReplaceOurAirportsCountries(ctx context.Context, columns []string, rows [][]string) error {
-	if s.ReplaceOurAirportsCountriesFn == nil {
-		panic("unexpected call: ReplaceOurAirportsCountries")
+func (s *Stub) ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error {
+	if s.ReplaceCountriesFn == nil {
+		panic("unexpected call: ReplaceCountries")
 	}
 
-	return s.ReplaceOurAirportsCountriesFn(ctx, columns, rows)
+	return s.ReplaceCountriesFn(ctx, columns, rows)
 }
 
-func (s *Stub) ReplaceOurAirportsRegions(ctx context.Context, columns []string, rows [][]string) error {
-	if s.ReplaceOurAirportsRegionsFn == nil {
-		panic("unexpected call: ReplaceOurAirportsRegions")
+func (s *Stub) ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error {
+	if s.ReplaceRegionsFn == nil {
+		panic("unexpected call: ReplaceRegions")
 	}
 
-	return s.ReplaceOurAirportsRegionsFn(ctx, columns, rows)
+	return s.ReplaceRegionsFn(ctx, columns, rows)
 }
 
-func (s *Stub) ReplaceOurAirportsAirports(ctx context.Context, columns []string, rows [][]string) error {
-	if s.ReplaceOurAirportsAirportsFn == nil {
-		panic("unexpected call: ReplaceOurAirportsAirports")
+func (s *Stub) ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error {
+	if s.ReplaceAirportsFn == nil {
+		panic("unexpected call: ReplaceAirports")
 	}
 
-	return s.ReplaceOurAirportsAirportsFn(ctx, columns, rows)
+	return s.ReplaceAirportsFn(ctx, columns, rows)
 }
 
-func (s *Stub) MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	if s.MonthsWithOnTimeFlightDataFn == nil {
-		panic("unexpected call: MonthsWithOnTimeFlightData")
+func (s *Stub) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	if s.MonthsWithFlightPerformanceDataFn == nil {
+		panic("unexpected call: MonthsWithFlightPerformanceData")
 	}
 
-	return s.MonthsWithOnTimeFlightDataFn(ctx, months)
+	return s.MonthsWithFlightPerformanceDataFn(ctx, months)
 }
 
-func (s *Stub) ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
-	if s.ReplaceOnTimeFlightsByMonthFn == nil {
-		panic("unexpected call: ReplaceOnTimeFlightsByMonth")
+func (s *Stub) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
+	if s.ReplaceFlightPerformanceByMonthFn == nil {
+		panic("unexpected call: ReplaceFlightPerformanceByMonth")
 	}
 
-	return s.ReplaceOnTimeFlightsByMonthFn(ctx, year, month, columns, rows)
+	return s.ReplaceFlightPerformanceByMonthFn(ctx, year, month, columns, rows)
 }
 
 func (s *Stub) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {

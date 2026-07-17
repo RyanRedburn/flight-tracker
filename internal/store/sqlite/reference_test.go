@@ -21,17 +21,17 @@ func testCountryRow(id, code, name string) []string {
 	return []string{id, code, name, "EU", "", testColKeywords}
 }
 
-func TestCreateOurAirportsIngestJob(t *testing.T) {
+func TestCreateReferenceIngestJob(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	job, err := s.CreateOurAirportsIngestJob(ctx, model.JobTypeImportOurAirportsCountries)
+	job, err := s.CreateReferenceIngestJob(ctx, model.JobTypeImportCountries)
 	if err != nil {
-		t.Fatalf("CreateOurAirportsIngestJob() error = %v", err)
+		t.Fatalf("CreateReferenceIngestJob() error = %v", err)
 	}
 
-	if job.Type != model.JobTypeImportOurAirportsCountries {
-		t.Errorf("Type = %q, want %q", job.Type, model.JobTypeImportOurAirportsCountries)
+	if job.Type != model.JobTypeImportCountries {
+		t.Errorf("Type = %q, want %q", job.Type, model.JobTypeImportCountries)
 	}
 
 	if job.Status != model.JobStatusPending {
@@ -39,23 +39,23 @@ func TestCreateOurAirportsIngestJob(t *testing.T) {
 	}
 }
 
-func TestCreateOurAirportsIngestJobInvalidType(t *testing.T) {
+func TestCreateReferenceIngestJobInvalidType(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	_, err := s.CreateOurAirportsIngestJob(ctx, "invalid_job_type")
+	_, err := s.CreateReferenceIngestJob(ctx, "invalid_job_type")
 	if err == nil {
 		t.Fatal("expected error for invalid job type")
 	}
 }
 
-func TestHasOurAirportsData(t *testing.T) {
+func TestHasReferenceData(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	hasData, err := s.HasOurAirportsData(ctx, store.OurAirportsCountries)
+	hasData, err := s.HasReferenceData(ctx, store.ReferenceCountries)
 	if err != nil {
-		t.Fatalf("HasOurAirportsData() error = %v", err)
+		t.Fatalf("HasReferenceData() error = %v", err)
 	}
 
 	if hasData {
@@ -65,13 +65,13 @@ func TestHasOurAirportsData(t *testing.T) {
 	columns := testCountryColumns()
 	rows := [][]string{testCountryRow("302672", "AD", "Andorra")}
 
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, rows); err != nil {
-		t.Fatalf("ReplaceOurAirportsCountries() error = %v", err)
+	if err := s.ReplaceCountries(ctx, columns, rows); err != nil {
+		t.Fatalf("ReplaceCountries() error = %v", err)
 	}
 
-	hasData, err = s.HasOurAirportsData(ctx, store.OurAirportsCountries)
+	hasData, err = s.HasReferenceData(ctx, store.ReferenceCountries)
 	if err != nil {
-		t.Fatalf("HasOurAirportsData() error = %v", err)
+		t.Fatalf("HasReferenceData() error = %v", err)
 	}
 
 	if !hasData {
@@ -79,22 +79,22 @@ func TestHasOurAirportsData(t *testing.T) {
 	}
 }
 
-func TestReplaceOurAirportsCountriesReplacesAllRows(t *testing.T) {
+func TestReplaceCountriesReplacesAllRows(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	columns := testCountryColumns()
 
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, [][]string{
+	if err := s.ReplaceCountries(ctx, columns, [][]string{
 		testCountryRow("1", "AA", "Alpha"),
 	}); err != nil {
-		t.Fatalf("first ReplaceOurAirportsCountries() error = %v", err)
+		t.Fatalf("first ReplaceCountries() error = %v", err)
 	}
 
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, [][]string{
+	if err := s.ReplaceCountries(ctx, columns, [][]string{
 		testCountryRow("2", "BB", "Beta"),
 	}); err != nil {
-		t.Fatalf("second ReplaceOurAirportsCountries() error = %v", err)
+		t.Fatalf("second ReplaceCountries() error = %v", err)
 	}
 
 	st, ok := s.(*Store)
@@ -125,15 +125,15 @@ func TestReplaceOurAirportsCountriesReplacesAllRows(t *testing.T) {
 	}
 }
 
-func TestReplaceOurAirportsCountriesStoresEmptyAsNull(t *testing.T) {
+func TestReplaceCountriesStoresEmptyAsNull(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
 	columns := testCountryColumns()
 	rows := [][]string{testCountryRow("302672", "AD", "Andorra")}
 
-	if err := s.ReplaceOurAirportsCountries(ctx, columns, rows); err != nil {
-		t.Fatalf("ReplaceOurAirportsCountries() error = %v", err)
+	if err := s.ReplaceCountries(ctx, columns, rows); err != nil {
+		t.Fatalf("ReplaceCountries() error = %v", err)
 	}
 
 	st, ok := s.(*Store)
@@ -153,11 +153,11 @@ func TestReplaceOurAirportsCountriesStoresEmptyAsNull(t *testing.T) {
 	}
 }
 
-func TestHasOurAirportsDataInvalidDataset(t *testing.T) {
+func TestHasReferenceDataInvalidDataset(t *testing.T) {
 	ctx := context.Background()
 	s := openTestStore(t)
 
-	_, err := s.HasOurAirportsData(ctx, store.OurAirportsDataset("invalid"))
+	_, err := s.HasReferenceData(ctx, store.ReferenceDataset("invalid"))
 	if err == nil {
 		t.Fatal("expected error for invalid dataset")
 	}

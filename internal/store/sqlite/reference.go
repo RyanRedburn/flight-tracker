@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Store) CreateOurAirportsIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
-	if !isOurAirportsJobType(jobType) {
-		return nil, fmt.Errorf("unsupported ourairports job type %q", jobType)
+func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
+	if !isReferenceJobType(jobType) {
+		return nil, fmt.Errorf("unsupported reference job type %q", jobType)
 	}
 
 	now := time.Now().UTC()
@@ -34,8 +34,8 @@ func (s *Store) CreateOurAirportsIngestJob(ctx context.Context, jobType string) 
 	return job, nil
 }
 
-func (s *Store) HasOurAirportsData(ctx context.Context, dataset store.OurAirportsDataset) (bool, error) {
-	query, err := hasOurAirportsDataQuery(dataset)
+func (s *Store) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {
+	query, err := hasReferenceDataQuery(dataset)
 	if err != nil {
 		return false, err
 	}
@@ -54,21 +54,21 @@ func (s *Store) HasOurAirportsData(ctx context.Context, dataset store.OurAirport
 	return true, nil
 }
 
-func (s *Store) ReplaceOurAirportsCountries(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceOurAirportsTable(ctx, store.OurAirportsCountries, store.QueryDeleteAllCountries, columns, rows)
+func (s *Store) ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error {
+	return s.replaceReferenceTable(ctx, store.ReferenceCountries, store.QueryDeleteAllCountries, columns, rows)
 }
 
-func (s *Store) ReplaceOurAirportsRegions(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceOurAirportsTable(ctx, store.OurAirportsRegions, store.QueryDeleteAllRegions, columns, rows)
+func (s *Store) ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error {
+	return s.replaceReferenceTable(ctx, store.ReferenceRegions, store.QueryDeleteAllRegions, columns, rows)
 }
 
-func (s *Store) ReplaceOurAirportsAirports(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceOurAirportsTable(ctx, store.OurAirportsAirports, store.QueryDeleteAllAirports, columns, rows)
+func (s *Store) ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error {
+	return s.replaceReferenceTable(ctx, store.ReferenceAirports, store.QueryDeleteAllAirports, columns, rows)
 }
 
-func (s *Store) replaceOurAirportsTable(
+func (s *Store) replaceReferenceTable(
 	ctx context.Context,
-	dataset store.OurAirportsDataset,
+	dataset store.ReferenceDataset,
 	deleteQuery string,
 	columns []string,
 	rows [][]string,
@@ -103,26 +103,26 @@ func (s *Store) replaceOurAirportsTable(
 	return nil
 }
 
-func isOurAirportsJobType(jobType string) bool {
+func isReferenceJobType(jobType string) bool {
 	switch jobType {
-	case model.JobTypeImportOurAirportsCountries,
-		model.JobTypeImportOurAirportsRegions,
-		model.JobTypeImportOurAirportsAirports:
+	case model.JobTypeImportCountries,
+		model.JobTypeImportRegions,
+		model.JobTypeImportAirports:
 		return true
 	default:
 		return false
 	}
 }
 
-func hasOurAirportsDataQuery(dataset store.OurAirportsDataset) (string, error) {
+func hasReferenceDataQuery(dataset store.ReferenceDataset) (string, error) {
 	switch dataset {
-	case store.OurAirportsCountries:
+	case store.ReferenceCountries:
 		return store.QueryHasCountriesData, nil
-	case store.OurAirportsRegions:
+	case store.ReferenceRegions:
 		return store.QueryHasRegionsData, nil
-	case store.OurAirportsAirports:
+	case store.ReferenceAirports:
 		return store.QueryHasAirportsData, nil
 	default:
-		return "", fmt.Errorf("%w: %q", store.ErrInvalidOurAirportsDataset, dataset)
+		return "", fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
 	}
 }

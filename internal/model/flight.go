@@ -1,6 +1,6 @@
 package model
 
-type OnTimeFlight struct {
+type FlightPerformance struct {
 	FlightDate                      string `json:"flight_date"`
 	DayOfWeek                       string `json:"day_of_week,omitempty"`
 	Origin                          string `json:"origin"`

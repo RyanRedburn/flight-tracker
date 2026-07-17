@@ -107,7 +107,7 @@ func TestJobsGetNotFound(t *testing.T) {
 	}
 }
 
-func TestJobsGetEnrichedBTSIngest(t *testing.T) {
+func TestJobsGetEnrichedFlightPerformanceIngest(t *testing.T) {
 	const jobID = "job-bts-1"
 
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
@@ -116,14 +116,14 @@ func TestJobsGetEnrichedBTSIngest(t *testing.T) {
 		GetJobFn: func(_ context.Context, id string) (*model.Job, error) {
 			return &model.Job{
 				ID:        id,
-				Type:      model.JobTypeImportBTSOnTime,
+				Type:      model.JobTypeImportFlightPerformance,
 				Status:    model.JobStatusPending,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}, nil
 		},
-		GetBTSIngestJobFn: func(_ context.Context, id string) (*model.BTSIngestJob, error) {
-			return &model.BTSIngestJob{JobID: id, Year: 2026, Month: 4}, nil
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, id string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: id, Year: 2026, Month: 4}, nil
 		},
 	})
 
@@ -162,15 +162,15 @@ func TestJobsList(t *testing.T) {
 			return []*model.Job{
 				{
 					ID:        "job-1",
-					Type:      model.JobTypeImportBTSOnTime,
+					Type:      model.JobTypeImportFlightPerformance,
 					Status:    model.JobStatusPending,
 					CreatedAt: now,
 					UpdatedAt: now,
 				},
 			}, nil
 		},
-		GetBTSIngestJobFn: func(_ context.Context, jobID string) (*model.BTSIngestJob, error) {
-			return &model.BTSIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
 		},
 	})
 

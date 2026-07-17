@@ -27,16 +27,16 @@ func ingestSuccessStub() *storetest.Stub {
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 	return &storetest.Stub{
-		ActiveBTSIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
+		ActiveFlightPerformanceIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return nil, nil
 		},
-		MonthsWithOnTimeFlightDataFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
+		MonthsWithFlightPerformanceDataFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return nil, nil
 		},
-		CreateBTSIngestJobFn: func(_ context.Context, year, month int) (*model.Job, error) {
+		CreateFlightPerformanceIngestJobFn: func(_ context.Context, year, month int) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-bts",
-				Type:      model.JobTypeImportBTSOnTime,
+				Type:      model.JobTypeImportFlightPerformance,
 				Status:    model.JobStatusPending,
 				CreatedAt: now,
 				UpdatedAt: now,
@@ -67,13 +67,13 @@ func TestIngestSingleMonth(t *testing.T) {
 
 	var createdYear, createdMonth int
 
-	st.CreateBTSIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
+	st.CreateFlightPerformanceIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
 		createdYear, createdMonth = year, month
 		now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 		return &model.Job{
 			ID:        "job-1",
-			Type:      model.JobTypeImportBTSOnTime,
+			Type:      model.JobTypeImportFlightPerformance,
 			Status:    model.JobStatusPending,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -105,7 +105,7 @@ func TestIngestSingleMonth(t *testing.T) {
 	}
 
 	if createdYear != 2026 || createdMonth != 4 {
-		t.Errorf("CreateBTSIngestJob args = %d-%d, want 2026-4", createdYear, createdMonth)
+		t.Errorf("CreateFlightPerformanceIngestJob args = %d-%d, want 2026-4", createdYear, createdMonth)
 	}
 
 	if resp.Jobs[0].Year != 2026 || resp.Jobs[0].Month != 4 {
@@ -122,13 +122,13 @@ func TestIngestRange(t *testing.T) {
 
 	var createCalls int
 
-	st.CreateBTSIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
+	st.CreateFlightPerformanceIngestJobFn = func(_ context.Context, year, month int) (*model.Job, error) {
 		createCalls++
 		now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 		return &model.Job{
 			ID:        fmt.Sprintf("job-%d", createCalls),
-			Type:      model.JobTypeImportBTSOnTime,
+			Type:      model.JobTypeImportFlightPerformance,
 			Status:    model.JobStatusPending,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -188,7 +188,7 @@ func TestIngestRangeTooLarge(t *testing.T) {
 
 func TestIngestActiveJobConflict(t *testing.T) {
 	h := NewIngestHandler(&storetest.Stub{
-		ActiveBTSIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
+		ActiveFlightPerformanceIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return []model.YearMonth{{Year: 2026, Month: 4}}, nil
 		},
 	}, defaultMaxIngestMonths)
@@ -214,10 +214,10 @@ func TestIngestActiveJobConflict(t *testing.T) {
 
 func TestIngestExistingDataConflict(t *testing.T) {
 	h := NewIngestHandler(&storetest.Stub{
-		ActiveBTSIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
+		ActiveFlightPerformanceIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return nil, nil
 		},
-		MonthsWithOnTimeFlightDataFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
+		MonthsWithFlightPerformanceDataFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return []model.YearMonth{{Year: 2026, Month: 4}}, nil
 		},
 	}, defaultMaxIngestMonths)

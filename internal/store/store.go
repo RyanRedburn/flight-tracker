@@ -21,24 +21,24 @@ type MigrationVersion struct {
 
 type Store interface {
 	CreateJob(ctx context.Context, job *model.Job) error
-	CreateBTSIngestJob(ctx context.Context, year, month int) (*model.Job, error)
+	CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error)
 	GetJob(ctx context.Context, id string) (*model.Job, error)
-	GetBTSIngestJob(ctx context.Context, jobID string) (*model.BTSIngestJob, error)
+	GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	ListJobs(ctx context.Context, limit int) ([]*model.Job, error)
 	UpdateJob(ctx context.Context, job *model.Job) error
 	ClaimNextPendingJob(ctx context.Context) (*model.Job, error)
 	CompleteJob(ctx context.Context, id string, result json.RawMessage) error
 	FailJob(ctx context.Context, id, errMsg string) error
 	ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error)
-	ActiveBTSIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJob(ctx context.Context, jobType string) (bool, error)
-	CreateOurAirportsIngestJob(ctx context.Context, jobType string) (*model.Job, error)
-	HasOurAirportsData(ctx context.Context, dataset OurAirportsDataset) (bool, error)
-	ReplaceOurAirportsCountries(ctx context.Context, columns []string, rows [][]string) error
-	ReplaceOurAirportsRegions(ctx context.Context, columns []string, rows [][]string) error
-	ReplaceOurAirportsAirports(ctx context.Context, columns []string, rows [][]string) error
-	MonthsWithOnTimeFlightData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
-	ReplaceOnTimeFlightsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
+	CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error)
+	HasReferenceData(ctx context.Context, dataset ReferenceDataset) (bool, error)
+	ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error
+	ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error
+	ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error
+	MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)
 	RouteOutlook(ctx context.Context, filter RouteOutlookFilter) (*model.RouteOutlook, error)
 	Ping(ctx context.Context) error
