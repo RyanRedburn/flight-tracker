@@ -279,7 +279,7 @@ func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month
 		return tx.Commit()
 	}
 
-	if err := replaceTableRows(ctx, tx, "flight_performance", columns, rows, false); err != nil {
+	if err := replaceTableRows(ctx, tx, "flight_performance", columns, rows, true); err != nil {
 		return err
 	}
 
