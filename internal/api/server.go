@@ -26,6 +26,7 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 	jobs := handlers.NewJobsHandler(s)
 	routes := handlers.NewRoutesHandler(s)
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
+	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
 
 	r := chi.NewRouter()
@@ -46,6 +47,7 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/ingest", ingestHandler.Create)
+		r.Post("/ingest/weather", weatherIngest.Create)
 		r.Post("/ingest/countries", referenceIngest.CreateCountries)
 		r.Post("/ingest/regions", referenceIngest.CreateRegions)
 		r.Post("/ingest/airports", referenceIngest.CreateAirports)

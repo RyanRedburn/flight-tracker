@@ -4,11 +4,12 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing flight performance data and airport reference data (countries, regions, airports).
+Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, and airport reference data (countries, regions, airports).
 
 ## Features
 
 - `POST /api/v1/ingest` to queue per-month flight performance import jobs
+- `POST /api/v1/ingest/weather` to queue per-month ASOS/METAR weather observation import jobs
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, booking outlook probabilities, and job status
@@ -133,6 +134,11 @@ curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4,"force":true}'
 
+# Queue weather observation import for stations and a month (live IEM download lands in a later phase)
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
+
 # Queue reference data imports (recommended order: countries → regions → airports)
 curl -X POST http://localhost:8080/api/v1/ingest/countries \
   -H "Content-Type: application/json" \
@@ -180,6 +186,19 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 - Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
 
 Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/ingest/bts/testdata/` contains a small CSV sample (header plus 20 diverse April 2026 rows) used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
+
+#### Weather observations (`POST /api/v1/ingest/weather`)
+
+- Creates one `import_weather_observations` job per month in the requested range.
+- Requires `stations`: IEM site ids (typically FAA/IATA for CONUS, e.g. `ORD`). Values are uppercased and de-duplicated.
+- Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
+- `start_year` must be >= 2018 (aligned with flight performance coverage).
+- Returns **409** if a pending/running weather ingest job already exists for a requested month.
+- Returns **409** if weather data already exists and `force` is not set.
+- `force: true` skips the data-exists check; workers always replace the target month on import.
+- Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
+
+Source adapter: Iowa Environmental Mesonet ASOS/METAR archive. Field notes: `internal/ingest/iem/documents/asos_observations.md`. Live CGI download is not wired yet; queueing and worker dispatch are in place for fixture-driven tests.
 
 #### Reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
 
@@ -236,7 +255,7 @@ docs/full/            Generated OpenAPI (full / internal Swagger)
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
 internal/database/    Store factory (driver selection)
-internal/ingest/      Ingest range expansion; provider adapters (BTS, OurAirports) download/parse/load
+internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAirports) download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, Postgres implementation, test stub

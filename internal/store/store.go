@@ -22,7 +22,7 @@ type MigrationVersion struct {
 type Store interface {
 	CreateJob(ctx context.Context, job *model.Job) error
 	CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error)
-	CreateWeatherIngestJob(ctx context.Context, year, month int) (*model.Job, error)
+	CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJob(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)

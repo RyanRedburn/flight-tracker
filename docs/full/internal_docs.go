@@ -224,6 +224,59 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "/api/v1/ingest/weather": {
+            "post": {
+                "description": "Queues one import job per month in the requested range for the given IEM station ids. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue weather observation data ingest",
+                "parameters": [
+                    {
+                        "description": "Ingest range and stations",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.WeatherIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WeatherIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.WeatherIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/jobs": {
             "get": {
                 "description": "Returns the most recent background jobs, newest first.",
@@ -718,6 +771,63 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "handlers.WeatherIngestConflictResponse": {
+            "type": "object",
+            "properties": {
+                "active_ingest_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.YearMonth"
+                    }
+                },
+                "error": {
+                    "type": "string"
+                },
+                "existing_data_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.YearMonth"
+                    }
+                }
+            }
+        },
+        "handlers.WeatherIngestJobResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "stations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.WeatherIngestResponse": {
+            "type": "object",
+            "properties": {
+                "jobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.WeatherIngestJobResponse"
+                    }
+                },
+                "months_requested": {
+                    "type": "integer"
+                }
+            }
+        },
         "model.AirportCount": {
             "type": "object",
             "properties": {
@@ -972,6 +1082,44 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "model.WeatherIngestRequest": {
+            "type": "object",
+            "required": [
+                "start_month",
+                "start_year",
+                "stations"
+            ],
+            "properties": {
+                "end_month": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 1
+                },
+                "end_year": {
+                    "type": "integer",
+                    "minimum": 2018
+                },
+                "force": {
+                    "type": "boolean"
+                },
+                "start_month": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 1
+                },
+                "start_year": {
+                    "type": "integer",
+                    "minimum": 2018
+                },
+                "stations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "model.YearMonth": {
             "type": "object",
             "properties": {
@@ -1001,7 +1149,7 @@ const docTemplateinternal = `{
             "name": "health"
         },
         {
-            "description": "Queue flight performance and reference data import jobs",
+            "description": "Queue flight performance, weather, and reference data import jobs",
             "name": "ingest"
         },
         {

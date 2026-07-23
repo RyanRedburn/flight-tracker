@@ -66,7 +66,16 @@ func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string)
 	return &detail, nil
 }
 
-func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error) {
+	if len(stations) == 0 {
+		return nil, errors.New("stations required")
+	}
+
+	stationsJSON, err := json.Marshal(stations)
+	if err != nil {
+		return nil, fmt.Errorf("marshal stations: %w", err)
+	}
+
 	now := time.Now().UTC()
 	job := &model.Job{
 		ID:        uuid.NewString(),
@@ -86,7 +95,7 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int) (*m
 		return nil, err
 	}
 
-	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month); err != nil {
+	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month, stationsJSON); err != nil {
 		return nil, fmt.Errorf("insert weather_ingest_jobs: %w", err)
 	}
 
@@ -99,11 +108,13 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int) (*m
 
 func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error) {
 	var detail model.WeatherIngestJob
+	var stationsJSON []byte
 
 	err := s.db.QueryRowxContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
+		&stationsJSON,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("weather ingest job %q: %w", jobID, store.ErrNotFound)
@@ -111,6 +122,10 @@ func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.W
 
 	if err != nil {
 		return nil, err
+	}
+
+	if err := json.Unmarshal(stationsJSON, &detail.Stations); err != nil {
+		return nil, fmt.Errorf("unmarshal stations: %w", err)
 	}
 
 	return &detail, nil

@@ -65,7 +65,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		EndMonth:   req.EndMonth,
 	}, h.maxIngestMonths)
 	if err != nil {
-		h.writeRangeError(w, err)
+		writeIngestRangeError(w, err)
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *IngestHandler) writeRangeError(w http.ResponseWriter, err error) {
+func writeIngestRangeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ingest.ErrRangeTooLarge):
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{

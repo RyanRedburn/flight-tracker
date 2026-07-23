@@ -48,7 +48,8 @@ type FlightPerformanceIngestJob struct {
 }
 
 type WeatherIngestJob struct {
-	JobID string `json:"job_id"`
-	Year  int    `json:"year"`
-	Month int    `json:"month"`
+	JobID    string   `json:"job_id"`
+	Year     int      `json:"year"`
+	Month    int      `json:"month"`
+	Stations []string `json:"stations"`
 }

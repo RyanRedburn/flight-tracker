@@ -15,7 +15,7 @@ import (
 type Stub struct {
 	CreateJobFn                           func(ctx context.Context, job *model.Job) error
 	CreateFlightPerformanceIngestJobFn    func(ctx context.Context, year, month int) (*model.Job, error)
-	CreateWeatherIngestJobFn              func(ctx context.Context, year, month int) (*model.Job, error)
+	CreateWeatherIngestJobFn              func(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJobFn                              func(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJobFn       func(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJobFn                 func(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
@@ -62,12 +62,12 @@ func (s *Stub) CreateFlightPerformanceIngestJob(ctx context.Context, year, month
 	return s.CreateFlightPerformanceIngestJobFn(ctx, year, month)
 }
 
-func (s *Stub) CreateWeatherIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+func (s *Stub) CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error) {
 	if s.CreateWeatherIngestJobFn == nil {
 		panic("unexpected call: CreateWeatherIngestJob")
 	}
 
-	return s.CreateWeatherIngestJobFn(ctx, year, month)
+	return s.CreateWeatherIngestJobFn(ctx, year, month, stations)
 }
 
 func (s *Stub) GetJob(ctx context.Context, id string) (*model.Job, error) {

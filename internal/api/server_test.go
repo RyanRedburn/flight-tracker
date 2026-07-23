@@ -75,6 +75,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/countries", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
+		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},

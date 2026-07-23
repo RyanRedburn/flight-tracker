@@ -1,7 +1,8 @@
 CREATE TABLE weather_ingest_jobs (
-    job_id TEXT PRIMARY KEY REFERENCES jobs (id) ON DELETE CASCADE,
-    year   INTEGER NOT NULL,
-    month  INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12)
+    job_id   TEXT PRIMARY KEY REFERENCES jobs (id) ON DELETE CASCADE,
+    year     INTEGER NOT NULL,
+    month    INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+    stations JSONB NOT NULL
 );
 
 CREATE INDEX idx_weather_ingest_jobs_year_month

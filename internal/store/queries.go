@@ -81,11 +81,11 @@ const (
 		WHERE year = $1 AND month = $2`
 
 	QueryCreateWeatherIngestJob = `
-		INSERT INTO weather_ingest_jobs (job_id, year, month)
-		VALUES ($1, $2, $3)`
+		INSERT INTO weather_ingest_jobs (job_id, year, month, stations)
+		VALUES ($1, $2, $3, $4)`
 
 	QueryGetWeatherIngestJob = `
-		SELECT job_id, year, month
+		SELECT job_id, year, month, stations
 		FROM weather_ingest_jobs
 		WHERE job_id = $1`
 
