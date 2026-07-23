@@ -37,7 +37,7 @@ func minimalCSVOpener(t *testing.T) CSVOpener {
 
 	path := fixtureCSVPath(t)
 
-	return func(context.Context, int, int) (string, func(), error) {
+	return func(context.Context, int, int, []string) (string, func(), error) {
 		return path, func() {}, nil
 	}
 }

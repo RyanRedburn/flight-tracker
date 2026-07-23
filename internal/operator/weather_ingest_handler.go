@@ -29,8 +29,7 @@ func (h *WeatherIngestHandler) Process(ctx context.Context, job *model.Job) (jso
 		return nil, fmt.Errorf("get weather ingest job: %w", err)
 	}
 
-	// detail.Stations is used by the Phase 3 live downloader; fixture import ignores it.
-	result, err := h.ingest.ImportMonth(ctx, detail.Year, detail.Month)
+	result, err := h.ingest.ImportMonth(ctx, detail.Year, detail.Month, detail.Stations)
 	if err != nil {
 		return nil, err
 	}

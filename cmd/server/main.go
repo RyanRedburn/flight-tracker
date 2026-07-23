@@ -72,7 +72,9 @@ func run() int {
 
 	btsDownloader := bts.NewDownloader(cfg.BTSBaseURL, cfg.BTSDownloadTimeout)
 	flightPerformanceIngest := bts.NewService(st, btsDownloader)
-	weatherIngest := iem.NewService(st)
+
+	iemDownloader := iem.NewDownloader(cfg.IEMASOSBaseURL, cfg.IEMASOSDownloadTimeout)
+	weatherIngest := iem.NewService(st, iemDownloader)
 
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)

@@ -59,7 +59,7 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 	}
 
 	path := iemFixtureCSVPath(t)
-	svc := iem.NewService(st).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
+	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
 		return path, func() {}, nil
 	})
 

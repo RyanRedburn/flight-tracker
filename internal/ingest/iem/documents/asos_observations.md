@@ -17,7 +17,7 @@ are requested in **UTC**. Routine METARs often land near `:51` rather than
 `:00`; specials (SPECI) add irregular timestamps.
 
 Empty CSV cells are stored as SQL `NULL`. IEM’s default missing token `M` is
-avoided by requesting `missing=empty` at download time (Phase 3).
+avoided by requesting `missing=empty` on download.
 
 ## Record layout
 

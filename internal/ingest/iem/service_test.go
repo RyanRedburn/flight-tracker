@@ -3,6 +3,7 @@ package iem
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -25,9 +26,9 @@ func TestServiceImportMonth(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewService(st).WithCSVOpener(minimalCSVOpener(t))
+	svc := NewService(st, nil).WithCSVOpener(minimalCSVOpener(t))
 
-	result, err := svc.ImportMonth(ctx, 2024, 1)
+	result, err := svc.ImportMonth(ctx, 2024, 1, []string{"ORD", "JFK"})
 	if err != nil {
 		t.Fatalf("ImportMonth() error = %v", err)
 	}
@@ -87,12 +88,21 @@ func TestServiceImportMonth(t *testing.T) {
 	}
 }
 
-func TestServiceImportMonthWithoutOpener(t *testing.T) {
-	svc := NewService(&storetest.Stub{})
+func TestServiceImportMonthWithoutDownloader(t *testing.T) {
+	svc := NewService(&storetest.Stub{}, nil)
 
-	_, err := svc.ImportMonth(context.Background(), 2024, 1)
+	_, err := svc.ImportMonth(context.Background(), 2024, 1, []string{"ORD"})
 	if err == nil {
-		t.Fatal("ImportMonth() expected error without opener")
+		t.Fatal("ImportMonth() expected error without downloader or opener")
+	}
+}
+
+func TestServiceImportMonthEmptyStations(t *testing.T) {
+	svc := NewService(&storetest.Stub{}, nil).WithCSVOpener(minimalCSVOpener(t))
+
+	_, err := svc.ImportMonth(context.Background(), 2024, 1, nil)
+	if !errors.Is(err, ErrEmptyStations) {
+		t.Fatalf("ImportMonth() error = %v, want ErrEmptyStations", err)
 	}
 }
 

@@ -16,6 +16,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("STALE_JOB_THRESHOLD", "")
 	t.Setenv("BTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("BTS_BASE_URL", "")
+	t.Setenv("IEM_ASOS_BASE_URL", "")
+	t.Setenv("IEM_ASOS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("OURAIRPORTS_BASE_URL", "")
 	t.Setenv("OURAIRPORTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("MAX_INGEST_MONTHS", "")
@@ -61,6 +63,14 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.BTSBaseURL != "https://transtats.bts.gov/PREZIP" {
 		t.Errorf("BTSBaseURL = %q, want default transtats URL", cfg.BTSBaseURL)
+	}
+
+	if cfg.IEMASOSBaseURL != "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py" {
+		t.Errorf("IEMASOSBaseURL = %q, want default IEM asos.py URL", cfg.IEMASOSBaseURL)
+	}
+
+	if cfg.IEMASOSDownloadTimeout != 10*time.Minute {
+		t.Errorf("IEMASOSDownloadTimeout = %v, want 10m", cfg.IEMASOSDownloadTimeout)
 	}
 
 	if cfg.OurAirportsBaseURL != "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main" {

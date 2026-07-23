@@ -14,16 +14,20 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-// CSVOpener opens a local CSV for tests. Live download arrives in a later phase.
-type CSVOpener func(ctx context.Context, year, month int) (csvPath string, cleanup func(), err error)
+// CSVOpener opens a local CSV for tests. When set, it replaces the live downloader.
+type CSVOpener func(ctx context.Context, year, month int, stations []string) (csvPath string, cleanup func(), err error)
 
 type Service struct {
-	store   store.Store
-	openCSV CSVOpener
+	store      store.Store
+	downloader *Downloader
+	openCSV    CSVOpener
 }
 
-func NewService(s store.Store) *Service {
-	return &Service{store: s}
+func NewService(s store.Store, downloader *Downloader) *Service {
+	return &Service{
+		store:      s,
+		downloader: downloader,
+	}
 }
 
 func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
@@ -46,8 +50,12 @@ func (r ImportResult) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResult, error) {
-	csvPath, cleanup, err := s.openCSVFile(ctx, year, month)
+func (s *Service) ImportMonth(ctx context.Context, year, month int, stations []string) (ImportResult, error) {
+	if len(stations) == 0 {
+		return ImportResult{}, ErrEmptyStations
+	}
+
+	csvPath, cleanup, err := s.openCSVFile(ctx, year, month, stations)
 	if err != nil {
 		return ImportResult{}, err
 	}
@@ -80,12 +88,16 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResul
 	}, nil
 }
 
-func (s *Service) openCSVFile(ctx context.Context, year, month int) (string, func(), error) {
+func (s *Service) openCSVFile(ctx context.Context, year, month int, stations []string) (string, func(), error) {
 	if s.openCSV != nil {
-		return s.openCSV(ctx, year, month)
+		return s.openCSV(ctx, year, month, stations)
 	}
 
-	return "", func() {}, errors.New("iem csv opener not configured")
+	if s.downloader == nil {
+		return "", func() {}, errors.New("iem downloader not configured")
+	}
+
+	return s.downloader.DownloadCSV(ctx, year, month, stations)
 }
 
 func withPartitionKeys(year, month int, columns []string, rows [][]string) ([]string, [][]string, error) {
