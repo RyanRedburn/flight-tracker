@@ -9,7 +9,7 @@
 //	@tag.name					health
 //	@tag.description			Liveness, readiness, and database migration version
 //	@tag.name					ingest
-//	@tag.description			Queue flight performance and reference data import jobs
+//	@tag.description			Queue flight performance, weather, and reference data import jobs
 //	@tag.name					jobs
 //	@tag.description			Inspect background job status
 //	@tag.name					routes
@@ -33,6 +33,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/config"
 	"github.com/RyanRedburn/flight-tracker/internal/database"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/operator"
 )
@@ -72,11 +73,16 @@ func run() int {
 	btsDownloader := bts.NewDownloader(cfg.BTSBaseURL, cfg.BTSDownloadTimeout)
 	flightPerformanceIngest := bts.NewService(st, btsDownloader)
 
+	iemDownloader := iem.NewDownloader(cfg.IEMASOSBaseURL, cfg.IEMASOSDownloadTimeout)
+	weatherIngest := iem.NewService(st, iemDownloader)
+	weatherStations := iem.NewStationResolver(st, iem.NewNetworkCatalog(cfg.IEMGeoJSONBaseURL, cfg.IEMGeoJSONTimeout), logger)
+
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)
 
 	processor := operator.NewProcessor(st,
 		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
+		operator.NewWeatherIngestHandler(st, weatherIngest),
 		operator.NewCountriesHandler(oaIngest),
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),
@@ -86,7 +92,7 @@ func run() int {
 	worker.Start(ctx)
 	defer worker.Stop(10 * time.Second)
 
-	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths)
+	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths, weatherStations)
 
 	serverErr := make(chan error, 1)
 

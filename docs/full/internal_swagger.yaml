@@ -93,6 +93,47 @@ definitions:
       status:
         type: string
     type: object
+  handlers.WeatherIngestConflictResponse:
+    properties:
+      active_ingest_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+      error:
+        type: string
+      existing_data_months:
+        items:
+          $ref: '#/definitions/model.YearMonth'
+        type: array
+    type: object
+  handlers.WeatherIngestJobResponse:
+    properties:
+      id:
+        type: string
+      month:
+        type: integer
+      stations:
+        items:
+          type: string
+        type: array
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      year:
+        type: integer
+    type: object
+  handlers.WeatherIngestResponse:
+    properties:
+      jobs:
+        items:
+          $ref: '#/definitions/handlers.WeatherIngestJobResponse'
+        type: array
+      months_requested:
+        type: integer
+      unresolved_airports:
+        items:
+          type: string
+        type: array
+    type: object
   model.AirportCount:
     properties:
       airport:
@@ -264,6 +305,33 @@ definitions:
       flight_number:
         type: string
     type: object
+  model.WeatherIngestRequest:
+    properties:
+      end_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      end_year:
+        minimum: 2018
+        type: integer
+      force:
+        type: boolean
+      start_month:
+        maximum: 12
+        minimum: 1
+        type: integer
+      start_year:
+        minimum: 2018
+        type: integer
+      stations:
+        items:
+          type: string
+        type: array
+    required:
+    - start_month
+    - start_year
+    - stations
+    type: object
   model.YearMonth:
     properties:
       month:
@@ -423,6 +491,44 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: Queue regions reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/weather:
+    post:
+      consumes:
+      - application/json
+      description: Queues one import job per month in the requested range. Provide
+        stations explicitly, or omit stations to resolve from distinct BTS origin/dest
+        codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a
+        single month. Set force=true to re-import months that already have data.
+      parameters:
+      - description: Ingest range and optional stations
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.WeatherIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.WeatherIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.WeatherIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue weather observation data ingest
       tags:
       - ingest
       - internal
@@ -678,7 +784,7 @@ swagger: "2.0"
 tags:
 - description: Liveness, readiness, and database migration version
   name: health
-- description: Queue flight performance and reference data import jobs
+- description: Queue flight performance, weather, and reference data import jobs
   name: ingest
 - description: Inspect background job status
   name: jobs

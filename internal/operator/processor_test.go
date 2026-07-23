@@ -47,7 +47,7 @@ func TestProcessorProcessSuccess(t *testing.T) {
 	}
 
 	processor := NewProcessor(st, testHandler{jobType: testJobType, result: result})
-	job := &model.Job{ID: "job-1", Type: testJobType, Status: model.JobStatusRunning}
+	job := &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err != nil {
 		t.Fatalf("Process() error = %v", err)

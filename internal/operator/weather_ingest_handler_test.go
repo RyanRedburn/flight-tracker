@@ -8,12 +8,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func btsFixtureCSVPath(t *testing.T) string {
+func iemFixtureCSVPath(t *testing.T) string {
 	t.Helper()
 
 	_, file, _, ok := runtime.Caller(0)
@@ -21,7 +21,7 @@ func btsFixtureCSVPath(t *testing.T) string {
 		t.Fatal("runtime.Caller failed")
 	}
 
-	path := filepath.Join(filepath.Dir(file), "..", "ingest", "bts", "testdata", "on_time_2026_04.csv")
+	path := filepath.Join(filepath.Dir(file), "..", "ingest", "iem", "testdata", "asos_2024_01.csv")
 
 	path, err := filepath.Abs(path)
 	if err != nil {
@@ -29,13 +29,13 @@ func btsFixtureCSVPath(t *testing.T) string {
 	}
 
 	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("bts testdata csv missing at %s: %v", path, err)
+		t.Fatalf("iem testdata csv missing at %s: %v", path, err)
 	}
 
 	return path
 }
 
-func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
+func TestWeatherIngestHandlerProcess(t *testing.T) {
 	ctx := context.Background()
 
 	var replaceYear, replaceMonth int
@@ -43,10 +43,15 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 	var replaceRows int
 
 	st := &storetest.Stub{
-		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
-			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
+			return &model.WeatherIngestJob{
+				JobID:    jobID,
+				Year:     2024,
+				Month:    1,
+				Stations: []string{"ORD", "JFK"},
+			}, nil
 		},
-		ReplaceFlightPerformanceByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
+		ReplaceWeatherObservationsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
 			replaceYear, replaceMonth = year, month
 			replaceRows = len(rows)
 
@@ -54,21 +59,21 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 		},
 	}
 
-	path := btsFixtureCSVPath(t)
-	svc := bts.NewService(st, nil).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
+	path := iemFixtureCSVPath(t)
+	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
 		return path, func() {}, nil
 	})
 
-	h := NewFlightPerformanceIngestHandler(st, svc)
-	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+	h := NewWeatherIngestHandler(st, svc)
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportWeatherObservations}
 
 	payload, err := h.Process(ctx, job)
 	if err != nil {
 		t.Fatalf("Process() error = %v", err)
 	}
 
-	if replaceYear != 2026 || replaceMonth != 4 {
-		t.Errorf("ReplaceFlightPerformanceByMonth = %d-%d, want 2026-4", replaceYear, replaceMonth)
+	if replaceYear != 2024 || replaceMonth != 1 {
+		t.Errorf("ReplaceWeatherObservationsByMonth = %d-%d, want 2024-1", replaceYear, replaceMonth)
 	}
 
 	var result map[string]any

@@ -61,7 +61,7 @@ func routerStub() *storetest.Stub {
 }
 
 func TestNewRouterRoutes(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24, nil)
 
 	tests := []struct {
 		method     string
@@ -75,6 +75,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/countries", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
+		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
@@ -97,7 +98,7 @@ func TestNewRouterRoutes(t *testing.T) {
 }
 
 func TestSwaggerSpecSurfaces(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24, nil)
 
 	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
@@ -156,7 +157,7 @@ func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[stri
 }
 
 func TestServerShutdown(t *testing.T) {
-	s := NewServer("unused", routerStub(), testLogger(), 24)
+	s := NewServer("unused", routerStub(), testLogger(), 24, nil)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

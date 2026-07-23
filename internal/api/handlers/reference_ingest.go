@@ -85,7 +85,7 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, dataset store.ReferenceDataset) {
 	var req model.ForceIngestRequest
 	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid json body"})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, 
 
 	active, err := h.store.ActiveIngestJob(ctx, jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check active ingest jobs"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
 		return
 	}
 
@@ -131,7 +131,7 @@ func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, 
 
 	job, err := h.store.CreateReferenceIngestJob(ctx, jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create ingest job"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
 		return
 	}
 

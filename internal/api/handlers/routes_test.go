@@ -15,6 +15,7 @@ import (
 const (
 	testOriginORD = "ORD"
 	testDestLAX   = "LAX"
+	testDestJFK   = "JFK"
 )
 
 func TestRoutesStats(t *testing.T) {

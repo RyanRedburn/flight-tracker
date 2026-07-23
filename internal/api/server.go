@@ -21,11 +21,17 @@ type Server struct {
 	httpServer *http.Server
 }
 
-func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Handler {
+func newRouter(
+	s store.Store,
+	logger *slog.Logger,
+	maxIngestMonths int,
+	weatherStations handlers.WeatherStationResolver,
+) http.Handler {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
 	routes := handlers.NewRoutesHandler(s)
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
+	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths, weatherStations, logger)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
 
 	r := chi.NewRouter()
@@ -46,6 +52,7 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/ingest", ingestHandler.Create)
+		r.Post("/ingest/weather", weatherIngest.Create)
 		r.Post("/ingest/countries", referenceIngest.CreateCountries)
 		r.Post("/ingest/regions", referenceIngest.CreateRegions)
 		r.Post("/ingest/airports", referenceIngest.CreateAirports)
@@ -58,11 +65,17 @@ func newRouter(s store.Store, logger *slog.Logger, maxIngestMonths int) http.Han
 	return r
 }
 
-func NewServer(addr string, s store.Store, logger *slog.Logger, maxIngestMonths int) *Server {
+func NewServer(
+	addr string,
+	s store.Store,
+	logger *slog.Logger,
+	maxIngestMonths int,
+	weatherStations handlers.WeatherStationResolver,
+) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:              addr,
-			Handler:           newRouter(s, logger, maxIngestMonths),
+			Handler:           newRouter(s, logger, maxIngestMonths, weatherStations),
 			ReadHeaderTimeout: 5 * time.Second,
 		},
 	}

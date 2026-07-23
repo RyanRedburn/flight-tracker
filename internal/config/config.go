@@ -22,6 +22,10 @@ type Config struct {
 	StaleJobThreshold          time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
 	BTSDownloadTimeout         time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
 	BTSBaseURL                 string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
+	IEMASOSBaseURL             string        `env:"IEM_ASOS_BASE_URL" envDefault:"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"`
+	IEMASOSDownloadTimeout     time.Duration `env:"IEM_ASOS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
+	IEMGeoJSONBaseURL          string        `env:"IEM_GEOJSON_BASE_URL" envDefault:"https://mesonet.agron.iastate.edu/geojson/network"`
+	IEMGeoJSONTimeout          time.Duration `env:"IEM_GEOJSON_TIMEOUT" envDefault:"2m"`
 	OurAirportsBaseURL         string        `env:"OURAIRPORTS_BASE_URL" envDefault:"https://raw.githubusercontent.com/davidmegginson/ourairports-data/main"`
 	OurAirportsDownloadTimeout time.Duration `env:"OURAIRPORTS_DOWNLOAD_TIMEOUT" envDefault:"5m"`
 	MaxIngestMonths            int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`

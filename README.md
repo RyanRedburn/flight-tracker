@@ -4,11 +4,12 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing flight performance data and airport reference data (countries, regions, airports).
+Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, and airport reference data (countries, regions, airports).
 
 ## Features
 
 - `POST /api/v1/ingest` to queue per-month flight performance import jobs
+- `POST /api/v1/ingest/weather` to queue per-month ASOS/METAR weather observation import jobs
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, booking outlook probabilities, and job status
@@ -86,6 +87,10 @@ Environment variables (defaults shown):
 | `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
 | `BTS_DOWNLOAD_TIMEOUT` | `10m` | HTTP timeout for BTS (flight performance source) zip downloads |
 | `BTS_BASE_URL` | `https://transtats.bts.gov/PREZIP` | BTS zip base URL (override in tests) |
+| `IEM_ASOS_BASE_URL` | `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py` | IEM ASOS CGI endpoint (override in tests) |
+| `IEM_ASOS_DOWNLOAD_TIMEOUT` | `10m` | HTTP timeout for IEM ASOS CSV downloads |
+| `IEM_GEOJSON_BASE_URL` | `https://mesonet.agron.iastate.edu/geojson/network` | IEM network GeoJSON base for station metadata |
+| `IEM_GEOJSON_TIMEOUT` | `2m` | HTTP timeout for IEM station GeoJSON downloads |
 | `OURAIRPORTS_BASE_URL` | `https://raw.githubusercontent.com/davidmegginson/ourairports-data/main` | OurAirports (reference data source) CSV base URL |
 | `OURAIRPORTS_DOWNLOAD_TIMEOUT` | `5m` | HTTP timeout for OurAirports CSV downloads |
 | `MAX_INGEST_MONTHS` | `24` | Max months per flight-performance ingest request |
@@ -132,6 +137,16 @@ curl -X POST http://localhost:8080/api/v1/ingest \
 curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4,"force":true}'
+
+# Queue weather observation import (auto-resolve stations from BTS airports ∩ IEM ASOS)
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1}'
+
+# Or provide an explicit station list
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
 # Queue reference data imports (recommended order: countries → regions → airports)
 curl -X POST http://localhost:8080/api/v1/ingest/countries \
@@ -180,6 +195,23 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 - Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
 
 Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/ingest/bts/testdata/` contains a small CSV sample (header plus 20 diverse April 2026 rows) used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
+
+#### Weather observations (`POST /api/v1/ingest/weather`)
+
+- Creates one `import_weather_observations` job per month in the requested range.
+- `stations` is optional. When omitted, the service resolves IEM site ids from distinct BTS `origin`/`dest` codes intersected with US ASOS GeoJSON metadata. Explicit lists still override.
+- Provided station values are uppercased and de-duplicated.
+- Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
+- `start_year` must be >= 2018 (aligned with flight performance coverage).
+- Workers poll the database, download ASOS/METAR CSV for the month and stations from IEM, and replace `weather_observations` for that month.
+- Returns **409** if a pending/running weather ingest job already exists for a requested month.
+- Returns **409** if weather data already exists and `force` is not set.
+- `force: true` skips the data-exists check; workers always replace the target month on import.
+- Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
+- IEM requests are throttled to about 1 request/second and retried on HTTP 503.
+- Auto-resolve responses may include `unresolved_airports` for BTS codes with no matching IEM ASOS `sid`.
+
+Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field notes: `internal/ingest/iem/documents/asos_observations.md`. `internal/ingest/iem/testdata/` holds a small CSV fixture used by parser and ingest tests.
 
 #### Reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
 
@@ -236,7 +268,7 @@ docs/full/            Generated OpenAPI (full / internal Swagger)
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
 internal/database/    Store factory (driver selection)
-internal/ingest/      Ingest range expansion; provider adapters (BTS, OurAirports) download/parse/load
+internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAirports) download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, Postgres implementation, test stub

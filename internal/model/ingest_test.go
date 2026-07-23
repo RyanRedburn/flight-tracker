@@ -53,7 +53,7 @@ func TestIngestRequestValidate(t *testing.T) {
 				StartMonth: 1,
 				EndYear:    &endYear,
 			},
-			wantErr: "end_year and end_month must both be set or both omitted",
+			wantErr: errEndYearMonthPair,
 		},
 		{
 			name:    "missing start",
@@ -81,5 +81,105 @@ func TestIngestRequestValidate(t *testing.T) {
 				t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestWeatherIngestRequestValidate(t *testing.T) {
+	endYear := 2024
+	endMonth := 3
+
+	tests := []struct {
+		name    string
+		req     WeatherIngestRequest
+		wantErr string
+		want    []string
+	}{
+		{
+			name: "valid single month",
+			req: WeatherIngestRequest{
+				StartYear:  2024,
+				StartMonth: 1,
+				Stations:   []string{"ord", "JFK", "ord"},
+			},
+			want: []string{"ORD", "JFK"},
+		},
+		{
+			name: "valid range",
+			req: WeatherIngestRequest{
+				StartYear:  2024,
+				StartMonth: 1,
+				EndYear:    &endYear,
+				EndMonth:   &endMonth,
+				Stations:   []string{"ATL"},
+			},
+			want: []string{"ATL"},
+		},
+		{
+			name: "missing stations",
+			req: WeatherIngestRequest{
+				StartYear:  2024,
+				StartMonth: 1,
+			},
+		},
+		{
+			name: "station too short",
+			req: WeatherIngestRequest{
+				StartYear:  2024,
+				StartMonth: 1,
+				Stations:   []string{"OR"},
+			},
+			wantErr: "stations[0] must be at least 3 characters",
+		},
+		{
+			name: "incomplete end",
+			req: WeatherIngestRequest{
+				StartYear:  2024,
+				StartMonth: 1,
+				EndYear:    &endYear,
+				Stations:   []string{"ORD"},
+			},
+			wantErr: errEndYearMonthPair,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assertWeatherIngestValidation(t, &tt.req, tt.wantErr, tt.want)
+		})
+	}
+}
+
+func assertWeatherIngestValidation(t *testing.T, req *WeatherIngestRequest, wantErr string, want []string) {
+	t.Helper()
+
+	err := req.Validate()
+	if wantErr != "" {
+		if err == nil {
+			t.Fatal("Validate() expected error")
+		}
+
+		if !strings.Contains(err.Error(), wantErr) {
+			t.Fatalf("Validate() error = %q, want substring %q", err.Error(), wantErr)
+		}
+
+		return
+	}
+
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if len(want) == 0 {
+		return
+	}
+
+	if len(req.Stations) != len(want) {
+		t.Fatalf("Stations = %v, want %v", req.Stations, want)
+	}
+
+	for i := range want {
+		if req.Stations[i] != want[i] {
+			t.Fatalf("Stations = %v, want %v", req.Stations, want)
+		}
 	}
 }
