@@ -61,7 +61,7 @@ func routerStub() *storetest.Stub {
 }
 
 func TestNewRouterRoutes(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24, nil)
 
 	tests := []struct {
 		method     string
@@ -98,7 +98,7 @@ func TestNewRouterRoutes(t *testing.T) {
 }
 
 func TestSwaggerSpecSurfaces(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24)
+	handler := newRouter(routerStub(), testLogger(), 24, nil)
 
 	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
@@ -157,7 +157,7 @@ func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[stri
 }
 
 func TestServerShutdown(t *testing.T) {
-	s := NewServer("unused", routerStub(), testLogger(), 24)
+	s := NewServer("unused", routerStub(), testLogger(), 24, nil)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

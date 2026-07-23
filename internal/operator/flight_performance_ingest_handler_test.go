@@ -60,7 +60,7 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 	})
 
 	h := NewFlightPerformanceIngestHandler(st, svc)
-	job := &model.Job{ID: "job-1", Type: model.JobTypeImportFlightPerformance}
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
 
 	payload, err := h.Process(ctx, job)
 	if err != nil {

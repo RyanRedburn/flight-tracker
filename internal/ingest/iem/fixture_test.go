@@ -25,7 +25,7 @@ func TestParseFixtureCSV(t *testing.T) {
 	}
 
 	stationIdx := observationColumnIndex(colStation)
-	if rows[0][stationIdx] != "ORD" {
+	if rows[0][stationIdx] != testStationORD {
 		t.Errorf("first station = %q, want ORD", rows[0][stationIdx])
 	}
 
@@ -34,7 +34,7 @@ func TestParseFixtureCSV(t *testing.T) {
 		stations[row[stationIdx]] = struct{}{}
 	}
 
-	for _, want := range []string{"ORD", "JFK", "ATL", "DEN", "SFO"} {
+	for _, want := range []string{testStationORD, testStationJFK, testStationATL, testStationDEN, testStationSFO} {
 		if _, ok := stations[want]; !ok {
 			t.Errorf("expected station %s in fixture", want)
 		}
@@ -56,6 +56,7 @@ func TestDBColumnsIncludePartitionKeys(t *testing.T) {
 	if len(DBColumns) != len(ObservationColumns)+2 {
 		t.Fatalf("len(DBColumns) = %d, want %d", len(DBColumns), len(ObservationColumns)+2)
 	}
+
 	if DBColumns[0] != colYear || DBColumns[1] != colMonth {
 		t.Fatalf("DBColumns prefix = %q,%q, want year,month", DBColumns[0], DBColumns[1])
 	}

@@ -16,7 +16,7 @@ import (
 func TestBuildURL(t *testing.T) {
 	d := NewDownloader("https://example.test/asos.py", time.Second)
 
-	raw, err := d.buildURL(2024, 1, []string{"ORD", "JFK"})
+	raw, err := d.buildURL(2024, 1, []string{testStationORD, testStationJFK})
 	if err != nil {
 		t.Fatalf("buildURL() error = %v", err)
 	}
@@ -35,7 +35,7 @@ func TestBuildURL(t *testing.T) {
 		t.Fatalf("sts/ets = %q/%q", q.Get("sts"), q.Get("ets"))
 	}
 
-	if got := q["station"]; len(got) != 2 || got[0] != "ORD" || got[1] != "JFK" {
+	if got := q["station"]; len(got) != 2 || got[0] != testStationORD || got[1] != testStationJFK {
 		t.Fatalf("station = %v, want [ORD JFK]", got)
 	}
 
@@ -65,7 +65,7 @@ func TestDownloaderWritesCSV(t *testing.T) {
 	const csvBody = "station,valid,tmpf\nORD,2024-01-01 00:51,32.00\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("station") != "ORD" {
+		if r.URL.Query().Get("station") != testStationORD {
 			t.Errorf("station = %q, want ORD", r.URL.Query().Get("station"))
 		}
 
@@ -77,7 +77,7 @@ func TestDownloaderWritesCSV(t *testing.T) {
 	d := NewDownloader(server.URL, time.Second)
 	d.minInterval = 0
 
-	csvPath, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{"ORD"})
+	csvPath, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{testStationORD})
 	if err != nil {
 		t.Fatalf("DownloadCSV() error = %v", err)
 	}
@@ -103,7 +103,7 @@ func TestDownloader422(t *testing.T) {
 	d := NewDownloader(server.URL, time.Second)
 	d.minInterval = 0
 
-	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{"ORD"})
+	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{testStationORD})
 	if cleanup != nil {
 		cleanup()
 	}
@@ -133,7 +133,7 @@ func TestDownloaderRetries503(t *testing.T) {
 	d.minInterval = 0
 	d.sleep = func(context.Context, time.Duration) error { return nil }
 
-	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{"ORD"})
+	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{testStationORD})
 	if err != nil {
 		t.Fatalf("DownloadCSV() error = %v", err)
 	}
@@ -154,7 +154,7 @@ func TestDownloaderERRORBody(t *testing.T) {
 	d := NewDownloader(server.URL, time.Second)
 	d.minInterval = 0
 
-	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{"ORD"})
+	_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{testStationORD})
 	if cleanup != nil {
 		cleanup()
 	}
@@ -175,6 +175,7 @@ func TestDownloaderThrottles(t *testing.T) {
 	defer server.Close()
 
 	now := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
 	var slept time.Duration
 
 	d := NewDownloader(server.URL, time.Second)
@@ -188,10 +189,11 @@ func TestDownloaderThrottles(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{"ORD"})
+		_, cleanup, err := d.DownloadCSV(context.Background(), 2024, 1, []string{testStationORD})
 		if err != nil {
 			t.Fatalf("DownloadCSV() error = %v", err)
 		}
+
 		cleanup()
 	}
 

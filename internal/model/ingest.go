@@ -41,13 +41,14 @@ type IngestRequest struct {
 	Force      bool `json:"force"`
 }
 
-// WeatherIngestRequest queues ASOS/METAR observation imports for an explicit station list.
+// WeatherIngestRequest queues ASOS/METAR observation imports.
+// Omit stations to auto-resolve from distinct BTS origin/dest ∩ US IEM ASOS metadata.
 type WeatherIngestRequest struct {
 	StartYear  int      `json:"start_year" validate:"required,gte=2018"`
 	StartMonth int      `json:"start_month" validate:"required,gte=1,lte=12"`
 	EndYear    *int     `json:"end_year,omitempty" validate:"omitempty,gte=2018"`
 	EndMonth   *int     `json:"end_month,omitempty" validate:"omitempty,gte=1,lte=12"`
-	Stations   []string `json:"stations" validate:"required,min=1,dive,required,min=3,max=4"`
+	Stations   []string `json:"stations,omitempty" validate:"omitempty,dive,required,min=3,max=4"`
 	Force      bool     `json:"force"`
 }
 
@@ -74,6 +75,11 @@ func normalizeWeatherStations(r *WeatherIngestRequest) {
 		return
 	}
 
+	if len(r.Stations) == 0 {
+		r.Stations = nil
+		return
+	}
+
 	out := make([]string, 0, len(r.Stations))
 	seen := make(map[string]struct{}, len(r.Stations))
 
@@ -89,6 +95,11 @@ func normalizeWeatherStations(r *WeatherIngestRequest) {
 
 		seen[station] = struct{}{}
 		out = append(out, station)
+	}
+
+	if len(out) == 0 {
+		r.Stations = nil
+		return
 	}
 
 	r.Stations = out
@@ -151,8 +162,10 @@ func formatIngestFieldError(fieldErr validator.FieldError) string {
 	case "required":
 		return field + " is required"
 	case "end_pair":
-		return "end_year and end_month must both be set or both omitted"
+		return errEndYearMonthPair
 	default:
 		return field + " is invalid"
 	}
 }
+
+const errEndYearMonthPair = "end_year and end_month must both be set or both omitted"

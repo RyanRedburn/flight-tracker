@@ -59,15 +59,17 @@ func TestWeatherIngestSingleMonth(t *testing.T) {
 	st := weatherIngestSuccessStub()
 
 	var createdYear, createdMonth int
+
 	var createdStations []string
 
 	st.CreateWeatherIngestJobFn = func(_ context.Context, year, month int, stations []string) (*model.Job, error) {
 		createdYear, createdMonth = year, month
+
 		createdStations = append([]string(nil), stations...)
 		now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
 
 		return &model.Job{
-			ID:        "job-1",
+			ID:        testJobID,
 			Type:      model.JobTypeImportWeatherObservations,
 			Status:    model.JobStatusPending,
 			CreatedAt: now,
@@ -75,12 +77,12 @@ func TestWeatherIngestSingleMonth(t *testing.T) {
 		}, nil
 	}
 
-	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths)
+	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths, nil, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
-		jsonStations:   []string{"ord", "JFK"},
+		jsonStations:   []string{"ord", testDestJFK},
 	})
 
 	if rec.Code != http.StatusCreated {
@@ -100,11 +102,11 @@ func TestWeatherIngestSingleMonth(t *testing.T) {
 		t.Errorf("CreateWeatherIngestJob args = %d-%d, want 2024-1", createdYear, createdMonth)
 	}
 
-	if len(createdStations) != 2 || createdStations[0] != "ORD" || createdStations[1] != "JFK" {
+	if len(createdStations) != 2 || createdStations[0] != testOriginORD || createdStations[1] != testDestJFK {
 		t.Errorf("stations = %v, want [ORD JFK]", createdStations)
 	}
 
-	if resp.Jobs[0].Stations[0] != "ORD" || resp.Jobs[0].Status != model.JobStatusPending {
+	if resp.Jobs[0].Stations[0] != testOriginORD || resp.Jobs[0].Status != model.JobStatusPending {
 		t.Errorf("job = %+v", resp.Jobs[0])
 	}
 }
@@ -127,14 +129,14 @@ func TestWeatherIngestRange(t *testing.T) {
 		}, nil
 	}
 
-	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths)
+	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths, nil, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
 		jsonEndYear:    2024,
 		jsonEndMonth:   3,
-		jsonStations:   []string{"ORD"},
+		jsonStations:   []string{testOriginORD},
 	})
 
 	if rec.Code != http.StatusCreated {
@@ -151,16 +153,63 @@ func TestWeatherIngestRange(t *testing.T) {
 	}
 }
 
-func TestWeatherIngestMissingStations(t *testing.T) {
-	h := NewWeatherIngestHandler(&storetest.Stub{}, defaultMaxIngestMonths)
+func TestWeatherIngestAutoResolveStations(t *testing.T) {
+	st := weatherIngestSuccessStub()
+
+	var createdStations []string
+
+	st.CreateWeatherIngestJobFn = func(_ context.Context, year, month int, stations []string) (*model.Job, error) {
+		createdStations = append([]string(nil), stations...)
+		now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+		return &model.Job{
+			ID:        testJobID,
+			Type:      model.JobTypeImportWeatherObservations,
+			Status:    model.JobStatusPending,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}, nil
+	}
+
+	resolver := weatherStationResolverFunc(func(context.Context) ([]string, []string, error) {
+		return []string{testOriginORD, testDestJFK}, []string{"XYZ"}, nil
+	})
+
+	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths, resolver, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
 	})
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var resp WeatherIngestResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if len(createdStations) != 2 || createdStations[0] != testOriginORD || createdStations[1] != testDestJFK {
+		t.Fatalf("created stations = %v, want [ORD JFK]", createdStations)
+	}
+
+	if len(resp.UnresolvedAirports) != 1 || resp.UnresolvedAirports[0] != "XYZ" {
+		t.Fatalf("UnresolvedAirports = %v, want [XYZ]", resp.UnresolvedAirports)
+	}
+}
+
+func TestWeatherIngestMissingStationsWithoutResolver(t *testing.T) {
+	h := NewWeatherIngestHandler(&storetest.Stub{}, defaultMaxIngestMonths, nil, nil)
+
+	rec := postWeatherIngest(t, h, map[string]any{
+		jsonStartYear:  2024,
+		jsonStartMonth: 1,
+	})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 }
 
@@ -169,12 +218,12 @@ func TestWeatherIngestActiveJobConflict(t *testing.T) {
 		ActiveWeatherIngestMonthsFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return []model.YearMonth{{Year: 2024, Month: 1}}, nil
 		},
-	}, defaultMaxIngestMonths)
+	}, defaultMaxIngestMonths, nil, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
-		jsonStations:   []string{"ORD"},
+		jsonStations:   []string{testOriginORD},
 	})
 
 	if rec.Code != http.StatusConflict {
@@ -190,12 +239,12 @@ func TestWeatherIngestExistingDataConflict(t *testing.T) {
 		MonthsWithWeatherDataFn: func(context.Context, []model.YearMonth) ([]model.YearMonth, error) {
 			return []model.YearMonth{{Year: 2024, Month: 1}}, nil
 		},
-	}, defaultMaxIngestMonths)
+	}, defaultMaxIngestMonths, nil, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
-		jsonStations:   []string{"ORD"},
+		jsonStations:   []string{testOriginORD},
 		jsonForce:      false,
 	})
 
@@ -205,16 +254,22 @@ func TestWeatherIngestExistingDataConflict(t *testing.T) {
 }
 
 func TestWeatherIngestForceReimport(t *testing.T) {
-	h := NewWeatherIngestHandler(weatherIngestSuccessStub(), defaultMaxIngestMonths)
+	h := NewWeatherIngestHandler(weatherIngestSuccessStub(), defaultMaxIngestMonths, nil, nil)
 
 	rec := postWeatherIngest(t, h, map[string]any{
 		jsonStartYear:  2024,
 		jsonStartMonth: 1,
-		jsonStations:   []string{"ORD"},
+		jsonStations:   []string{testOriginORD},
 		jsonForce:      true,
 	})
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
+}
+
+type weatherStationResolverFunc func(context.Context) ([]string, []string, error)
+
+func (f weatherStationResolverFunc) Resolve(ctx context.Context) ([]string, []string, error) {
+	return f(ctx)
 }

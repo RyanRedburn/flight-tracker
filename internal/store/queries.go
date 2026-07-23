@@ -105,6 +105,19 @@ const (
 		DELETE FROM weather_observations
 		WHERE year = $1 AND month = $2`
 
+	QueryDistinctFlightAirportCodes = `
+		SELECT DISTINCT code
+		FROM (
+			SELECT origin AS code
+			FROM flight_performance
+			WHERE origin IS NOT NULL AND origin <> ''
+			UNION
+			SELECT dest AS code
+			FROM flight_performance
+			WHERE dest IS NOT NULL AND dest <> ''
+		) AS airports
+		ORDER BY code`
+
 	QueryDeleteAllCountries = `DELETE FROM countries`
 	QueryDeleteAllRegions   = `DELETE FROM regions`
 	QueryDeleteAllAirports  = `DELETE FROM airports`

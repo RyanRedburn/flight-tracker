@@ -42,6 +42,7 @@ type Store interface {
 	ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error
 	MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	DistinctFlightAirportCodes(ctx context.Context) ([]string, error)
 	ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)

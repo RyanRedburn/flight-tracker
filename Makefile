@@ -3,8 +3,11 @@
 # Pin must match //go:generate in cmd/server/main.go and CI swagger workflow.
 SWAG_VERSION := v1.16.6
 
+# Pin must match .github/workflows/lint.yml. go run rebuilds with the module toolchain (needed for Go 1.26+).
+GOLANGCI_LINT_VERSION := v2.12.2
+
 lint:
-	golangci-lint run
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run
 
 # Regenerate external + full (internal) OpenAPI docs via go:generate.
 swagger:

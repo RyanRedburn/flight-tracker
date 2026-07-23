@@ -161,7 +161,7 @@ func TestJobsList(t *testing.T) {
 			// Scenario: store already returns the limited page.
 			return []*model.Job{
 				{
-					ID:        "job-1",
+					ID:        testJobID,
 					Type:      model.JobTypeImportFlightPerformance,
 					Status:    model.JobStatusPending,
 					CreatedAt: now,

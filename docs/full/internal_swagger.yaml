@@ -129,6 +129,10 @@ definitions:
         type: array
       months_requested:
         type: integer
+      unresolved_airports:
+        items:
+          type: string
+        type: array
     type: object
   model.AirportCount:
     properties:
@@ -322,7 +326,6 @@ definitions:
       stations:
         items:
           type: string
-        minItems: 1
         type: array
     required:
     - start_month
@@ -495,11 +498,12 @@ paths:
     post:
       consumes:
       - application/json
-      description: Queues one import job per month in the requested range for the
-        given IEM station ids. Omit end_year/end_month for a single month. Set force=true
-        to re-import months that already have data.
+      description: Queues one import job per month in the requested range. Provide
+        stations explicitly, or omit stations to resolve from distinct BTS origin/dest
+        codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a
+        single month. Set force=true to re-import months that already have data.
       parameters:
-      - description: Ingest range and stations
+      - description: Ingest range and optional stations
         in: body
         name: body
         required: true

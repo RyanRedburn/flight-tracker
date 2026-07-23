@@ -21,6 +21,7 @@ const (
 	jsonEndYear            = "end_year"
 	jsonEndMonth           = "end_month"
 	jsonForce              = "force"
+	testJobID              = "job-1"
 )
 
 func ingestSuccessStub() *storetest.Stub {
@@ -72,7 +73,7 @@ func TestIngestSingleMonth(t *testing.T) {
 		now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 		return &model.Job{
-			ID:        "job-1",
+			ID:        testJobID,
 			Type:      model.JobTypeImportFlightPerformance,
 			Status:    model.JobStatusPending,
 			CreatedAt: now,

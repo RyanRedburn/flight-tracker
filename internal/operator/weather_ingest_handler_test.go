@@ -39,6 +39,7 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 	ctx := context.Background()
 
 	var replaceYear, replaceMonth int
+
 	var replaceRows int
 
 	st := &storetest.Stub{
@@ -64,7 +65,7 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 	})
 
 	h := NewWeatherIngestHandler(st, svc)
-	job := &model.Job{ID: "job-1", Type: model.JobTypeImportWeatherObservations}
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportWeatherObservations}
 
 	payload, err := h.Process(ctx, job)
 	if err != nil {

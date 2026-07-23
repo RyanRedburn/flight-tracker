@@ -102,12 +102,14 @@ func (s *Service) openCSVFile(ctx context.Context, year, month int, stations []s
 
 func withPartitionKeys(year, month int, columns []string, rows [][]string) ([]string, [][]string, error) {
 	validIdx := -1
+
 	for i, col := range columns {
 		if col == colValid {
 			validIdx = i
 			break
 		}
 	}
+
 	if validIdx < 0 {
 		return nil, nil, errors.New("valid column required")
 	}
@@ -129,6 +131,7 @@ func withPartitionKeys(year, month int, columns []string, rows [][]string) ([]st
 			if err != nil {
 				return nil, nil, fmt.Errorf("row %d valid %q: %w", i+1, normalized[validIdx], err)
 			}
+
 			normalized[validIdx] = utc.Format(time.RFC3339)
 		}
 
@@ -143,16 +146,18 @@ func withPartitionKeys(year, month int, columns []string, rows [][]string) ([]st
 // parseIEMValidUTC parses IEM "YYYY-MM-DD HH:MM" (or with seconds) as UTC.
 func parseIEMValidUTC(raw string) (time.Time, error) {
 	raw = strings.TrimSpace(raw)
+
 	layouts := []string{
 		"2006-01-02 15:04",
 		"2006-01-02 15:04:05",
 		time.RFC3339,
 	}
+
 	for _, layout := range layouts {
 		if t, err := time.ParseInLocation(layout, raw, time.UTC); err == nil {
 			return t, nil
 		}
 	}
 
-	return time.Time{}, fmt.Errorf("unsupported timestamp")
+	return time.Time{}, errors.New("unsupported timestamp")
 }

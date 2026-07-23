@@ -24,13 +24,6 @@ const (
 	defaultMaxAttempts = 6
 )
 
-// dataVars are IEM `data=` columns (station/valid are always returned).
-var dataVars = []string{
-	"tmpf", "dwpf", "relh", "drct", "sknt", "gust", "vsby",
-	"skyc1", "skyc2", "skyc3", "skyl1", "skyl2", "skyl3",
-	"wxcodes", "p01i", "alti", "mslp", "metar",
-}
-
 type Downloader struct {
 	baseURL     string
 	httpClient  *http.Client
@@ -154,7 +147,7 @@ func (d *Downloader) doDownload(ctx context.Context, reqURL string) (csvPath str
 
 		return "", nil, fmt.Errorf("%w: %s", ErrRequestTooLarge, strings.TrimSpace(string(body)))
 	case resp.StatusCode == http.StatusServiceUnavailable:
-		return "", nil, &retryableError{msg: fmt.Sprintf("download iem csv: status %s", resp.Status)}
+		return "", nil, &retryableError{msg: "download iem csv: status " + resp.Status}
 	case resp.StatusCode < 200 || resp.StatusCode >= 300:
 		return "", nil, fmt.Errorf("download iem csv: unexpected status %s", resp.Status)
 	}
@@ -169,6 +162,7 @@ func (d *Downloader) doDownload(ctx context.Context, reqURL string) (csvPath str
 
 	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
 		_ = tmpFile.Close()
+
 		cleanup()
 
 		return "", nil, fmt.Errorf("write temp file: %w", err)

@@ -18,6 +18,8 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("BTS_BASE_URL", "")
 	t.Setenv("IEM_ASOS_BASE_URL", "")
 	t.Setenv("IEM_ASOS_DOWNLOAD_TIMEOUT", "")
+	t.Setenv("IEM_GEOJSON_BASE_URL", "")
+	t.Setenv("IEM_GEOJSON_TIMEOUT", "")
 	t.Setenv("OURAIRPORTS_BASE_URL", "")
 	t.Setenv("OURAIRPORTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("MAX_INGEST_MONTHS", "")
@@ -71,6 +73,14 @@ func TestLoadDefaults(t *testing.T) {
 
 	if cfg.IEMASOSDownloadTimeout != 10*time.Minute {
 		t.Errorf("IEMASOSDownloadTimeout = %v, want 10m", cfg.IEMASOSDownloadTimeout)
+	}
+
+	if cfg.IEMGeoJSONBaseURL != "https://mesonet.agron.iastate.edu/geojson/network" {
+		t.Errorf("IEMGeoJSONBaseURL = %q, want default IEM geojson URL", cfg.IEMGeoJSONBaseURL)
+	}
+
+	if cfg.IEMGeoJSONTimeout != 2*time.Minute {
+		t.Errorf("IEMGeoJSONTimeout = %v, want 2m", cfg.IEMGeoJSONTimeout)
 	}
 
 	if cfg.OurAirportsBaseURL != "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main" {

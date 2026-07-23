@@ -35,6 +35,7 @@ type Stub struct {
 	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
 	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithWeatherDataFn               func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	DistinctFlightAirportCodesFn          func(ctx context.Context) ([]string, error)
 	ReplaceFlightPerformanceByMonthFn     func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	ReplaceWeatherObservationsByMonthFn   func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
@@ -220,6 +221,14 @@ func (s *Stub) MonthsWithWeatherData(ctx context.Context, months []model.YearMon
 	}
 
 	return s.MonthsWithWeatherDataFn(ctx, months)
+}
+
+func (s *Stub) DistinctFlightAirportCodes(ctx context.Context) ([]string, error) {
+	if s.DistinctFlightAirportCodesFn == nil {
+		panic("unexpected call: DistinctFlightAirportCodes")
+	}
+
+	return s.DistinctFlightAirportCodesFn(ctx)
 }
 
 func (s *Stub) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {

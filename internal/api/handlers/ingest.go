@@ -49,7 +49,7 @@ type IngestResponse struct {
 func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.IngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid json body"})
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	active, err := h.store.ActiveFlightPerformanceIngestMonths(ctx, months)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check active ingest jobs"})
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !req.Force {
 		existing, err := h.store.MonthsWithFlightPerformanceData(ctx, months)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing flight data"})
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckExistingFlight})
 			return
 		}
 
@@ -108,7 +108,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	for _, ym := range months {
 		job, err := h.store.CreateFlightPerformanceIngestJob(ctx, ym.Year, ym.Month)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to create ingest job"})
+			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
 			return
 		}
 

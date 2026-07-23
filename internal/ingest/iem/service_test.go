@@ -14,12 +14,15 @@ func TestServiceImportMonth(t *testing.T) {
 	ctx := context.Background()
 
 	var gotYear, gotMonth int
+
 	var gotColumns []string
+
 	var gotRows [][]string
 
 	st := &storetest.Stub{
 		ReplaceWeatherObservationsByMonthFn: func(_ context.Context, year, month int, columns []string, rows [][]string) error {
 			gotYear, gotMonth = year, month
+
 			gotColumns = append([]string(nil), columns...)
 			gotRows = rows
 
@@ -28,7 +31,7 @@ func TestServiceImportMonth(t *testing.T) {
 	}
 	svc := NewService(st, nil).WithCSVOpener(minimalCSVOpener(t))
 
-	result, err := svc.ImportMonth(ctx, 2024, 1, []string{"ORD", "JFK"})
+	result, err := svc.ImportMonth(ctx, 2024, 1, []string{testStationORD, testStationJFK})
 	if err != nil {
 		t.Fatalf("ImportMonth() error = %v", err)
 	}
@@ -55,12 +58,15 @@ func TestServiceImportMonth(t *testing.T) {
 	}
 
 	validIdx := -1
+
 	for i, col := range gotColumns {
 		if col == colValid {
 			validIdx = i
+
 			break
 		}
 	}
+
 	if validIdx < 0 {
 		t.Fatal("valid column missing from replace columns")
 	}
@@ -69,6 +75,7 @@ func TestServiceImportMonth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("valid not RFC3339: %q (%v)", gotRows[0][validIdx], err)
 	}
+
 	if parsed.Location() != time.UTC {
 		t.Errorf("valid location = %v, want UTC", parsed.Location())
 	}
@@ -91,7 +98,7 @@ func TestServiceImportMonth(t *testing.T) {
 func TestServiceImportMonthWithoutDownloader(t *testing.T) {
 	svc := NewService(&storetest.Stub{}, nil)
 
-	_, err := svc.ImportMonth(context.Background(), 2024, 1, []string{"ORD"})
+	_, err := svc.ImportMonth(context.Background(), 2024, 1, []string{testStationORD})
 	if err == nil {
 		t.Fatal("ImportMonth() expected error without downloader or opener")
 	}
@@ -127,9 +134,9 @@ func TestParseIEMValidUTC(t *testing.T) {
 		raw  string
 		want string
 	}{
-		{raw: "2024-01-01 00:51", want: "2024-01-01T00:51:00Z"},
+		{raw: "2024-01-01 00:51", want: testValidTimestamp},
 		{raw: "2024-01-01 00:51:30", want: "2024-01-01T00:51:30Z"},
-		{raw: "2024-01-01T00:51:00Z", want: "2024-01-01T00:51:00Z"},
+		{raw: testValidTimestamp, want: testValidTimestamp},
 	}
 
 	for _, tt := range tests {
@@ -137,6 +144,7 @@ func TestParseIEMValidUTC(t *testing.T) {
 		if err != nil {
 			t.Fatalf("parseIEMValidUTC(%q) error = %v", tt.raw, err)
 		}
+
 		if got.Format(time.RFC3339) != tt.want {
 			t.Errorf("parseIEMValidUTC(%q) = %s, want %s", tt.raw, got.Format(time.RFC3339), tt.want)
 		}

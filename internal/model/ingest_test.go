@@ -53,7 +53,7 @@ func TestIngestRequestValidate(t *testing.T) {
 				StartMonth: 1,
 				EndYear:    &endYear,
 			},
-			wantErr: "end_year and end_month must both be set or both omitted",
+			wantErr: errEndYearMonthPair,
 		},
 		{
 			name:    "missing start",
@@ -120,7 +120,6 @@ func TestWeatherIngestRequestValidate(t *testing.T) {
 				StartYear:  2024,
 				StartMonth: 1,
 			},
-			wantErr: "stations must contain at least 1 items",
 		},
 		{
 			name: "station too short",
@@ -139,40 +138,48 @@ func TestWeatherIngestRequestValidate(t *testing.T) {
 				EndYear:    &endYear,
 				Stations:   []string{"ORD"},
 			},
-			wantErr: "end_year and end_month must both be set or both omitted",
+			wantErr: errEndYearMonthPair,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.req.Validate()
-			if tt.wantErr == "" {
-				if err != nil {
-					t.Fatalf("Validate() error = %v", err)
-				}
-
-				if len(tt.want) > 0 {
-					if len(tt.req.Stations) != len(tt.want) {
-						t.Fatalf("Stations = %v, want %v", tt.req.Stations, tt.want)
-					}
-
-					for i := range tt.want {
-						if tt.req.Stations[i] != tt.want[i] {
-							t.Fatalf("Stations = %v, want %v", tt.req.Stations, tt.want)
-						}
-					}
-				}
-
-				return
-			}
-
-			if err == nil {
-				t.Fatal("Validate() expected error")
-			}
-
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tt.wantErr)
-			}
+			assertWeatherIngestValidation(t, &tt.req, tt.wantErr, tt.want)
 		})
+	}
+}
+
+func assertWeatherIngestValidation(t *testing.T, req *WeatherIngestRequest, wantErr string, want []string) {
+	t.Helper()
+
+	err := req.Validate()
+	if wantErr != "" {
+		if err == nil {
+			t.Fatal("Validate() expected error")
+		}
+
+		if !strings.Contains(err.Error(), wantErr) {
+			t.Fatalf("Validate() error = %q, want substring %q", err.Error(), wantErr)
+		}
+
+		return
+	}
+
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+
+	if len(want) == 0 {
+		return
+	}
+
+	if len(req.Stations) != len(want) {
+		t.Fatalf("Stations = %v, want %v", req.Stations, want)
+	}
+
+	for i := range want {
+		if req.Stations[i] != want[i] {
+			t.Fatalf("Stations = %v, want %v", req.Stations, want)
+		}
 	}
 }

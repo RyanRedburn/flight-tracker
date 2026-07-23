@@ -108,6 +108,7 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 
 func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error) {
 	var detail model.WeatherIngestJob
+
 	var stationsJSON []byte
 
 	err := s.db.QueryRowxContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(

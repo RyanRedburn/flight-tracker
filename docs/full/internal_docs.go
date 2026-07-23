@@ -226,7 +226,7 @@ const docTemplateinternal = `{
         },
         "/api/v1/ingest/weather": {
             "post": {
-                "description": "Queues one import job per month in the requested range for the given IEM station ids. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
+                "description": "Queues one import job per month in the requested range. Provide stations explicitly, or omit stations to resolve from distinct BTS origin/dest codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -240,7 +240,7 @@ const docTemplateinternal = `{
                 "summary": "Queue weather observation data ingest",
                 "parameters": [
                     {
-                        "description": "Ingest range and stations",
+                        "description": "Ingest range and optional stations",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -825,6 +825,12 @@ const docTemplateinternal = `{
                 },
                 "months_requested": {
                     "type": "integer"
+                },
+                "unresolved_airports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1113,7 +1119,6 @@ const docTemplateinternal = `{
                 },
                 "stations": {
                     "type": "array",
-                    "minItems": 1,
                     "items": {
                         "type": "string"
                     }

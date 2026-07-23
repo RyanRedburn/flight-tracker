@@ -8,7 +8,20 @@ import (
 	"testing"
 )
 
-const testdataRowCount = 10
+const (
+	testdataRowCount      = 10
+	testStationORD        = "ORD"
+	testStationJFK        = "JFK"
+	testStationATL        = "ATL"
+	testStationDEN        = "DEN"
+	testStationSFO        = "SFO"
+	testStationXYZ        = "XYZ"
+	testNetworkILASOS     = "IL_ASOS"
+	testNetworkNYASOS     = "NY_ASOS"
+	testValidTimestamp    = "2024-01-01T00:51:00Z"
+	testGeoJSONProperties = "properties"
+	testGeoJSONSID        = "sid"
+)
 
 func fixtureCSVPath(t *testing.T) string {
 	t.Helper()
