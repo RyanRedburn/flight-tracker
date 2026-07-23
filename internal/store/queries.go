@@ -80,6 +80,31 @@ const (
 		DELETE FROM flight_performance
 		WHERE year = $1 AND month = $2`
 
+	QueryCreateWeatherIngestJob = `
+		INSERT INTO weather_ingest_jobs (job_id, year, month)
+		VALUES ($1, $2, $3)`
+
+	QueryGetWeatherIngestJob = `
+		SELECT job_id, year, month
+		FROM weather_ingest_jobs
+		WHERE job_id = $1`
+
+	QueryActiveWeatherIngestMonths = `
+		SELECT b.year, b.month
+		FROM weather_ingest_jobs b
+		INNER JOIN jobs j ON j.id = b.job_id
+		WHERE j.status IN ($1, $2)`
+
+	QueryMonthsWithWeatherData = `
+		SELECT 1
+		FROM weather_observations
+		WHERE year = $1 AND month = $2
+		LIMIT 1`
+
+	QueryDeleteWeatherObservationsByMonth = `
+		DELETE FROM weather_observations
+		WHERE year = $1 AND month = $2`
+
 	QueryDeleteAllCountries = `DELETE FROM countries`
 	QueryDeleteAllRegions   = `DELETE FROM regions`
 	QueryDeleteAllAirports  = `DELETE FROM airports`

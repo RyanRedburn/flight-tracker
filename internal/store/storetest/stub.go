@@ -15,8 +15,10 @@ import (
 type Stub struct {
 	CreateJobFn                           func(ctx context.Context, job *model.Job) error
 	CreateFlightPerformanceIngestJobFn    func(ctx context.Context, year, month int) (*model.Job, error)
+	CreateWeatherIngestJobFn              func(ctx context.Context, year, month int) (*model.Job, error)
 	GetJobFn                              func(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJobFn       func(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
+	GetWeatherIngestJobFn                 func(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
 	ListJobsFn                            func(ctx context.Context, limit int) ([]*model.Job, error)
 	UpdateJobFn                           func(ctx context.Context, job *model.Job) error
 	ClaimNextPendingJobFn                 func(ctx context.Context) (*model.Job, error)
@@ -24,6 +26,7 @@ type Stub struct {
 	FailJobFn                             func(ctx context.Context, id, errMsg string) error
 	ResetStaleRunningJobsFn               func(ctx context.Context, olderThan time.Time) (int64, error)
 	ActiveFlightPerformanceIngestMonthsFn func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	ActiveWeatherIngestMonthsFn           func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJobFn                     func(ctx context.Context, jobType string) (bool, error)
 	CreateReferenceIngestJobFn            func(ctx context.Context, jobType string) (*model.Job, error)
 	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
@@ -31,7 +34,9 @@ type Stub struct {
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
 	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
+	MonthsWithWeatherDataFn               func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ReplaceFlightPerformanceByMonthFn     func(ctx context.Context, year, month int, columns []string, rows [][]string) error
+	ReplaceWeatherObservationsByMonthFn   func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
 	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
 	PingFn                                func(ctx context.Context) error
@@ -57,6 +62,14 @@ func (s *Stub) CreateFlightPerformanceIngestJob(ctx context.Context, year, month
 	return s.CreateFlightPerformanceIngestJobFn(ctx, year, month)
 }
 
+func (s *Stub) CreateWeatherIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+	if s.CreateWeatherIngestJobFn == nil {
+		panic("unexpected call: CreateWeatherIngestJob")
+	}
+
+	return s.CreateWeatherIngestJobFn(ctx, year, month)
+}
+
 func (s *Stub) GetJob(ctx context.Context, id string) (*model.Job, error) {
 	if s.GetJobFn == nil {
 		panic("unexpected call: GetJob")
@@ -71,6 +84,14 @@ func (s *Stub) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) 
 	}
 
 	return s.GetFlightPerformanceIngestJobFn(ctx, jobID)
+}
+
+func (s *Stub) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error) {
+	if s.GetWeatherIngestJobFn == nil {
+		panic("unexpected call: GetWeatherIngestJob")
+	}
+
+	return s.GetWeatherIngestJobFn(ctx, jobID)
 }
 
 func (s *Stub) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
@@ -129,6 +150,14 @@ func (s *Stub) ActiveFlightPerformanceIngestMonths(ctx context.Context, months [
 	return s.ActiveFlightPerformanceIngestMonthsFn(ctx, months)
 }
 
+func (s *Stub) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	if s.ActiveWeatherIngestMonthsFn == nil {
+		panic("unexpected call: ActiveWeatherIngestMonths")
+	}
+
+	return s.ActiveWeatherIngestMonthsFn(ctx, months)
+}
+
 func (s *Stub) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
 	if s.ActiveIngestJobFn == nil {
 		panic("unexpected call: ActiveIngestJob")
@@ -185,12 +214,28 @@ func (s *Stub) MonthsWithFlightPerformanceData(ctx context.Context, months []mod
 	return s.MonthsWithFlightPerformanceDataFn(ctx, months)
 }
 
+func (s *Stub) MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	if s.MonthsWithWeatherDataFn == nil {
+		panic("unexpected call: MonthsWithWeatherData")
+	}
+
+	return s.MonthsWithWeatherDataFn(ctx, months)
+}
+
 func (s *Stub) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	if s.ReplaceFlightPerformanceByMonthFn == nil {
 		panic("unexpected call: ReplaceFlightPerformanceByMonth")
 	}
 
 	return s.ReplaceFlightPerformanceByMonthFn(ctx, year, month, columns, rows)
+}
+
+func (s *Stub) ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
+	if s.ReplaceWeatherObservationsByMonthFn == nil {
+		panic("unexpected call: ReplaceWeatherObservationsByMonth")
+	}
+
+	return s.ReplaceWeatherObservationsByMonthFn(ctx, year, month, columns, rows)
 }
 
 func (s *Stub) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {

@@ -66,6 +66,56 @@ func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string)
 	return &detail, nil
 }
 
+func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
+	now := time.Now().UTC()
+	job := &model.Job{
+		ID:        uuid.NewString(),
+		Type:      model.JobTypeImportWeatherObservations,
+		Status:    model.JobStatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := execCreateJob(ctx, tx, job); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month); err != nil {
+		return nil, fmt.Errorf("insert weather_ingest_jobs: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+
+	return job, nil
+}
+
+func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error) {
+	var detail model.WeatherIngestJob
+
+	err := s.db.QueryRowxContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(
+		&detail.JobID,
+		&detail.Year,
+		&detail.Month,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("weather ingest job %q: %w", jobID, store.ErrNotFound)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &detail, nil
+}
+
 func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -214,6 +264,46 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 	return active, rows.Err()
 }
 
+func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	rows, err := s.db.QueryxContext(ctx, store.QueryActiveWeatherIngestMonths,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	activeSet := make(map[model.YearMonth]struct{}, len(months))
+
+	requested := make(map[model.YearMonth]struct{}, len(months))
+	for _, ym := range months {
+		requested[ym] = struct{}{}
+	}
+
+	var active []model.YearMonth
+
+	for rows.Next() {
+		var ym model.YearMonth
+		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
+			return nil, err
+		}
+
+		if _, ok := requested[ym]; !ok {
+			continue
+		}
+
+		if _, seen := activeSet[ym]; seen {
+			continue
+		}
+
+		activeSet[ym] = struct{}{}
+		active = append(active, ym)
+	}
+
+	return active, rows.Err()
+}
+
 func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
 	var exists int
 
@@ -257,6 +347,30 @@ func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []mo
 	return withData, nil
 }
 
+func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	var withData []model.YearMonth
+
+	for _, ym := range months {
+		var exists int
+
+		err := s.db.QueryRowContext(ctx, store.QueryMonthsWithWeatherData,
+			strconv.Itoa(ym.Year),
+			strconv.Itoa(ym.Month),
+		).Scan(&exists)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		withData = append(withData, ym)
+	}
+
+	return withData, nil
+}
+
 func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	if len(columns) == 0 {
 		return errors.New("columns required")
@@ -280,6 +394,39 @@ func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month
 	}
 
 	if err := replaceTableRows(ctx, tx, "flight_performance", columns, rows, true); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Store) ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
+	if len(columns) == 0 {
+		return errors.New("columns required")
+	}
+
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, store.QueryDeleteWeatherObservationsByMonth,
+		strconv.Itoa(year),
+		strconv.Itoa(month),
+	); err != nil {
+		return fmt.Errorf("delete month rows: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return tx.Commit()
+	}
+
+	if err := replaceTableRows(ctx, tx, "weather_observations", columns, rows, true); err != nil {
 		return err
 	}
 

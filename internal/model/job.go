@@ -16,6 +16,8 @@ const (
 
 const JobTypeImportFlightPerformance = "import_flight_performance"
 
+const JobTypeImportWeatherObservations = "import_weather_observations"
+
 const (
 	JobTypeImportCountries = "import_countries"
 	JobTypeImportRegions   = "import_regions"
@@ -40,6 +42,12 @@ type YearMonth struct {
 }
 
 type FlightPerformanceIngestJob struct {
+	JobID string `json:"job_id"`
+	Year  int    `json:"year"`
+	Month int    `json:"month"`
+}
+
+type WeatherIngestJob struct {
 	JobID string `json:"job_id"`
 	Year  int    `json:"year"`
 	Month int    `json:"month"`
