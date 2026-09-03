@@ -31,6 +31,7 @@ type JobResponse struct {
 	Error     string          `json:"error,omitempty"`
 	Year      *int            `json:"year,omitempty"`
 	Month     *int            `json:"month,omitempty"`
+	Stations  []string        `json:"stations,omitempty"`
 	CreatedAt string          `json:"created_at"`
 	UpdatedAt string          `json:"updated_at"`
 	StartedAt *string         `json:"started_at,omitempty"`
@@ -40,7 +41,7 @@ type JobResponse struct {
 // Get returns a single job by ID.
 //
 //	@Summary		Get job by ID
-//	@Description	Returns status and details for a background job. Flight-schedule jobs include year and month when available.
+//	@Description	Returns status and details for a background job. Flight-performance jobs include year and month. Weather jobs include year, month, and stations.
 //	@Tags			jobs,internal
 //	@Produce		json
 //	@Param			id	path		string	true	"Job ID"
@@ -141,19 +142,29 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 		resp.EndedAt = &ended
 	}
 
-	if job.Type != model.JobTypeImportFlightPerformance {
-		return resp, nil
-	}
+	switch job.Type {
+	case model.JobTypeImportFlightPerformance:
+		detail, err := h.store.GetFlightPerformanceIngestJob(ctx, job.ID)
+		if err != nil {
+			return JobResponse{}, err
+		}
 
-	detail, err := h.store.GetFlightPerformanceIngestJob(ctx, job.ID)
-	if err != nil {
-		return JobResponse{}, err
-	}
+		year := detail.Year
+		month := detail.Month
+		resp.Year = &year
+		resp.Month = &month
+	case model.JobTypeImportWeatherObservations:
+		detail, err := h.store.GetWeatherIngestJob(ctx, job.ID)
+		if err != nil {
+			return JobResponse{}, err
+		}
 
-	year := detail.Year
-	month := detail.Month
-	resp.Year = &year
-	resp.Month = &month
+		year := detail.Year
+		month := detail.Month
+		resp.Year = &year
+		resp.Month = &month
+		resp.Stations = detail.Stations
+	}
 
 	return resp, nil
 }

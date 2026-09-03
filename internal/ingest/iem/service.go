@@ -77,6 +77,11 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int, stations []s
 		return ImportResult{}, err
 	}
 
+	dbRows, err = dedupWeatherRows(dbColumns, dbRows)
+	if err != nil {
+		return ImportResult{}, err
+	}
+
 	if err := s.store.ReplaceWeatherObservationsByMonth(ctx, year, month, dbColumns, dbRows); err != nil {
 		return ImportResult{}, fmt.Errorf("load weather: %w", err)
 	}
@@ -141,6 +146,55 @@ func withPartitionKeys(year, month int, columns []string, rows [][]string) ([]st
 	}
 
 	return dbColumns, dbRows, nil
+}
+
+func dedupWeatherRows(columns []string, rows [][]string) ([][]string, error) {
+	stationIdx, validIdx := -1, -1
+
+	for i, col := range columns {
+		switch col {
+		case colStation:
+			stationIdx = i
+		case colValid:
+			validIdx = i
+		}
+	}
+
+	if stationIdx < 0 || validIdx < 0 {
+		return nil, errors.New("station and valid columns required")
+	}
+
+	type key struct {
+		station string
+		valid   string
+	}
+
+	last := make(map[key]int, len(rows))
+
+	for i, row := range rows {
+		if len(row) <= stationIdx || len(row) <= validIdx {
+			return nil, fmt.Errorf("row %d width %d does not include station/valid", i+1, len(row))
+		}
+
+		last[key{station: row[stationIdx], valid: row[validIdx]}] = i
+	}
+
+	if len(last) == len(rows) {
+		return rows, nil
+	}
+
+	out := make([][]string, 0, len(last))
+
+	for i, row := range rows {
+		k := key{station: row[stationIdx], valid: row[validIdx]}
+		if last[k] != i {
+			continue
+		}
+
+		out = append(out, row)
+	}
+
+	return out, nil
 }
 
 // parseIEMValidUTC parses IEM "YYYY-MM-DD HH:MM" (or with seconds) as UTC.

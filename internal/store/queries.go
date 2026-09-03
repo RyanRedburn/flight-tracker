@@ -131,31 +131,150 @@ const (
 		FROM schema_migrations
 		LIMIT 1`
 
-	QueryRoutePerfBase = `
+	QueryRouteStats = `
+		WITH matched AS (
+			SELECT
+				cancelled,
+				diverted,
+				arr_del15,
+				arr_delay_minutes,
+				dep_delay_minutes,
+				carrier_delay,
+				weather_delay,
+				nas_delay,
+				security_delay,
+				late_aircraft_delay,
+				cancellation_code,
+				div1_airport,
+				div2_airport,
+				div3_airport,
+				div4_airport,
+				div5_airport
+			FROM flight_performance
+			WHERE origin = $1
+				AND dest = $2
+				AND flight_date >= $3
+				AND flight_date <= $4
+				/*extra*/
+		),
+		classified AS (
+			SELECT
+				*,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		)
 		SELECT
-			flight_date,
-			day_of_week,
-			origin,
-			dest,
-			iata_code_marketing_airline,
-			flight_number_marketing_airline,
-			crs_dep_time,
-			arr_delay_minutes,
-			dep_delay_minutes,
-			arr_del15,
-			dep_del15,
-			cancelled,
-			cancellation_code,
-			diverted,
-			carrier_delay,
-			weather_delay,
-			nas_delay,
-			security_delay,
-			late_aircraft_delay,
-			div1_airport,
-			div2_airport,
-			div3_airport,
-			div4_airport,
-			div5_airport
-		FROM flight_performance`
+			COUNT(*)::int AS flights,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
+			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
+			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted,
+			AVG(arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS avg_arr,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
+			) AS median_arr,
+			AVG(arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS avg_arr_delayed,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
+			) AS median_arr_delayed,
+			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep,
+			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
+			AVG(COALESCE(carrier_delay, 0)) FILTER (WHERE is_delayed) AS cause_carrier,
+			AVG(COALESCE(weather_delay, 0)) FILTER (WHERE is_delayed) AS cause_weather,
+			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,
+			AVG(COALESCE(security_delay, 0)) FILTER (WHERE is_delayed) AS cause_security,
+			AVG(COALESCE(late_aircraft_delay, 0)) FILTER (WHERE is_delayed) AS cause_late,
+			(
+				SELECT COALESCE(
+					json_agg(json_build_object('airport', airport, 'count', cnt) ORDER BY cnt DESC, airport),
+					'[]'::json
+				)
+				FROM (
+					SELECT btrim(airport) AS airport, COUNT(*)::int AS cnt
+					FROM classified,
+						LATERAL unnest(ARRAY[div1_airport, div2_airport, div3_airport, div4_airport, div5_airport]) AS airport
+					WHERE is_diverted AND airport IS NOT NULL AND btrim(airport) <> ''
+					GROUP BY btrim(airport)
+				) d
+			) AS diversion_airports,
+			(
+				SELECT COALESCE(
+					json_agg(json_build_object('code', code, 'count', cnt) ORDER BY cnt DESC, code),
+					'[]'::json
+				)
+				FROM (
+					SELECT btrim(cancellation_code) AS code, COUNT(*)::int AS cnt
+					FROM classified
+					WHERE is_cancelled AND cancellation_code IS NOT NULL AND btrim(cancellation_code) <> ''
+					GROUP BY btrim(cancellation_code)
+				) c
+			) AS cancellation_codes
+		FROM classified`
+
+	QueryRouteOutlookMaxDate = `
+		SELECT MAX(flight_date)::text
+		FROM flight_performance
+		WHERE origin = $1
+			AND dest = $2
+			AND iata_code_marketing_airline = $3`
+
+	QueryRouteOutlook = `
+		WITH matched AS (
+			SELECT
+				cancelled,
+				diverted,
+				arr_del15,
+				arr_delay_minutes,
+				dep_delay_minutes
+			FROM flight_performance
+			WHERE origin = $1
+				AND dest = $2
+				AND iata_code_marketing_airline = $3
+				AND flight_date >= $4::date
+				AND flight_date <= $5::date
+				AND day_of_week = $6
+				AND crs_dep_time IS NOT NULL
+				AND crs_dep_time >= 0
+				AND crs_dep_time <= 2359
+				AND (crs_dep_time / 100) BETWEEN 0 AND 23
+				AND (crs_dep_time % 100) BETWEEN 0 AND 59
+				AND LEAST(
+					ABS(((crs_dep_time / 100) * 60 + (crs_dep_time % 100)) - $7),
+					1440 - ABS(((crs_dep_time / 100) * 60 + (crs_dep_time % 100)) - $7)
+				) <= $8
+		),
+		classified AS (
+			SELECT
+				*,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		)
+		SELECT
+			COUNT(*)::int AS sample_size,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
+			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
+			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted,
+			AVG(arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS avg_arr,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
+			) AS median_arr,
+			AVG(arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS avg_arr_delayed,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
+			) AS median_arr_delayed,
+			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep
+		FROM classified`
 )

@@ -72,6 +72,23 @@ func TestParseSuccess(t *testing.T) {
 	}
 }
 
+func TestParseBareQuoteInUnquotedField(t *testing.T) {
+	csv := "station,metar\nORD,KORD 010051Z 5\" SN\n"
+
+	columns, rows, err := Parse(strings.NewReader(csv), []string{"station", "metar"}, identityMapper)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	if len(columns) != 2 || len(rows) != 1 {
+		t.Fatalf("columns = %v rows = %d", columns, len(rows))
+	}
+
+	if rows[0][0] != "ORD" || rows[0][1] != "KORD 010051Z 5\" SN" {
+		t.Errorf("rows[0] = %v", rows[0])
+	}
+}
+
 func TestParseSkipsUnmappedHeaders(t *testing.T) {
 	skipExtra := func(raw string) string {
 		col := identityMapper(raw)

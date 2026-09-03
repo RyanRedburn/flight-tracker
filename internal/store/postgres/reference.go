@@ -73,34 +73,12 @@ func (s *Store) replaceReferenceTable(
 	columns []string,
 	rows [][]string,
 ) error {
-	if len(columns) == 0 {
-		return errors.New("columns required")
-	}
-
 	table, err := dataset.Table()
 	if err != nil {
 		return err
 	}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, deleteQuery); err != nil {
-		return fmt.Errorf("delete %s rows: %w", table, err)
-	}
-
-	if err := replaceTableRows(ctx, tx, table, columns, rows, true); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
+	return s.replaceTable(ctx, deleteQuery, nil, table, columns, rows)
 }
 
 func isReferenceJobType(jobType string) bool {
