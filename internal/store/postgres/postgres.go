@@ -17,11 +17,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/jmoiron/sqlx"
 )
 
 type Store struct {
-	db *sqlx.DB
+	db *sql.DB
 }
 
 func Open(ctx context.Context, dsn, migrationsPath string) (store.Store, error) {
@@ -34,7 +33,7 @@ func Open(ctx context.Context, dsn, migrationsPath string) (store.Store, error) 
 		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 
-	db, err := sqlx.Open("pgx", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}
@@ -81,7 +80,7 @@ func (s *Store) CreateJob(ctx context.Context, job *model.Job) error {
 }
 
 func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
-	row := s.db.QueryRowxContext(ctx, store.QueryGetJob, id)
+	row := s.db.QueryRowContext(ctx, store.QueryGetJob, id)
 	job, err := scanJob(row)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -92,7 +91,7 @@ func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
 }
 
 func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
-	rows, err := s.db.QueryxContext(ctx, store.QueryListJobs, limit)
+	rows, err := s.db.QueryContext(ctx, store.QueryListJobs, limit)
 	if err != nil {
 		return nil, err
 	}

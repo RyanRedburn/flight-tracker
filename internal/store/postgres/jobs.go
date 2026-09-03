@@ -25,7 +25,7 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 		UpdatedAt: now,
 	}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
@@ -49,7 +49,7 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
 	var detail model.FlightPerformanceIngestJob
 
-	err := s.db.QueryRowxContext(ctx, store.QueryGetFlightPerformanceIngestJob, jobID).Scan(
+	err := s.db.QueryRowContext(ctx, store.QueryGetFlightPerformanceIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
@@ -84,7 +84,7 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 		UpdatedAt: now,
 	}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
@@ -110,7 +110,7 @@ func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.W
 
 	var stationsJSON []byte
 
-	err := s.db.QueryRowxContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(
+	err := s.db.QueryRowContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
@@ -132,13 +132,13 @@ func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.W
 }
 
 func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
-	tx, err := s.db.BeginTxx(ctx, nil)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	row := tx.QueryRowxContext(ctx, store.QueryClaimNextPendingJobSelect, string(model.JobStatusPending))
+	row := tx.QueryRowContext(ctx, store.QueryClaimNextPendingJobSelect, string(model.JobStatusPending))
 
 	job, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -240,7 +240,7 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 		return nil, nil
 	}
 
-	rows, err := s.db.QueryxContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
+	rows, err := s.db.QueryContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
 	)
@@ -280,7 +280,7 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 }
 
 func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	rows, err := s.db.QueryxContext(ctx, store.QueryActiveWeatherIngestMonths,
+	rows, err := s.db.QueryContext(ctx, store.QueryActiveWeatherIngestMonths,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
 	)

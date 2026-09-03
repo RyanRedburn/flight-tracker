@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Store) DistinctFlightAirportCodes(ctx context.Context) ([]string, error) {
-	rows, err := s.db.QueryxContext(ctx, store.QueryDistinctFlightAirportCodes)
+	rows, err := s.db.QueryContext(ctx, store.QueryDistinctFlightAirportCodes)
 	if err != nil {
 		return nil, fmt.Errorf("query distinct flight airports: %w", err)
 	}
