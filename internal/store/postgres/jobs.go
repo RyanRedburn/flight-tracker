@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -387,72 +386,6 @@ func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMo
 	return withData, nil
 }
 
-func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
-	if len(columns) == 0 {
-		return errors.New("columns required")
-	}
-
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryDeleteFlightPerformanceByMonth,
-		strconv.Itoa(year),
-		strconv.Itoa(month),
-	); err != nil {
-		return fmt.Errorf("delete month rows: %w", err)
-	}
-
-	if len(rows) == 0 {
-		return tx.Commit()
-	}
-
-	if err := replaceTableRows(ctx, tx, "flight_performance", columns, rows, true); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
-}
-
-func (s *Store) ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
-	if len(columns) == 0 {
-		return errors.New("columns required")
-	}
-
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryDeleteWeatherObservationsByMonth,
-		strconv.Itoa(year),
-		strconv.Itoa(month),
-	); err != nil {
-		return fmt.Errorf("delete month rows: %w", err)
-	}
-
-	if len(rows) == 0 {
-		return tx.Commit()
-	}
-
-	if err := replaceTableRows(ctx, tx, "weather_observations", columns, rows, true); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
-}
-
 func execCreateJob(ctx context.Context, exec sqlExecContext, job *model.Job) error {
 	var errMsg sql.NullString
 	if job.Error != "" {
@@ -489,8 +422,4 @@ func expectOneRowAffected(res sql.Result, conflictErr error) error {
 	}
 
 	return nil
-}
-
-func quoteIdent(name string) string {
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

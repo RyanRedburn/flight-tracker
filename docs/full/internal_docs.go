@@ -323,7 +323,7 @@ const docTemplateinternal = `{
         },
         "/api/v1/jobs/{id}": {
             "get": {
-                "description": "Returns status and details for a background job. Flight-schedule jobs include year and month when available.",
+                "description": "Returns status and details for a background job. Flight-performance jobs include year and month. Weather jobs include year, month, and stations.",
                 "produces": [
                     "application/json"
                 ],
@@ -712,6 +712,12 @@ const docTemplateinternal = `{
                 },
                 "started_at": {
                     "type": "string"
+                },
+                "stations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status": {
                     "$ref": "#/definitions/model.JobStatus"

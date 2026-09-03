@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -126,6 +127,117 @@ func TestImportResultJSON(t *testing.T) {
 
 	if decoded[jsonKeyRows] != float64(42) {
 		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
+	}
+}
+
+func TestDedupWeatherRowsLastWins(t *testing.T) {
+	columns := []string{colYear, colMonth, colStation, colValid, colTmpf}
+	rows := [][]string{
+		{"2024", "1", testStationORD, testValidTimestamp, "32.00"},
+		{"2024", "1", testStationJFK, testValidTimestamp, "36.00"},
+		{"2024", "1", testStationORD, testValidTimestamp, "33.00"},
+	}
+
+	got, err := dedupWeatherRows(columns, rows)
+	if err != nil {
+		t.Fatalf("dedupWeatherRows() error = %v", err)
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+
+	if got[0][2] != testStationJFK {
+		t.Errorf("first remaining station = %q, want JFK", got[0][2])
+	}
+
+	if got[1][2] != testStationORD || got[1][4] != "33.00" {
+		t.Errorf("ORD row = %v, want last-wins tmpf 33.00", got[1])
+	}
+}
+
+func TestDedupWeatherRowsNoDuplicates(t *testing.T) {
+	columns := []string{colStation, colValid}
+	rows := [][]string{
+		{testStationORD, testValidTimestamp},
+		{testStationJFK, testValidTimestamp},
+	}
+
+	got, err := dedupWeatherRows(columns, rows)
+	if err != nil {
+		t.Fatalf("dedupWeatherRows() error = %v", err)
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want 2", len(got))
+	}
+}
+
+func TestServiceImportMonthDedup(t *testing.T) {
+	ctx := context.Background()
+
+	var gotRows [][]string
+
+	st := &storetest.Stub{
+		ReplaceWeatherObservationsByMonthFn: func(_ context.Context, _ int, _ int, _ []string, rows [][]string) error {
+			gotRows = rows
+
+			return nil
+		},
+	}
+
+	opener := func(context.Context, int, int, []string) (string, func(), error) {
+		file, err := os.CreateTemp(t.TempDir(), "asos-dup-*.csv")
+		if err != nil {
+			t.Fatalf("CreateTemp() error = %v", err)
+		}
+
+		const csvBody = "station,valid,tmpf,dwpf,relh,drct,sknt,gust,vsby,skyc1,skyc2,skyc3,skyl1,skyl2,skyl3,wxcodes,p01i,alti,mslp,metar\n" +
+			"ORD,2024-01-01 00:51,32.00,28.00,84.98,310.00,11.00,,10.00,OVC,,,1500.00,,,-SN,0.0001,30.05,1018.20,KORD first\n" +
+			"ORD,2024-01-01 00:51,33.00,28.00,84.98,310.00,11.00,,10.00,OVC,,,1500.00,,,-SN,0.0001,30.05,1018.20,KORD second\n"
+
+		if _, err := file.WriteString(csvBody); err != nil {
+			t.Fatalf("WriteString() error = %v", err)
+		}
+
+		if err := file.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+
+		return file.Name(), func() {}, nil
+	}
+
+	svc := NewService(st, nil).WithCSVOpener(opener)
+
+	result, err := svc.ImportMonth(ctx, 2024, 1, []string{testStationORD})
+	if err != nil {
+		t.Fatalf("ImportMonth() error = %v", err)
+	}
+
+	if result.RowsImported != 1 {
+		t.Fatalf("RowsImported = %d, want 1", result.RowsImported)
+	}
+
+	if len(gotRows) != 1 {
+		t.Fatalf("len(gotRows) = %d, want 1", len(gotRows))
+	}
+
+	metarIdx := -1
+
+	for i, col := range DBColumns {
+		if col == colMetar {
+			metarIdx = i
+
+			break
+		}
+	}
+
+	if metarIdx < 0 {
+		t.Fatal("metar column missing")
+	}
+
+	if gotRows[0][metarIdx] != "KORD second" {
+		t.Errorf("metar = %q, want last-wins KORD second", gotRows[0][metarIdx])
 	}
 }
 

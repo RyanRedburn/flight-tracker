@@ -153,6 +153,61 @@ func TestJobsGetEnrichedFlightPerformanceIngest(t *testing.T) {
 	}
 }
 
+func TestJobsGetEnrichedWeatherIngest(t *testing.T) {
+	const jobID = "job-weather-1"
+
+	now := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	h := NewJobsHandler(&storetest.Stub{
+		GetJobFn: func(_ context.Context, id string) (*model.Job, error) {
+			return &model.Job{
+				ID:        id,
+				Type:      model.JobTypeImportWeatherObservations,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+		GetWeatherIngestJobFn: func(_ context.Context, id string) (*model.WeatherIngestJob, error) {
+			return &model.WeatherIngestJob{
+				JobID:    id,
+				Year:     2024,
+				Month:    1,
+				Stations: []string{"ORD", "JFK"},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobID, nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", jobID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Get(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	var body JobResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Year == nil || *body.Year != 2024 {
+		t.Errorf("year = %v, want 2024", body.Year)
+	}
+
+	if body.Month == nil || *body.Month != 1 {
+		t.Errorf("month = %v, want 1", body.Month)
+	}
+
+	if len(body.Stations) != 2 || body.Stations[0] != "ORD" || body.Stations[1] != "JFK" {
+		t.Errorf("stations = %v, want [ORD JFK]", body.Stations)
+	}
+}
+
 func TestJobsList(t *testing.T) {
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 

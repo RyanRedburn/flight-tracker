@@ -14,7 +14,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -132,83 +132,6 @@ func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
 	return err
 }
 
-func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
-	rows, err := s.queryFlightPerf(ctx, filter.Origin, filter.Dest, filter.StartDate, filter.EndDate, filter.Carrier, filter.FlightNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	return store.AggregateRouteStats(filter, rows), nil
-}
-
-func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-	rows, err := s.queryFlightPerf(ctx, filter.Origin, filter.Dest, "", "", filter.Carrier, "")
-	if err != nil {
-		return nil, err
-	}
-
-	return store.AggregateRouteOutlook(filter, rows), nil
-}
-
-func (s *Store) queryFlightPerf(ctx context.Context, origin, dest, startDate, endDate, carrier, flightNumber string) ([]store.FlightPerf, error) {
-	query := store.QueryRoutePerfBase
-	args := make([]any, 0, 6)
-	where := make([]string, 0, 6)
-	n := 1
-
-	where = append(where, fmt.Sprintf("origin = $%d", n))
-	args = append(args, origin)
-	n++
-
-	where = append(where, fmt.Sprintf("dest = $%d", n))
-	args = append(args, dest)
-	n++
-
-	if startDate != "" {
-		where = append(where, fmt.Sprintf("flight_date >= $%d", n))
-		args = append(args, startDate)
-		n++
-	}
-
-	if endDate != "" {
-		where = append(where, fmt.Sprintf("flight_date <= $%d", n))
-		args = append(args, endDate)
-		n++
-	}
-
-	if carrier != "" {
-		where = append(where, fmt.Sprintf("iata_code_marketing_airline = $%d", n))
-		args = append(args, carrier)
-		n++
-	}
-
-	if flightNumber != "" {
-		where = append(where, fmt.Sprintf("flight_number_marketing_airline = $%d", n))
-		args = append(args, flightNumber)
-	}
-
-	query += "\n\t\tWHERE " + strings.Join(where, " AND ")
-
-	rows, err := s.db.QueryxContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []store.FlightPerf
-
-	for rows.Next() {
-		perf, err := scanFlightPerf(rows)
-		if err != nil {
-			return nil, err
-		}
-
-		out = append(out, perf)
-	}
-
-	return out, rows.Err()
-}
-
 type rowScanner interface {
 	Scan(dest ...any) error
 }
@@ -264,101 +187,6 @@ func scanJob(row rowScanner) (*model.Job, error) {
 	return &job, nil
 }
 
-func scanFlightPerf(row rowScanner) (store.FlightPerf, error) {
-	var (
-		flightDate        sql.NullString
-		dayOfWeek         sql.NullString
-		origin            sql.NullString
-		dest              sql.NullString
-		carrier           sql.NullString
-		flightNumber      sql.NullString
-		crsDep            sql.NullString
-		arrDelayMinutes   sql.NullString
-		depDelayMinutes   sql.NullString
-		arrDel15          sql.NullString
-		depDel15          sql.NullString
-		cancelled         sql.NullString
-		cancellationCode  sql.NullString
-		diverted          sql.NullString
-		carrierDelay      sql.NullString
-		weatherDelay      sql.NullString
-		nasDelay          sql.NullString
-		securityDelay     sql.NullString
-		lateAircraftDelay sql.NullString
-		div1              sql.NullString
-		div2              sql.NullString
-		div3              sql.NullString
-		div4              sql.NullString
-		div5              sql.NullString
-	)
-
-	if err := row.Scan(
-		&flightDate,
-		&dayOfWeek,
-		&origin,
-		&dest,
-		&carrier,
-		&flightNumber,
-		&crsDep,
-		&arrDelayMinutes,
-		&depDelayMinutes,
-		&arrDel15,
-		&depDel15,
-		&cancelled,
-		&cancellationCode,
-		&diverted,
-		&carrierDelay,
-		&weatherDelay,
-		&nasDelay,
-		&securityDelay,
-		&lateAircraftDelay,
-		&div1,
-		&div2,
-		&div3,
-		&div4,
-		&div5,
-	); err != nil {
-		return store.FlightPerf{}, err
-	}
-
-	return store.FlightPerf{
-		FlightDate:        nullString(flightDate),
-		DayOfWeek:         nullString(dayOfWeek),
-		Origin:            nullString(origin),
-		Dest:              nullString(dest),
-		Carrier:           nullString(carrier),
-		FlightNumber:      nullString(flightNumber),
-		CRSDepTime:        nullString(crsDep),
-		ArrDelayMinutes:   nullString(arrDelayMinutes),
-		DepDelayMinutes:   nullString(depDelayMinutes),
-		ArrDel15:          nullString(arrDel15),
-		DepDel15:          nullString(depDel15),
-		Cancelled:         nullString(cancelled),
-		CancellationCode:  nullString(cancellationCode),
-		Diverted:          nullString(diverted),
-		CarrierDelay:      nullString(carrierDelay),
-		WeatherDelay:      nullString(weatherDelay),
-		NASDelay:          nullString(nasDelay),
-		SecurityDelay:     nullString(securityDelay),
-		LateAircraftDelay: nullString(lateAircraftDelay),
-		DivAirports: [5]string{
-			nullString(div1),
-			nullString(div2),
-			nullString(div3),
-			nullString(div4),
-			nullString(div5),
-		},
-	}, nil
-}
-
-func nullString(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-
-	return ""
-}
-
 func nullJSON(b json.RawMessage) any {
 	if len(b) == 0 {
 		return nil
@@ -378,7 +206,7 @@ func nullTime(t *time.Time) sql.NullTime {
 func runMigrations(migrationsPath, databaseURL string) error {
 	migrationsURL := toFileURL(migrationsPath)
 
-	m, err := migrate.New(migrationsURL, databaseURL)
+	m, err := migrate.New(migrationsURL, toPgx5URL(databaseURL))
 	if err != nil {
 		return err
 	}
@@ -401,4 +229,14 @@ func toFileURL(path string) string {
 	}
 
 	return "file://" + path
+}
+
+func toPgx5URL(databaseURL string) string {
+	for _, prefix := range []string{"postgres://", "postgresql://"} {
+		if rest, ok := strings.CutPrefix(databaseURL, prefix); ok {
+			return "pgx5://" + rest
+		}
+	}
+
+	return databaseURL
 }

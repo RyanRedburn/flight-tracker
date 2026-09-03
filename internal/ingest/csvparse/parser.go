@@ -21,6 +21,7 @@ func Parse(r io.Reader, columns []string, mapper HeaderMapper) (cols []string, r
 	reader := csv.NewReader(r)
 	reader.ReuseRecord = true
 	reader.FieldsPerRecord = -1
+	reader.LazyQuotes = true
 
 	header, err := reader.Read()
 	if err != nil {

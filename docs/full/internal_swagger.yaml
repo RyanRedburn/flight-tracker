@@ -56,6 +56,10 @@ definitions:
         type: array
       started_at:
         type: string
+      stations:
+        items:
+          type: string
+        type: array
       status:
         $ref: '#/definitions/model.JobStatus'
       type:
@@ -563,8 +567,8 @@ paths:
       - internal
   /api/v1/jobs/{id}:
     get:
-      description: Returns status and details for a background job. Flight-schedule
-        jobs include year and month when available.
+      description: Returns status and details for a background job. Flight-performance
+        jobs include year and month. Weather jobs include year, month, and stations.
       parameters:
       - description: Job ID
         in: path
