@@ -35,7 +35,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		cancelJSON       []byte
 	)
 
-	err := s.db.QueryRowxContext(ctx, query, args...).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&stats.Flights,
 		&stats.OnTime,
 		&stats.Delayed,
@@ -140,7 +140,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		avgDep           sql.NullFloat64
 	)
 
-	err = s.db.QueryRowxContext(ctx, store.QueryRouteOutlook,
+	err = s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,
