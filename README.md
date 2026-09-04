@@ -222,7 +222,7 @@ Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field
 #### Weather stations (`POST /api/v1/ingest/weather-stations`)
 
 - Creates one `import_weather_stations` job.
-- Workers download US IEM ASOS GeoJSON, full-replace `weather_stations`, and rebuild `airport_weather_stations` from distinct BTS `origin`/`dest` codes (exact uppercase `sid` match). Unmatched airports are stored as rows with `matched = false`.
+- Workers download US IEM ASOS GeoJSON, full-replace `weather_stations`, and rebuild `airport_weather_stations` from distinct BTS `origin`/`dest` codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. If airports reference data is missing, matching falls back to exact IATA=`sid` only. Unmatched airports are stored as rows with `matched = false`.
 - Empty BTS data still replaces the catalog; the mapping table is empty and the job succeeds.
 - Returns **409** if a pending/running job already exists for this dataset.
 - Returns **409** if mapping tables already have rows and `force` is not set.

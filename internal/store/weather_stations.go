@@ -10,3 +10,11 @@ type AirportWeatherStation struct {
 	Matched     bool
 	UpdatedAt   time.Time
 }
+
+// AirportIdentifiers are OurAirports codes used to resolve an IEM ASOS sid.
+type AirportIdentifiers struct {
+	IATACode  string
+	LocalCode string
+	ICAOCode  string
+	Ident     string
+}

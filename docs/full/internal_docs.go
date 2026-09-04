@@ -279,7 +279,7 @@ const docTemplateinternal = `{
         },
         "/api/v1/ingest/weather-stations": {
             "post": {
-                "description": "Queues an import of the US IEM ASOS station catalog and a BTS airport mapping (including unmatched airports). An empty body is treated as {\"force\":false}. Set force=true to replace existing mapping tables.",
+                "description": "Queues an import of the US IEM ASOS station catalog and a BTS airport mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA, then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty body is treated as {\"force\":false}. Set force=true to replace existing mapping tables.",
                 "consumes": [
                     "application/json"
                 ],

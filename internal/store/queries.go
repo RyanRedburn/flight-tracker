@@ -118,6 +118,11 @@ const (
 		) AS airports
 		ORDER BY code`
 
+	QueryListAirportIdentifiersByIATA = `
+		SELECT iata_code, local_code, icao_code, ident
+		FROM airports
+		WHERE iata_code = ANY($1)`
+
 	QueryDeleteAllCountries = `DELETE FROM countries`
 	QueryDeleteAllRegions   = `DELETE FROM regions`
 	QueryDeleteAllAirports  = `DELETE FROM airports`

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -136,7 +137,18 @@ func (s *Service) ImportStations(ctx context.Context) (StationsImportResult, err
 		return StationsImportResult{}, fmt.Errorf("list flight airports: %w", err)
 	}
 
-	mapping := mapFlightAirports(flightCodes, catalog)
+	refs, err := s.store.ListAirportIdentifiersByIATA(ctx, flightCodes)
+	if err != nil {
+		return StationsImportResult{}, fmt.Errorf("list airport identifiers: %w", err)
+	}
+
+	if len(flightCodes) > 0 && len(refs) == 0 {
+		slog.Default().Warn("weather stations ingest: no OurAirports identifiers for flight codes; matching IEM sid to BTS code only",
+			"flight_airport_count", len(flightCodes),
+		)
+	}
+
+	mapping := mapFlightAirports(flightCodes, catalog, refs)
 	stationRows := encodeWeatherStations(catalog)
 	mappingRows := encodeAirportWeatherStations(mapping, time.Now().UTC())
 

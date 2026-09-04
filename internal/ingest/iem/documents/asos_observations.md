@@ -28,7 +28,7 @@ IEM CSV; they are injected at import time for month-scoped replace.
 | ------ | ----------- |
 | year | Calendar year of the ingest partition (UTC month of `valid`). Used with `month` for delete-and-replace. |
 | month | Calendar month of the ingest partition (1–12). |
-| station | IEM site identifier (three or four characters). For most CONUS airports this matches the FAA/IATA code used by BTS `origin`/`dest` (e.g. `ORD`, not `KORD`). Alaska, Hawaii, and territories may differ. |
+| station | IEM site identifier (three or four characters). Weather-stations ingest stores the resolved sid on `airport_weather_stations.iem_sid`: BTS/IATA first (`ORD`), then OurAirports FAA `local_code` (`AZA`→`IWA`), then ICAO/ident (`HNL`→`PHNL`). Join observations on `iem_sid`, not the BTS airport code. |
 | valid | Observation timestamp (`TIMESTAMPTZ`, stored as UTC). Source CSV values look like `YYYY-MM-DD HH:MM` in the requested timezone. |
 | tmpf | Air temperature, typically at 2 meters. Degrees Fahrenheit. |
 | dwpf | Dew point temperature, typically at 2 meters. Degrees Fahrenheit. |

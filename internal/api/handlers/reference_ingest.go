@@ -88,7 +88,7 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 // CreateWeatherStations queues an IEM ASOS catalog and BTS airport mapping ingest job.
 //
 //	@Summary		Queue weather station mapping ingest
-//	@Description	Queues an import of the US IEM ASOS station catalog and a BTS airport mapping (including unmatched airports). An empty body is treated as {"force":false}. Set force=true to replace existing mapping tables.
+//	@Description	Queues an import of the US IEM ASOS station catalog and a BTS airport mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA, then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty body is treated as {"force":false}. Set force=true to replace existing mapping tables.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json

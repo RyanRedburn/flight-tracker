@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -295,6 +296,11 @@ func TestServiceImportStations(t *testing.T) {
 		DistinctFlightAirportCodesFn: func(context.Context) ([]string, error) {
 			return []string{testStationORD, testStationXYZ}, nil
 		},
+		ListAirportIdentifiersByIATAFn: func(context.Context, []string) (map[string]store.AirportIdentifiers, error) {
+			return map[string]store.AirportIdentifiers{
+				testStationORD: {IATACode: testStationORD, LocalCode: testStationORD},
+			}, nil
+		},
 		ReplaceWeatherStationsFn: func(_ context.Context, _ []string, stations [][]string, _ []string, mapping [][]string) error {
 			stationRows = stations
 			mappingRows = mapping
@@ -353,6 +359,9 @@ func TestServiceImportStationsEmptyBTS(t *testing.T) {
 		DistinctFlightAirportCodesFn: func(context.Context) ([]string, error) {
 			return nil, nil
 		},
+		ListAirportIdentifiersByIATAFn: func(context.Context, []string) (map[string]store.AirportIdentifiers, error) {
+			return map[string]store.AirportIdentifiers{}, nil
+		},
 		ReplaceWeatherStationsFn: func(_ context.Context, _ []string, _ [][]string, _ []string, mapping [][]string) error {
 			mappingRows = mapping
 
@@ -375,5 +384,57 @@ func TestServiceImportStationsEmptyBTS(t *testing.T) {
 
 	if len(mappingRows) != 0 {
 		t.Fatalf("mappingRows = %v, want empty", mappingRows)
+	}
+}
+
+func TestServiceImportStationsUsesICAOAlias(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			testGeoJSONFeatures: []map[string]any{
+				{
+					testGeoJSONProperties: map[string]any{
+						testGeoJSONSID:     testStationPHNL,
+						testGeoJSONNetwork: "HI_ASOS",
+						testGeoJSONTzName:  testTzHonolulu,
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	var mappingRows [][]string
+
+	st := &storetest.Stub{
+		DistinctFlightAirportCodesFn: func(context.Context) ([]string, error) {
+			return []string{testStationHNL}, nil
+		},
+		ListAirportIdentifiersByIATAFn: func(context.Context, []string) (map[string]store.AirportIdentifiers, error) {
+			return map[string]store.AirportIdentifiers{
+				testStationHNL: {IATACode: testStationHNL, ICAOCode: testStationPHNL, Ident: testStationPHNL},
+			}, nil
+		},
+		ReplaceWeatherStationsFn: func(_ context.Context, _ []string, _ [][]string, _ []string, mapping [][]string) error {
+			mappingRows = mapping
+
+			return nil
+		},
+	}
+
+	catalog := NewNetworkCatalog(server.URL, 0)
+	catalog.networks = []string{testNetworkILASOS}
+	svc := NewService(st, nil).WithCatalog(catalog)
+
+	result, err := svc.ImportStations(context.Background())
+	if err != nil {
+		t.Fatalf("ImportStations() error = %v", err)
+	}
+
+	if result.MatchedAirports != 1 || result.UnmatchedAirports != 0 {
+		t.Fatalf("result = %+v, want HNL matched via PHNL", result)
+	}
+
+	if len(mappingRows) != 1 || mappingRows[0][0] != testStationHNL || mappingRows[0][1] != testStationPHNL || mappingRows[0][3] != "true" {
+		t.Fatalf("mappingRows = %v, want HNL→PHNL", mappingRows)
 	}
 }

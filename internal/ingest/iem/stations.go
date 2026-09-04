@@ -84,7 +84,7 @@ func (r *StationResolver) Resolve(ctx context.Context) (stations []string, unmat
 	return stations, unmatched, nil
 }
 
-func mapFlightAirports(flightCodes []string, catalog map[string]Station) []store.AirportWeatherStation {
+func mapFlightAirports(flightCodes []string, catalog map[string]Station, refs map[string]store.AirportIdentifiers) []store.AirportWeatherStation {
 	rows := make([]store.AirportWeatherStation, 0, len(flightCodes))
 	seen := make(map[string]struct{}, len(flightCodes))
 
@@ -101,7 +101,7 @@ func mapFlightAirports(flightCodes []string, catalog map[string]Station) []store
 		seen[code] = struct{}{}
 
 		row := store.AirportWeatherStation{AirportCode: code}
-		if station, ok := catalog[code]; ok {
+		if station, ok := lookupStation(catalog, stationCandidates(code, refs)); ok {
 			row.Matched = true
 			row.IEMSID = station.SID
 			row.TzName = station.TzName
@@ -115,4 +115,45 @@ func mapFlightAirports(flightCodes []string, catalog map[string]Station) []store
 	})
 
 	return rows
+}
+
+func stationCandidates(code string, refs map[string]store.AirportIdentifiers) []string {
+	out := make([]string, 0, 4)
+	seen := make(map[string]struct{}, 4)
+
+	add := func(v string) {
+		v = strings.ToUpper(strings.TrimSpace(v))
+		if v == "" {
+			return
+		}
+
+		if _, ok := seen[v]; ok {
+			return
+		}
+
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+
+	add(code)
+
+	if refs != nil {
+		if ref, ok := refs[code]; ok {
+			add(ref.LocalCode)
+			add(ref.ICAOCode)
+			add(ref.Ident)
+		}
+	}
+
+	return out
+}
+
+func lookupStation(catalog map[string]Station, candidates []string) (Station, bool) {
+	for _, candidate := range candidates {
+		if station, ok := catalog[candidate]; ok {
+			return station, true
+		}
+	}
+
+	return Station{}, false
 }

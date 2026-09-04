@@ -22,7 +22,7 @@ func TestMapFlightAirports(t *testing.T) {
 		testStationATL: {SID: testStationATL, TzName: "America/New_York"},
 	}
 
-	rows := mapFlightAirports([]string{"ord", testStationXYZ, testStationJFK, "ord"}, catalog)
+	rows := mapFlightAirports([]string{"ord", testStationXYZ, testStationJFK, "ord"}, catalog, nil)
 	if len(rows) != 3 {
 		t.Fatalf("len(rows) = %d, want 3", len(rows))
 	}
@@ -37,6 +37,106 @@ func TestMapFlightAirports(t *testing.T) {
 
 	if rows[2].AirportCode != testStationXYZ || rows[2].Matched || rows[2].IEMSID != "" || rows[2].TzName != "" {
 		t.Fatalf("row[2] = %+v, want unmatched XYZ", rows[2])
+	}
+}
+
+func TestMapFlightAirportsICAOFallback(t *testing.T) {
+	catalog := map[string]Station{
+		testStationPHNL: {SID: testStationPHNL, TzName: testTzHonolulu},
+	}
+	refs := map[string]store.AirportIdentifiers{
+		testStationHNL: {IATACode: testStationHNL, LocalCode: testStationHNL, ICAOCode: testStationPHNL, Ident: testStationPHNL},
+	}
+
+	rows := mapFlightAirports([]string{testStationHNL}, catalog, refs)
+	if len(rows) != 1 {
+		t.Fatalf("len(rows) = %d, want 1", len(rows))
+	}
+
+	if !rows[0].Matched || rows[0].IEMSID != testStationPHNL || rows[0].TzName != testTzHonolulu {
+		t.Fatalf("row = %+v, want matched PHNL", rows[0])
+	}
+}
+
+func TestMapFlightAirportsFAAFallback(t *testing.T) {
+	catalog := map[string]Station{
+		testStationIWA: {SID: testStationIWA, TzName: testTzPhoenix},
+	}
+	refs := map[string]store.AirportIdentifiers{
+		testStationAZA: {IATACode: testStationAZA, LocalCode: testStationIWA, ICAOCode: testStationKIWA, Ident: testStationKIWA},
+	}
+
+	rows := mapFlightAirports([]string{testStationAZA}, catalog, refs)
+	if len(rows) != 1 || !rows[0].Matched || rows[0].IEMSID != testStationIWA {
+		t.Fatalf("row = %+v, want matched IWA", rows)
+	}
+}
+
+func TestMapFlightAirportsPrefersIATAOverFAA(t *testing.T) {
+	catalog := map[string]Station{
+		testStationYUM: {SID: testStationYUM, TzName: testTzPhoenix},
+		testStationNYL: {SID: testStationNYL, TzName: testTzPhoenix},
+	}
+	refs := map[string]store.AirportIdentifiers{
+		testStationYUM: {IATACode: testStationYUM, LocalCode: testStationNYL, ICAOCode: "KNYL", Ident: "KNYL"},
+	}
+
+	rows := mapFlightAirports([]string{testStationYUM}, catalog, refs)
+	if len(rows) != 1 || !rows[0].Matched || rows[0].IEMSID != testStationYUM {
+		t.Fatalf("row = %+v, want matched YUM", rows)
+	}
+}
+
+func TestMapFlightAirportsEmptyRefsExactOnly(t *testing.T) {
+	catalog := map[string]Station{
+		testStationPHNL: {SID: testStationPHNL, TzName: testTzHonolulu},
+		testStationORD:  {SID: testStationORD, TzName: testTzChicago},
+	}
+
+	rows := mapFlightAirports([]string{testStationHNL, testStationORD}, catalog, nil)
+	if len(rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2", len(rows))
+	}
+
+	if rows[0].AirportCode != testStationHNL || rows[0].Matched {
+		t.Fatalf("row[0] = %+v, want unmatched HNL", rows[0])
+	}
+
+	if rows[1].AirportCode != testStationORD || !rows[1].Matched || rows[1].IEMSID != testStationORD {
+		t.Fatalf("row[1] = %+v, want matched ORD", rows[1])
+	}
+}
+
+func TestMapFlightAirportsNoCandidateHit(t *testing.T) {
+	catalog := map[string]Station{
+		testStationORD: {SID: testStationORD, TzName: testTzChicago},
+	}
+	refs := map[string]store.AirportIdentifiers{
+		testStationHNL: {IATACode: testStationHNL, LocalCode: testStationHNL, ICAOCode: testStationPHNL, Ident: testStationPHNL},
+	}
+
+	rows := mapFlightAirports([]string{testStationHNL}, catalog, refs)
+	if len(rows) != 1 || rows[0].Matched || rows[0].IEMSID != "" {
+		t.Fatalf("row = %+v, want unmatched HNL", rows)
+	}
+}
+
+func TestStationCandidatesOrder(t *testing.T) {
+	refs := map[string]store.AirportIdentifiers{
+		testStationAZA: {LocalCode: testStationIWA, ICAOCode: testStationKIWA, Ident: testStationKIWA},
+	}
+
+	got := stationCandidates(testStationAZA, refs)
+	want := []string{testStationAZA, testStationIWA, testStationKIWA}
+
+	if len(got) != len(want) {
+		t.Fatalf("candidates = %v, want %v", got, want)
+	}
+
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("candidates = %v, want %v", got, want)
+		}
 	}
 }
 
