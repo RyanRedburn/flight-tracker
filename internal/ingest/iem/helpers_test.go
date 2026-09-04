@@ -9,18 +9,40 @@ import (
 )
 
 const (
-	testdataRowCount      = 10
-	testStationORD        = "ORD"
-	testStationJFK        = "JFK"
-	testStationATL        = "ATL"
-	testStationDEN        = "DEN"
-	testStationSFO        = "SFO"
-	testStationXYZ        = "XYZ"
-	testNetworkILASOS     = "IL_ASOS"
-	testNetworkNYASOS     = "NY_ASOS"
-	testValidTimestamp    = "2024-01-01T00:51:00Z"
-	testGeoJSONProperties = "properties"
-	testGeoJSONSID        = "sid"
+	testdataRowCount        = 10
+	testStationORD          = "ORD"
+	testStationJFK          = "JFK"
+	testStationATL          = "ATL"
+	testStationDEN          = "DEN"
+	testStationSFO          = "SFO"
+	testStationXYZ          = "XYZ"
+	testStationHNL          = "HNL"
+	testStationPHNL         = "PHNL"
+	testStationAZA          = "AZA"
+	testStationIWA          = "IWA"
+	testStationKIWA         = "KIWA"
+	testStationYUM          = "YUM"
+	testStationNYL          = "NYL"
+	testTzHonolulu          = "Pacific/Honolulu"
+	testTzPhoenix           = "America/Phoenix"
+	testNetworkILASOS       = "IL_ASOS"
+	testValidTimestamp      = "2024-01-01T00:51:00Z"
+	testGeoJSONProperties   = "properties"
+	testGeoJSONSID          = "sid"
+	testGeoJSONNetwork      = "network"
+	testGeoJSONSName        = "sname"
+	testGeoJSONTzName       = "tzname"
+	testGeoJSONArchiveBegin = "archive_begin"
+	testGeoJSONGeometry     = "geometry"
+	testGeoJSONCoordinates  = "coordinates"
+	testGeoJSONFeatures     = "features"
+	testTzChicago           = "America/Chicago"
+	testORDName             = "Chicago OHare"
+	testORDArchiveBegin     = "1946-10-01"
+	testORDLongitude        = -87.9316
+	testORDLatitude         = 41.9602
+	testHHMM0700            = 700
+	testFlightDateWinter    = "2024-01-15"
 )
 
 func fixtureCSVPath(t *testing.T) string {

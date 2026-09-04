@@ -118,6 +118,11 @@ const (
 		) AS airports
 		ORDER BY code`
 
+	QueryListAirportIdentifiersByIATA = `
+		SELECT iata_code, local_code, icao_code, ident
+		FROM airports
+		WHERE iata_code = ANY($1)`
+
 	QueryDeleteAllCountries = `DELETE FROM countries`
 	QueryDeleteAllRegions   = `DELETE FROM regions`
 	QueryDeleteAllAirports  = `DELETE FROM airports`
@@ -125,6 +130,23 @@ const (
 	QueryHasCountriesData = `SELECT 1 FROM countries LIMIT 1`
 	QueryHasRegionsData   = `SELECT 1 FROM regions LIMIT 1`
 	QueryHasAirportsData  = `SELECT 1 FROM airports LIMIT 1`
+
+	QueryDeleteAllWeatherStations        = `DELETE FROM weather_stations`
+	QueryDeleteAllAirportWeatherStations = `DELETE FROM airport_weather_stations`
+
+	QueryHasWeatherStationsData = `
+		SELECT 1
+		FROM (
+			SELECT 1 FROM weather_stations
+			UNION ALL
+			SELECT 1 FROM airport_weather_stations
+		) AS mapping
+		LIMIT 1`
+
+	QueryListAirportWeatherStations = `
+		SELECT airport_code, iem_sid, tzname, matched, updated_at
+		FROM airport_weather_stations
+		ORDER BY airport_code`
 
 	QueryMigrationVersion = `
 		SELECT version, dirty

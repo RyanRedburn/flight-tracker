@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type CSVOpener func(ctx context.Context, year, month int, stations []string) (cs
 type Service struct {
 	store      store.Store
 	downloader *Downloader
+	catalog    *NetworkCatalog
 	openCSV    CSVOpener
 }
 
@@ -36,6 +38,12 @@ func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
 	return s
 }
 
+func (s *Service) WithCatalog(catalog *NetworkCatalog) *Service {
+	s.catalog = catalog
+
+	return s
+}
+
 type ImportResult struct {
 	Year         int `json:"year"`
 	Month        int `json:"month"`
@@ -48,6 +56,27 @@ func (r ImportResult) MarshalJSON() ([]byte, error) {
 		jsonKeyMonth: r.Month,
 		jsonKeyRows:  r.RowsImported,
 	})
+}
+
+type StationsImportResult struct {
+	StationsLoaded    int
+	MatchedAirports   int
+	UnmatchedAirports int
+	Unmatched         []string
+}
+
+func (r StationsImportResult) MarshalJSON() ([]byte, error) {
+	payload := map[string]any{
+		jsonKeyStationsLoaded:    r.StationsLoaded,
+		jsonKeyMatchedAirports:   r.MatchedAirports,
+		jsonKeyUnmatchedAirports: r.UnmatchedAirports,
+	}
+
+	if len(r.Unmatched) > 0 {
+		payload[jsonKeyUnmatched] = r.Unmatched
+	}
+
+	return json.Marshal(payload)
 }
 
 func (s *Service) ImportMonth(ctx context.Context, year, month int, stations []string) (ImportResult, error) {
@@ -90,6 +119,66 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int, stations []s
 		Year:         year,
 		Month:        month,
 		RowsImported: len(dbRows),
+	}, nil
+}
+
+func (s *Service) ImportStations(ctx context.Context) (StationsImportResult, error) {
+	if s.catalog == nil {
+		return StationsImportResult{}, errors.New("iem network catalog not configured")
+	}
+
+	catalog, err := s.catalog.LoadStations(ctx)
+	if err != nil {
+		return StationsImportResult{}, err
+	}
+
+	flightCodes, err := s.store.DistinctFlightAirportCodes(ctx)
+	if err != nil {
+		return StationsImportResult{}, fmt.Errorf("list flight airports: %w", err)
+	}
+
+	refs, err := s.store.ListAirportIdentifiersByIATA(ctx, flightCodes)
+	if err != nil {
+		return StationsImportResult{}, fmt.Errorf("list airport identifiers: %w", err)
+	}
+
+	if len(flightCodes) > 0 && len(refs) == 0 {
+		slog.Default().Warn("weather stations ingest: no OurAirports identifiers for flight codes; matching IEM sid to BTS code only",
+			"flight_airport_count", len(flightCodes),
+		)
+	}
+
+	mapping := mapFlightAirports(flightCodes, catalog, refs)
+	stationRows := encodeWeatherStations(catalog)
+	mappingRows := encodeAirportWeatherStations(mapping, time.Now().UTC())
+
+	if err := s.store.ReplaceWeatherStations(
+		ctx,
+		append([]string(nil), weatherStationColumns...),
+		stationRows,
+		append([]string(nil), airportWeatherStationColumns...),
+		mappingRows,
+	); err != nil {
+		return StationsImportResult{}, fmt.Errorf("load weather stations: %w", err)
+	}
+
+	unmatched := make([]string, 0)
+	matched := 0
+
+	for _, row := range mapping {
+		if row.Matched {
+			matched++
+			continue
+		}
+
+		unmatched = append(unmatched, row.AirportCode)
+	}
+
+	return StationsImportResult{
+		StationsLoaded:    len(catalog),
+		MatchedAirports:   matched,
+		UnmatchedAirports: len(unmatched),
+		Unmatched:         unmatched,
 	}, nil
 }
 

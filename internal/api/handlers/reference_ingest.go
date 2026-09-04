@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
+
+const datasetWeatherStations = "weather_stations"
 
 type ReferenceIngestHandler struct {
 	store store.Store
@@ -45,7 +48,7 @@ type ReferenceIngestResponse struct {
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/countries [post]
 func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.ReferenceCountries)
+	h.createReference(w, r, store.ReferenceCountries)
 }
 
 // CreateRegions queues a regions reference data ingest job.
@@ -62,7 +65,7 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/regions [post]
 func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.ReferenceRegions)
+	h.createReference(w, r, store.ReferenceRegions)
 }
 
 // CreateAirports queues an airports reference data ingest job.
@@ -79,19 +82,48 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/api/v1/ingest/airports [post]
 func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, store.ReferenceAirports)
+	h.createReference(w, r, store.ReferenceAirports)
 }
 
-func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, dataset store.ReferenceDataset) {
-	var req model.ForceIngestRequest
-	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
-		return
-	}
+// CreateWeatherStations queues an IEM ASOS catalog and BTS airport mapping ingest job.
+//
+//	@Summary		Queue weather station mapping ingest
+//	@Description	Queues an import of the US IEM ASOS station catalog and a BTS airport mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA, then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty body is treated as {"force":false}. Set force=true to replace existing mapping tables.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/api/v1/ingest/weather-stations [post]
+func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, model.JobTypeImportWeatherStations, datasetWeatherStations, h.store.HasWeatherStationsData)
+}
 
+func (h *ReferenceIngestHandler) createReference(w http.ResponseWriter, r *http.Request, dataset store.ReferenceDataset) {
 	jobType, err := ourairports.JobType(dataset)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "invalid dataset"})
+		return
+	}
+
+	h.create(w, r, jobType, string(dataset), func(ctx context.Context) (bool, error) {
+		return h.store.HasReferenceData(ctx, dataset)
+	})
+}
+
+func (h *ReferenceIngestHandler) create(
+	w http.ResponseWriter,
+	r *http.Request,
+	jobType string,
+	dataset string,
+	hasData func(context.Context) (bool, error),
+) {
+	var req model.ForceIngestRequest
+	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
@@ -113,16 +145,16 @@ func (h *ReferenceIngestHandler) create(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if !req.Force {
-		hasData, err := h.store.HasReferenceData(ctx, dataset)
+		hasExisting, err := hasData(ctx)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing data"})
 			return
 		}
 
-		if hasData {
+		if hasExisting {
 			writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
 				Error:   "data already exists for this dataset; set force=true to re-import",
-				Dataset: string(dataset),
+				Dataset: dataset,
 			})
 
 			return

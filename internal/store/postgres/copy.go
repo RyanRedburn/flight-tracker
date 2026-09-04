@@ -16,6 +16,14 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
+type tableReplace struct {
+	deleteQuery string
+	deleteArgs  []any
+	table       string
+	columns     []string
+	rows        [][]string
+}
+
 func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	return s.replaceTable(ctx, store.QueryDeleteFlightPerformanceByMonth, []any{
 		strconv.Itoa(year),
@@ -38,8 +46,24 @@ func (s *Store) replaceTable(
 	columns []string,
 	rows [][]string,
 ) error {
-	if len(columns) == 0 {
-		return errors.New("columns required")
+	return s.replaceTables(ctx, tableReplace{
+		deleteQuery: deleteQuery,
+		deleteArgs:  deleteArgs,
+		table:       table,
+		columns:     columns,
+		rows:        rows,
+	})
+}
+
+func (s *Store) replaceTables(ctx context.Context, ops ...tableReplace) error {
+	if len(ops) == 0 {
+		return errors.New("replace operations required")
+	}
+
+	for _, op := range ops {
+		if len(op.columns) == 0 {
+			return errors.New("columns required")
+		}
 	}
 
 	conn, err := s.db.Conn(ctx)
@@ -54,12 +78,18 @@ func (s *Store) replaceTable(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, deleteQuery, deleteArgs...); err != nil {
-		return fmt.Errorf("delete rows: %w", err)
+	for _, op := range ops {
+		if _, err := tx.ExecContext(ctx, op.deleteQuery, op.deleteArgs...); err != nil {
+			return fmt.Errorf("delete rows: %w", err)
+		}
 	}
 
-	if len(rows) > 0 {
-		if err := copyTableRows(ctx, conn, table, columns, rows); err != nil {
+	for _, op := range ops {
+		if len(op.rows) == 0 {
+			continue
+		}
+
+		if err := copyTableRows(ctx, conn, op.table, op.columns, op.rows); err != nil {
 			return err
 		}
 	}

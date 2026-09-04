@@ -226,7 +226,7 @@ const docTemplateinternal = `{
         },
         "/api/v1/ingest/weather": {
             "post": {
-                "description": "Queues one import job per month in the requested range. Provide stations explicitly, or omit stations to resolve from distinct BTS origin/dest codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
+                "description": "Queues one import job per month in the requested range. Provide stations explicitly, or omit stations to resolve from airport_weather_stations (ingest weather-stations first). Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -266,6 +266,58 @@ const docTemplateinternal = `{
                         "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/handlers.WeatherIngestConflictResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ingest/weather-stations": {
+            "post": {
+                "description": "Queues an import of the US IEM ASOS station catalog and a BTS airport mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA, then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty body is treated as {\"force\":false}. Set force=true to replace existing mapping tables.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue weather station mapping ingest",
+                "parameters": [
+                    {
+                        "description": "Optional force flag",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/model.ForceIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestConflictResponse"
                         }
                     },
                     "500": {

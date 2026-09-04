@@ -28,7 +28,7 @@ IEM CSV; they are injected at import time for month-scoped replace.
 | ------ | ----------- |
 | year | Calendar year of the ingest partition (UTC month of `valid`). Used with `month` for delete-and-replace. |
 | month | Calendar month of the ingest partition (1–12). |
-| station | IEM site identifier (three or four characters). For most CONUS airports this matches the FAA/IATA code used by BTS `origin`/`dest` (e.g. `ORD`, not `KORD`). Alaska, Hawaii, and territories may differ. |
+| station | IEM site identifier (three or four characters). Weather-stations ingest stores the resolved sid on `airport_weather_stations.iem_sid`: BTS/IATA first (`ORD`), then OurAirports FAA `local_code` (`AZA`→`IWA`), then ICAO/ident (`HNL`→`PHNL`). Join observations on `iem_sid`, not the BTS airport code. |
 | valid | Observation timestamp (`TIMESTAMPTZ`, stored as UTC). Source CSV values look like `YYYY-MM-DD HH:MM` in the requested timezone. |
 | tmpf | Air temperature, typically at 2 meters. Degrees Fahrenheit. |
 | dwpf | Dew point temperature, typically at 2 meters. Degrees Fahrenheit. |
@@ -53,5 +53,7 @@ IEM CSV; they are injected at import time for month-scoped replace.
 
 - **Ceiling** is not a stored column. Derive it from `skyc*` / `skyl*` (typically the lowest `BKN`/`OVC`/`VV` layer).
 - **BTS `weather_delay`** is carrier-reported delay-cause minutes, not these METAR measurements; do not treat them as the same signal.
-- Joining to BTS flights requires converting local `CRSDepTime` / `DepTime` (`hhmm`) plus `FlightDate` into UTC using the airport timezone before matching on `station` and `valid`.
+- Joining to BTS flights requires converting local `CRSDepTime` / `DepTime` (`hhmm`) plus `FlightDate` into UTC using the airport IANA timezone, then matching on `station` and `valid`. Timezone comes from `airport_weather_stations.tzname` (copied from `weather_stations.tzname` at mapping ingest), not live IEM GeoJSON. Treat `flight_date + make_time(hh, mm, 0)` as a naive timestamp, then `AT TIME ZONE tzname` to get `timestamptz`:
+
+  `((flight_date + make_time((crs_dep_time / 100), (crs_dep_time % 100), 0)) AT TIME ZONE tzname)`
 - IEM also offers fields not stored here (ice accretion, peak wind, snow depth, fourth sky layer, heat index/`feel`). Add columns later if needed.
