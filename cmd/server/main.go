@@ -74,8 +74,9 @@ func run() int {
 	flightPerformanceIngest := bts.NewService(st, btsDownloader)
 
 	iemDownloader := iem.NewDownloader(cfg.IEMASOSBaseURL, cfg.IEMASOSDownloadTimeout)
-	weatherIngest := iem.NewService(st, iemDownloader)
-	weatherStations := iem.NewStationResolver(st, iem.NewNetworkCatalog(cfg.IEMGeoJSONBaseURL, cfg.IEMGeoJSONTimeout), logger)
+	iemCatalog := iem.NewNetworkCatalog(cfg.IEMGeoJSONBaseURL, cfg.IEMGeoJSONTimeout)
+	weatherIngest := iem.NewService(st, iemDownloader).WithCatalog(iemCatalog)
+	weatherStations := iem.NewStationResolver(st, logger)
 
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)
@@ -83,6 +84,7 @@ func run() int {
 	processor := operator.NewProcessor(st,
 		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
 		operator.NewWeatherIngestHandler(st, weatherIngest),
+		operator.NewWeatherStationsHandler(weatherIngest),
 		operator.NewCountriesHandler(oaIngest),
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),

@@ -4,12 +4,13 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, and airport reference data (countries, regions, airports).
+Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, weather station mappings, and airport reference data (countries, regions, airports).
 
 ## Features
 
 - `POST /api/v1/ingest` to queue per-month flight performance import jobs
 - `POST /api/v1/ingest/weather` to queue per-month ASOS/METAR weather observation import jobs
+- `POST /api/v1/ingest/weather-stations` to queue IEM ASOS catalog and BTS airport mapping import
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, booking outlook probabilities, and job status
@@ -138,17 +139,7 @@ curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4,"force":true}'
 
-# Queue weather observation import (auto-resolve stations from BTS airports ∩ IEM ASOS)
-curl -X POST http://localhost:8080/api/v1/ingest/weather \
-  -H "Content-Type: application/json" \
-  -d '{"start_year":2024,"start_month":1}'
-
-# Or provide an explicit station list
-curl -X POST http://localhost:8080/api/v1/ingest/weather \
-  -H "Content-Type: application/json" \
-  -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
-
-# Queue reference data imports (recommended order: countries → regions → airports)
+# Queue reference data imports (recommended order: countries → regions → airports → BTS month → weather-stations → weather)
 curl -X POST http://localhost:8080/api/v1/ingest/countries \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -160,6 +151,21 @@ curl -X POST http://localhost:8080/api/v1/ingest/regions \
 curl -X POST http://localhost:8080/api/v1/ingest/airports \
   -H "Content-Type: application/json" \
   -d '{}'
+
+# Queue weather station catalog + BTS airport mapping (after at least one BTS month)
+curl -X POST http://localhost:8080/api/v1/ingest/weather-stations \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Queue weather observation import (auto-resolve stations from airport_weather_stations)
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1}'
+
+# Or provide an explicit station list
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
 # Re-import reference data that already exists
 curl -X POST http://localhost:8080/api/v1/ingest/airports \
@@ -199,7 +205,7 @@ Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/i
 #### Weather observations (`POST /api/v1/ingest/weather`)
 
 - Creates one `import_weather_observations` job per month in the requested range.
-- `stations` is optional. When omitted, the service resolves IEM site ids from distinct BTS `origin`/`dest` codes intersected with US ASOS GeoJSON metadata. Explicit lists still override.
+- `stations` is optional. When omitted, the service resolves IEM site ids from `airport_weather_stations` (`matched = true`). Ingest weather-stations first. Explicit lists still override.
 - Provided station values are uppercased and de-duplicated.
 - Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
 - `start_year` must be >= 2018 (aligned with flight performance coverage).
@@ -209,9 +215,18 @@ Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/i
 - `force: true` skips the data-exists check; workers always replace the target month on import.
 - Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
 - IEM requests are throttled to about 1 request/second and retried on HTTP 503.
-- Auto-resolve responses may include `unresolved_airports` for BTS codes with no matching IEM ASOS `sid`.
+- Auto-resolve responses may include `unresolved_airports` for mapping rows with `matched = false`. Unmatched BTS airports are persisted in `airport_weather_stations`.
 
 Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field notes: `internal/ingest/iem/documents/asos_observations.md`. `internal/ingest/iem/testdata/` holds a small CSV fixture used by parser and ingest tests.
+
+#### Weather stations (`POST /api/v1/ingest/weather-stations`)
+
+- Creates one `import_weather_stations` job.
+- Workers download US IEM ASOS GeoJSON, full-replace `weather_stations`, and rebuild `airport_weather_stations` from distinct BTS `origin`/`dest` codes (exact uppercase `sid` match). Unmatched airports are stored as rows with `matched = false`.
+- Empty BTS data still replaces the catalog; the mapping table is empty and the job succeeds.
+- Returns **409** if a pending/running job already exists for this dataset.
+- Returns **409** if mapping tables already have rows and `force` is not set.
+- `force: true` skips the data-exists check; workers always replace both tables.
 
 #### Reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
 
@@ -220,7 +235,7 @@ Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field
 - Returns **409** if a pending/running job already exists for that dataset.
 - Returns **409** if the table already has rows and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the full table on import.
-- Recommended load order: **countries → regions → airports** (no FK constraints; order is for data consistency only).
+- Recommended load order: **countries → regions → airports → at least one BTS month → weather-stations → weather observations** (no FK constraints; order is for data consistency only).
 
 Source adapter: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
 

@@ -30,6 +30,38 @@ type NetworkCatalog struct {
 	networks   []string
 }
 
+type geoJSONFeatureCollection struct {
+	Features []geoJSONFeature `json:"features"`
+}
+
+type geoJSONFeature struct {
+	Properties geoJSONProperties `json:"properties"`
+	Geometry   *geoJSONGeometry  `json:"geometry"`
+}
+
+type geoJSONProperties struct {
+	SID          string `json:"sid"`
+	Network      string `json:"network"`
+	SName        string `json:"sname"`
+	TzName       string `json:"tzname"`
+	ArchiveBegin string `json:"archive_begin"`
+}
+
+type geoJSONGeometry struct {
+	Coordinates []float64 `json:"coordinates"`
+}
+
+// Station is one IEM ASOS site from network GeoJSON.
+type Station struct {
+	SID          string
+	Network      string
+	Name         string
+	TzName       string
+	Latitude     *float64
+	Longitude    *float64
+	ArchiveBegin string
+}
+
 func NewNetworkCatalog(baseURL string, timeout time.Duration) *NetworkCatalog {
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = defaultGeoJSONBaseURL
@@ -48,33 +80,44 @@ func NewNetworkCatalog(baseURL string, timeout time.Duration) *NetworkCatalog {
 	}
 }
 
-type geoJSONFeatureCollection struct {
-	Features []struct {
-		Properties struct {
-			SID string `json:"sid"`
-		} `json:"properties"`
-	} `json:"features"`
-}
-
-// LoadStationIDs downloads US ASOS network GeoJSON and returns IEM site ids.
-func (c *NetworkCatalog) LoadStationIDs(ctx context.Context) (map[string]struct{}, error) {
-	ids := make(map[string]struct{})
+// LoadStations downloads US ASOS network GeoJSON and returns stations keyed by uppercase sid.
+func (c *NetworkCatalog) LoadStations(ctx context.Context) (map[string]Station, error) {
+	stations := make(map[string]Station)
 
 	for _, network := range c.networks {
-		networkIDs, err := c.loadNetwork(ctx, network)
+		networkStations, err := c.loadNetworkStations(ctx, network)
 		if err != nil {
 			return nil, err
 		}
 
-		for id := range networkIDs {
-			ids[id] = struct{}{}
+		for sid, station := range networkStations {
+			if _, exists := stations[sid]; exists {
+				continue
+			}
+
+			stations[sid] = station
 		}
+	}
+
+	return stations, nil
+}
+
+// LoadStationIDs downloads US ASOS network GeoJSON and returns IEM site ids.
+func (c *NetworkCatalog) LoadStationIDs(ctx context.Context) (map[string]struct{}, error) {
+	stations, err := c.LoadStations(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make(map[string]struct{}, len(stations))
+	for sid := range stations {
+		ids[sid] = struct{}{}
 	}
 
 	return ids, nil
 }
 
-func (c *NetworkCatalog) loadNetwork(ctx context.Context, network string) (map[string]struct{}, error) {
+func (c *NetworkCatalog) loadNetworkStations(ctx context.Context, network string) (map[string]Station, error) {
 	reqURL := fmt.Sprintf("%s/%s.geojson", c.baseURL, network)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -90,7 +133,7 @@ func (c *NetworkCatalog) loadNetwork(ctx context.Context, network string) (map[s
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Some territory networks may be absent; skip quietly.
-		return map[string]struct{}{}, nil
+		return map[string]Station{}, nil
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -102,15 +145,54 @@ func (c *NetworkCatalog) loadNetwork(ctx context.Context, network string) (map[s
 		return nil, fmt.Errorf("decode geojson for %s: %w", network, err)
 	}
 
-	ids := make(map[string]struct{}, len(payload.Features))
+	stations := make(map[string]Station, len(payload.Features))
 	for _, feature := range payload.Features {
-		sid := strings.ToUpper(strings.TrimSpace(feature.Properties.SID))
-		if sid == "" {
+		station, ok := stationFromFeature(feature, network)
+		if !ok {
 			continue
 		}
 
-		ids[sid] = struct{}{}
+		if _, exists := stations[station.SID]; exists {
+			continue
+		}
+
+		stations[station.SID] = station
 	}
 
-	return ids, nil
+	return stations, nil
+}
+
+func stationFromFeature(feature geoJSONFeature, fallbackNetwork string) (Station, bool) {
+	sid := strings.ToUpper(strings.TrimSpace(feature.Properties.SID))
+	if sid == "" {
+		return Station{}, false
+	}
+
+	network := strings.TrimSpace(feature.Properties.Network)
+	if network == "" {
+		network = fallbackNetwork
+	}
+
+	lat, lon := coordsFromGeometry(feature.Geometry)
+
+	return Station{
+		SID:          sid,
+		Network:      network,
+		Name:         strings.TrimSpace(feature.Properties.SName),
+		TzName:       strings.TrimSpace(feature.Properties.TzName),
+		Latitude:     lat,
+		Longitude:    lon,
+		ArchiveBegin: strings.TrimSpace(feature.Properties.ArchiveBegin),
+	}, true
+}
+
+func coordsFromGeometry(geometry *geoJSONGeometry) (lat, lon *float64) {
+	if geometry == nil || len(geometry.Coordinates) < 2 {
+		return nil, nil
+	}
+
+	lonV := geometry.Coordinates[0]
+	latV := geometry.Coordinates[1]
+
+	return &latV, &lonV
 }

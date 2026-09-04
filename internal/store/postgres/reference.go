@@ -85,7 +85,8 @@ func isReferenceJobType(jobType string) bool {
 	switch jobType {
 	case model.JobTypeImportCountries,
 		model.JobTypeImportRegions,
-		model.JobTypeImportAirports:
+		model.JobTypeImportAirports,
+		model.JobTypeImportWeatherStations:
 		return true
 	default:
 		return false

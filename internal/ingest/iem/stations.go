@@ -12,50 +12,63 @@ import (
 )
 
 var (
-	ErrNoFlightAirports  = errors.New("no flight airport codes found; ingest flight performance data first or provide stations")
-	ErrNoMatchedStations = errors.New("no flight airports matched IEM ASOS station ids")
+	ErrNoFlightAirports        = errors.New("no flight airport codes found; ingest flight performance data first or provide stations")
+	ErrNoMatchedStations       = errors.New("no flight airports matched IEM ASOS station ids")
+	ErrNoWeatherStationMapping = errors.New("no weather station mapping found; ingest weather-stations first or provide stations")
 )
 
-// StationResolver builds a default IEM station list from BTS airports ∩ US ASOS metadata.
+// StationResolver builds a default IEM station list from persisted BTS↔ASOS mapping rows.
 type StationResolver struct {
-	store   store.Store
-	catalog *NetworkCatalog
-	logger  *slog.Logger
+	store  store.Store
+	logger *slog.Logger
 }
 
-func NewStationResolver(s store.Store, catalog *NetworkCatalog, logger *slog.Logger) *StationResolver {
+func NewStationResolver(s store.Store, logger *slog.Logger) *StationResolver {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	return &StationResolver{
-		store:   s,
-		catalog: catalog,
-		logger:  logger,
+		store:  s,
+		logger: logger,
 	}
 }
 
 // Resolve returns matched IEM station ids and unmatched flight airport codes.
 func (r *StationResolver) Resolve(ctx context.Context) (stations []string, unmatched []string, err error) {
-	if r == nil || r.store == nil || r.catalog == nil {
+	if r == nil || r.store == nil {
 		return nil, nil, errors.New("station resolver not configured")
 	}
 
-	flightCodes, err := r.store.DistinctFlightAirportCodes(ctx)
+	rows, err := r.store.ListAirportWeatherStations(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list flight airports: %w", err)
+		return nil, nil, fmt.Errorf("list airport weather stations: %w", err)
 	}
 
-	if len(flightCodes) == 0 {
-		return nil, nil, ErrNoFlightAirports
+	if len(rows) == 0 {
+		return nil, nil, ErrNoWeatherStationMapping
 	}
 
-	iemIDs, err := r.catalog.LoadStationIDs(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load iem station catalog: %w", err)
+	stations = make([]string, 0, len(rows))
+	unmatched = make([]string, 0)
+
+	for _, row := range rows {
+		if !row.Matched {
+			unmatched = append(unmatched, row.AirportCode)
+			continue
+		}
+
+		sid := strings.ToUpper(strings.TrimSpace(row.IEMSID))
+		if sid == "" {
+			sid = strings.ToUpper(strings.TrimSpace(row.AirportCode))
+		}
+
+		stations = append(stations, sid)
 	}
 
-	stations, unmatched = intersectStations(flightCodes, iemIDs)
+	sort.Strings(stations)
+	sort.Strings(unmatched)
+
 	if len(stations) == 0 {
 		return nil, unmatched, ErrNoMatchedStations
 	}
@@ -71,10 +84,8 @@ func (r *StationResolver) Resolve(ctx context.Context) (stations []string, unmat
 	return stations, unmatched, nil
 }
 
-func intersectStations(flightCodes []string, iemIDs map[string]struct{}) (matched, unmatched []string) {
-	matched = make([]string, 0, len(flightCodes))
-	unmatched = make([]string, 0)
-
+func mapFlightAirports(flightCodes []string, catalog map[string]Station) []store.AirportWeatherStation {
+	rows := make([]store.AirportWeatherStation, 0, len(flightCodes))
 	seen := make(map[string]struct{}, len(flightCodes))
 
 	for _, code := range flightCodes {
@@ -89,16 +100,19 @@ func intersectStations(flightCodes []string, iemIDs map[string]struct{}) (matche
 
 		seen[code] = struct{}{}
 
-		if _, ok := iemIDs[code]; ok {
-			matched = append(matched, code)
-			continue
+		row := store.AirportWeatherStation{AirportCode: code}
+		if station, ok := catalog[code]; ok {
+			row.Matched = true
+			row.IEMSID = station.SID
+			row.TzName = station.TzName
 		}
 
-		unmatched = append(unmatched, code)
+		rows = append(rows, row)
 	}
 
-	sort.Strings(matched)
-	sort.Strings(unmatched)
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].AirportCode < rows[j].AirportCode
+	})
 
-	return matched, unmatched
+	return rows
 }

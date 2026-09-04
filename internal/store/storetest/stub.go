@@ -33,6 +33,9 @@ type Stub struct {
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
+	HasWeatherStationsDataFn              func(ctx context.Context) (bool, error)
+	ReplaceWeatherStationsFn              func(ctx context.Context, stationColumns []string, stationRows [][]string, mappingColumns []string, mappingRows [][]string) error
+	ListAirportWeatherStationsFn          func(ctx context.Context) ([]store.AirportWeatherStation, error)
 	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithWeatherDataFn               func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	DistinctFlightAirportCodesFn          func(ctx context.Context) ([]string, error)
@@ -205,6 +208,36 @@ func (s *Stub) ReplaceAirports(ctx context.Context, columns []string, rows [][]s
 	}
 
 	return s.ReplaceAirportsFn(ctx, columns, rows)
+}
+
+func (s *Stub) HasWeatherStationsData(ctx context.Context) (bool, error) {
+	if s.HasWeatherStationsDataFn == nil {
+		panic("unexpected call: HasWeatherStationsData")
+	}
+
+	return s.HasWeatherStationsDataFn(ctx)
+}
+
+func (s *Stub) ReplaceWeatherStations(
+	ctx context.Context,
+	stationColumns []string,
+	stationRows [][]string,
+	mappingColumns []string,
+	mappingRows [][]string,
+) error {
+	if s.ReplaceWeatherStationsFn == nil {
+		panic("unexpected call: ReplaceWeatherStations")
+	}
+
+	return s.ReplaceWeatherStationsFn(ctx, stationColumns, stationRows, mappingColumns, mappingRows)
+}
+
+func (s *Stub) ListAirportWeatherStations(ctx context.Context) ([]store.AirportWeatherStation, error) {
+	if s.ListAirportWeatherStationsFn == nil {
+		panic("unexpected call: ListAirportWeatherStations")
+	}
+
+	return s.ListAirportWeatherStationsFn(ctx)
 }
 
 func (s *Stub) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {

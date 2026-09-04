@@ -27,6 +27,23 @@ const (
 	colMetar     = "metar"
 	jsonKeyMonth = "month"
 	jsonKeyRows  = "rows_imported"
+
+	colSID          = "sid"
+	colNetwork      = "network"
+	colName         = "name"
+	colTzname       = "tzname"
+	colLatitude     = "latitude"
+	colLongitude    = "longitude"
+	colArchiveBegin = "archive_begin"
+	colAirportCode  = "airport_code"
+	colIEMSID       = "iem_sid"
+	colMatched      = "matched"
+	colUpdatedAt    = "updated_at"
+
+	jsonKeyStationsLoaded    = "stations_loaded"
+	jsonKeyMatchedAirports   = "matched_airports"
+	jsonKeyUnmatchedAirports = "unmatched_airports"
+	jsonKeyUnmatched         = "unmatched"
 )
 
 // ObservationColumns is the IEM CSV column order (excluding year/month partition keys).
@@ -51,6 +68,24 @@ var ObservationColumns = []string{
 	colAlti,
 	colMslp,
 	colMetar,
+}
+
+var weatherStationColumns = []string{
+	colSID,
+	colNetwork,
+	colName,
+	colTzname,
+	colLatitude,
+	colLongitude,
+	colArchiveBegin,
+}
+
+var airportWeatherStationColumns = []string{
+	colAirportCode,
+	colIEMSID,
+	colTzname,
+	colMatched,
+	colUpdatedAt,
 }
 
 // dataVars are IEM `data=` columns (station/valid are always returned).

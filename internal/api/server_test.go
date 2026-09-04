@@ -39,6 +39,9 @@ func routerStub() *storetest.Stub {
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
 			return false, nil
 		},
+		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
+			return false, nil
+		},
 		CreateReferenceIngestJobFn: func(_ context.Context, jobType string) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-oa",
@@ -75,6 +78,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/countries", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
+		{http.MethodPost, "/api/v1/ingest/weather-stations", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
@@ -113,6 +117,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec must not include /api/v1/ingest")
 	}
 
+	if _, ok := external["/api/v1/ingest/weather-stations"]; ok {
+		t.Fatal("external spec must not include /api/v1/ingest/weather-stations")
+	}
+
 	if _, ok := external["/health"]; ok {
 		t.Fatal("external spec must not include /health")
 	}
@@ -121,6 +129,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 	for _, path := range []string{
 		"/health",
 		"/api/v1/ingest",
+		"/api/v1/ingest/weather-stations",
 		"/api/v1/jobs",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",

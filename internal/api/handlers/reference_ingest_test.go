@@ -24,6 +24,9 @@ func referenceSuccessStub() *storetest.Stub {
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
 			return false, nil
 		},
+		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
+			return false, nil
+		},
 		CreateReferenceIngestJobFn: func(_ context.Context, jt string) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-oa-1",
@@ -63,6 +66,8 @@ func postReferenceIngest(t *testing.T, h *ReferenceIngestHandler, path string, b
 		h.CreateRegions(rec, req)
 	case "/api/v1/ingest/airports":
 		h.CreateAirports(rec, req)
+	case "/api/v1/ingest/weather-stations":
+		h.CreateWeatherStations(rec, req)
 	default:
 		t.Fatalf("unexpected path %q", path)
 	}
@@ -220,5 +225,89 @@ func TestReferenceIngestCompletedJobDoesNotBlock(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 after completed job; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+const pathWeatherStations = "/api/v1/ingest/weather-stations"
+
+func TestWeatherStationsIngestCreate(t *testing.T) {
+	h := NewReferenceIngestHandler(referenceSuccessStub())
+
+	rec := postReferenceIngest(t, h, pathWeatherStations, map[string]any{})
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var resp ReferenceIngestResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if resp.Job.Type != model.JobTypeImportWeatherStations {
+		t.Errorf("job type = %q, want %q", resp.Job.Type, model.JobTypeImportWeatherStations)
+	}
+}
+
+func TestWeatherStationsIngestActiveJobConflict(t *testing.T) {
+	h := NewReferenceIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return true, nil
+		},
+	})
+
+	rec := postReferenceIngest(t, h, pathWeatherStations, map[string]any{})
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body["job_type"] != model.JobTypeImportWeatherStations {
+		t.Errorf("job_type = %v, want %q", body["job_type"], model.JobTypeImportWeatherStations)
+	}
+}
+
+func TestWeatherStationsIngestExistingDataConflict(t *testing.T) {
+	h := NewReferenceIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+			return false, nil
+		},
+		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
+			return true, nil
+		},
+	})
+
+	rec := postReferenceIngest(t, h, pathWeatherStations, map[string]any{
+		jsonForce: false,
+	})
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body["dataset"] != datasetWeatherStations {
+		t.Errorf("dataset = %v, want %s", body["dataset"], datasetWeatherStations)
+	}
+}
+
+func TestWeatherStationsIngestForceReimport(t *testing.T) {
+	h := NewReferenceIngestHandler(referenceSuccessStub())
+
+	rec := postReferenceIngest(t, h, pathWeatherStations, map[string]any{
+		jsonForce: true,
+	})
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 }

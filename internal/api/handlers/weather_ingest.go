@@ -62,7 +62,7 @@ type WeatherIngestResponse struct {
 // Create queues weather observation ingest jobs for a month range.
 //
 //	@Summary		Queue weather observation data ingest
-//	@Description	Queues one import job per month in the requested range. Provide stations explicitly, or omit stations to resolve from distinct BTS origin/dest codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.
+//	@Description	Queues one import job per month in the requested range. Provide stations explicitly, or omit stations to resolve from airport_weather_stations (ingest weather-stations first). Omit end_year/end_month for a single month. Set force=true to re-import months that already have data.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json
@@ -179,7 +179,9 @@ func (h *WeatherIngestHandler) resolveStations(ctx context.Context) ([]string, [
 
 func (h *WeatherIngestHandler) writeResolveError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, iem.ErrNoFlightAirports), errors.Is(err, iem.ErrNoMatchedStations):
+	case errors.Is(err, iem.ErrNoFlightAirports),
+		errors.Is(err, iem.ErrNoMatchedStations),
+		errors.Is(err, iem.ErrNoWeatherStationMapping):
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 	default:
 		h.logger.Error("resolve weather stations", "error", err)

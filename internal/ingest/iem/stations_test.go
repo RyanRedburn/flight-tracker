@@ -8,60 +8,107 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"strings"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func TestIntersectStations(t *testing.T) {
-	iemIDs := map[string]struct{}{
-		testStationORD: {},
-		testStationJFK: {},
-		testStationATL: {},
+func TestMapFlightAirports(t *testing.T) {
+	catalog := map[string]Station{
+		testStationORD: {SID: testStationORD, TzName: testTzChicago},
+		testStationJFK: {SID: testStationJFK, TzName: "America/New_York"},
+		testStationATL: {SID: testStationATL, TzName: "America/New_York"},
 	}
 
-	matched, unmatched := intersectStations([]string{"ord", testStationXYZ, testStationJFK, "ord"}, iemIDs)
-	if len(matched) != 2 || matched[0] != testStationJFK || matched[1] != testStationORD {
-		t.Fatalf("matched = %v, want [JFK ORD]", matched)
+	rows := mapFlightAirports([]string{"ord", testStationXYZ, testStationJFK, "ord"}, catalog)
+	if len(rows) != 3 {
+		t.Fatalf("len(rows) = %d, want 3", len(rows))
 	}
 
-	if len(unmatched) != 1 || unmatched[0] != testStationXYZ {
-		t.Fatalf("unmatched = %v, want [XYZ]", unmatched)
+	if rows[0].AirportCode != testStationJFK || !rows[0].Matched || rows[0].IEMSID != testStationJFK {
+		t.Fatalf("row[0] = %+v, want matched JFK", rows[0])
+	}
+
+	if rows[1].AirportCode != testStationORD || !rows[1].Matched || rows[1].TzName != testTzChicago {
+		t.Fatalf("row[1] = %+v, want matched ORD", rows[1])
+	}
+
+	if rows[2].AirportCode != testStationXYZ || rows[2].Matched || rows[2].IEMSID != "" || rows[2].TzName != "" {
+		t.Fatalf("row[2] = %+v, want unmatched XYZ", rows[2])
+	}
+}
+
+func TestLoadStationsParsesProperties(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, testNetworkILASOS) {
+			http.NotFound(w, r)
+
+			return
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			testGeoJSONFeatures: []map[string]any{
+				{
+					testGeoJSONProperties: map[string]any{
+						testGeoJSONSID:          testStationORD,
+						testGeoJSONNetwork:      testNetworkILASOS,
+						testGeoJSONSName:        testORDName,
+						testGeoJSONTzName:       testTzChicago,
+						testGeoJSONArchiveBegin: testORDArchiveBegin,
+					},
+					testGeoJSONGeometry: map[string]any{
+						testGeoJSONCoordinates: []float64{testORDLongitude, testORDLatitude},
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	catalog := NewNetworkCatalog(server.URL, 0)
+	catalog.networks = []string{testNetworkILASOS, "MISSING_ASOS"}
+
+	stations, err := catalog.LoadStations(context.Background())
+	if err != nil {
+		t.Fatalf("LoadStations() error = %v", err)
+	}
+
+	station, ok := stations[testStationORD]
+	if !ok {
+		t.Fatalf("stations = %v, want ORD", stations)
+	}
+
+	if station.Network != testNetworkILASOS || station.Name != testORDName || station.TzName != testTzChicago {
+		t.Fatalf("station = %+v", station)
+	}
+
+	if station.ArchiveBegin != testORDArchiveBegin {
+		t.Fatalf("archive_begin = %q, want %q", station.ArchiveBegin, testORDArchiveBegin)
+	}
+
+	if station.Longitude == nil || station.Latitude == nil {
+		t.Fatal("expected coordinates")
+	}
+
+	if *station.Longitude != testORDLongitude || *station.Latitude != testORDLatitude {
+		t.Fatalf("coords = (%v,%v), want (%v,%v)", *station.Longitude, *station.Latitude, testORDLongitude, testORDLatitude)
 	}
 }
 
 func TestStationResolverResolve(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		network := strings.TrimSuffix(path.Base(r.URL.Path), ".geojson")
-		features := []map[string]any{}
-
-		switch network {
-		case testNetworkILASOS:
-			features = append(features, map[string]any{
-				testGeoJSONProperties: map[string]any{testGeoJSONSID: testStationORD},
-			})
-		case testNetworkNYASOS:
-			features = append(features, map[string]any{
-				testGeoJSONProperties: map[string]any{testGeoJSONSID: testStationJFK},
-			})
-		}
-
-		_ = json.NewEncoder(w).Encode(map[string]any{"features": features})
-	}))
-	defer server.Close()
-
 	st := &storetest.Stub{
-		DistinctFlightAirportCodesFn: func(context.Context) ([]string, error) {
-			return []string{testStationORD, testStationXYZ, testStationJFK}, nil
+		ListAirportWeatherStationsFn: func(context.Context) ([]store.AirportWeatherStation, error) {
+			return []store.AirportWeatherStation{
+				{AirportCode: testStationORD, IEMSID: testStationORD, TzName: testTzChicago, Matched: true},
+				{AirportCode: testStationXYZ, Matched: false},
+				{AirportCode: testStationJFK, IEMSID: testStationJFK, Matched: true},
+			}, nil
 		},
 	}
 
-	catalog := NewNetworkCatalog(server.URL, 0)
-	catalog.networks = []string{testNetworkILASOS, testNetworkNYASOS, "ZZ_ASOS"}
-
-	resolver := NewStationResolver(st, catalog, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	resolver := NewStationResolver(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	stations, unmatched, err := resolver.Resolve(context.Background())
 	if err != nil {
@@ -77,18 +124,39 @@ func TestStationResolverResolve(t *testing.T) {
 	}
 }
 
-func TestStationResolverNoFlightAirports(t *testing.T) {
+func TestStationResolverNoMapping(t *testing.T) {
 	st := &storetest.Stub{
-		DistinctFlightAirportCodesFn: func(context.Context) ([]string, error) {
+		ListAirportWeatherStationsFn: func(context.Context) ([]store.AirportWeatherStation, error) {
 			return nil, nil
 		},
 	}
 
-	resolver := NewStationResolver(st, NewNetworkCatalog("https://example.test", 0), slog.Default())
+	resolver := NewStationResolver(st, slog.Default())
 
 	_, _, err := resolver.Resolve(context.Background())
-	if !errors.Is(err, ErrNoFlightAirports) {
-		t.Fatalf("Resolve() error = %v, want ErrNoFlightAirports", err)
+	if !errors.Is(err, ErrNoWeatherStationMapping) {
+		t.Fatalf("Resolve() error = %v, want ErrNoWeatherStationMapping", err)
+	}
+}
+
+func TestStationResolverNoMatchedStations(t *testing.T) {
+	st := &storetest.Stub{
+		ListAirportWeatherStationsFn: func(context.Context) ([]store.AirportWeatherStation, error) {
+			return []store.AirportWeatherStation{
+				{AirportCode: testStationXYZ, Matched: false},
+			}, nil
+		},
+	}
+
+	resolver := NewStationResolver(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	_, unmatched, err := resolver.Resolve(context.Background())
+	if !errors.Is(err, ErrNoMatchedStations) {
+		t.Fatalf("Resolve() error = %v, want ErrNoMatchedStations", err)
+	}
+
+	if len(unmatched) != 1 || unmatched[0] != testStationXYZ {
+		t.Fatalf("unmatched = %v, want [XYZ]", unmatched)
 	}
 }
 
@@ -101,7 +169,7 @@ func TestNetworkCatalogSkips404(t *testing.T) {
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"features": []map[string]any{
+			testGeoJSONFeatures: []map[string]any{
 				{testGeoJSONProperties: map[string]any{testGeoJSONSID: testStationORD}},
 			},
 		})
@@ -118,5 +186,32 @@ func TestNetworkCatalogSkips404(t *testing.T) {
 
 	if _, ok := ids[testStationORD]; !ok {
 		t.Fatalf("ids = %v, want ORD", ids)
+	}
+}
+
+func TestNetworkCatalogUsesFallbackNetwork(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			testGeoJSONFeatures: []map[string]any{
+				{
+					testGeoJSONProperties: map[string]any{
+						testGeoJSONSID: testStationORD,
+					},
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	catalog := NewNetworkCatalog(server.URL, 0)
+	catalog.networks = []string{testNetworkILASOS}
+
+	stations, err := catalog.LoadStations(context.Background())
+	if err != nil {
+		t.Fatalf("LoadStations() error = %v", err)
+	}
+
+	if stations[testStationORD].Network != testNetworkILASOS {
+		t.Fatalf("network = %q, want %q", stations[testStationORD].Network, testNetworkILASOS)
 	}
 }

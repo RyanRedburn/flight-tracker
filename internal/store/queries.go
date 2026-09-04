@@ -126,6 +126,23 @@ const (
 	QueryHasRegionsData   = `SELECT 1 FROM regions LIMIT 1`
 	QueryHasAirportsData  = `SELECT 1 FROM airports LIMIT 1`
 
+	QueryDeleteAllWeatherStations        = `DELETE FROM weather_stations`
+	QueryDeleteAllAirportWeatherStations = `DELETE FROM airport_weather_stations`
+
+	QueryHasWeatherStationsData = `
+		SELECT 1
+		FROM (
+			SELECT 1 FROM weather_stations
+			UNION ALL
+			SELECT 1 FROM airport_weather_stations
+		) AS mapping
+		LIMIT 1`
+
+	QueryListAirportWeatherStations = `
+		SELECT airport_code, iem_sid, tzname, matched, updated_at
+		FROM airport_weather_stations
+		ORDER BY airport_code`
+
 	QueryMigrationVersion = `
 		SELECT version, dirty
 		FROM schema_migrations

@@ -503,9 +503,9 @@ paths:
       consumes:
       - application/json
       description: Queues one import job per month in the requested range. Provide
-        stations explicitly, or omit stations to resolve from distinct BTS origin/dest
-        codes intersected with US IEM ASOS metadata. Omit end_year/end_month for a
-        single month. Set force=true to re-import months that already have data.
+        stations explicitly, or omit stations to resolve from airport_weather_stations
+        (ingest weather-stations first). Omit end_year/end_month for a single month.
+        Set force=true to re-import months that already have data.
       parameters:
       - description: Ingest range and optional stations
         in: body
@@ -533,6 +533,42 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
       summary: Queue weather observation data ingest
+      tags:
+      - ingest
+      - internal
+  /api/v1/ingest/weather-stations:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of the US IEM ASOS station catalog and a BTS airport
+        mapping (including unmatched airports). An empty body is treated as {"force":false}.
+        Set force=true to replace existing mapping tables.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Queue weather station mapping ingest
       tags:
       - ingest
       - internal

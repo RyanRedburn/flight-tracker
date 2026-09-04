@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
@@ -265,6 +266,23 @@ func TestWeatherIngestForceReimport(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWeatherIngestNoStationMapping(t *testing.T) {
+	resolver := weatherStationResolverFunc(func(context.Context) ([]string, []string, error) {
+		return nil, nil, iem.ErrNoWeatherStationMapping
+	})
+
+	h := NewWeatherIngestHandler(&storetest.Stub{}, defaultMaxIngestMonths, resolver, nil)
+
+	rec := postWeatherIngest(t, h, map[string]any{
+		jsonStartYear:  2024,
+		jsonStartMonth: 1,
+	})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
