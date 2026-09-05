@@ -13,7 +13,7 @@ Go service with a REST API and an in-process background worker for importing fli
 - `POST /api/v1/ingest/weather-stations` to queue IEM ASOS catalog and BTS airport mapping import
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
-- REST API for route performance stats, booking outlook probabilities, and job status
+- REST API for route performance stats, carrier performance stats, booking outlook probabilities, and job status
 - SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker Compose with Postgres and a migrate sidecar
 
@@ -185,6 +185,11 @@ curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2
 # Booking outlook probabilities for a departure slot (required: origin, dest, carrier, day_of_week, dep_time;
 # optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history)
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
+
+# Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
+# dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days)
+curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
+curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&start_date=2025-01-01&end_date=2025-03-31"
 ```
 
 ### Ingest behavior

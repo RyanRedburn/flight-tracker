@@ -20,19 +20,25 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	query, args := buildRouteStatsQuery(filter)
 
 	var (
-		avgArr           sql.NullFloat64
-		medianArr        sql.NullFloat64
-		avgArrDelayed    sql.NullFloat64
-		medianArrDelayed sql.NullFloat64
-		avgDep           sql.NullFloat64
-		avgDepDelayed    sql.NullFloat64
-		causeCarrier     sql.NullFloat64
-		causeWeather     sql.NullFloat64
-		causeNAS         sql.NullFloat64
-		causeSecurity    sql.NullFloat64
-		causeLate        sql.NullFloat64
-		diversionJSON    []byte
-		cancelJSON       []byte
+		avgArr            sql.NullFloat64
+		medianArr         sql.NullFloat64
+		avgArrDelayed     sql.NullFloat64
+		medianArrDelayed  sql.NullFloat64
+		avgDep            sql.NullFloat64
+		avgDepDelayed     sql.NullFloat64
+		causeCarrier      sql.NullFloat64
+		causeWeather      sql.NullFloat64
+		causeNAS          sql.NullFloat64
+		causeSecurity     sql.NullFloat64
+		causeLate         sql.NullFloat64
+		shareCarrier      int
+		shareWeather      int
+		shareNAS          int
+		shareSecurity     int
+		shareLate         int
+		shareUnattributed int
+		diversionJSON     []byte
+		cancelJSON        []byte
 	)
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
@@ -52,6 +58,12 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		&causeNAS,
 		&causeSecurity,
 		&causeLate,
+		&shareCarrier,
+		&shareWeather,
+		&shareNAS,
+		&shareSecurity,
+		&shareLate,
+		&shareUnattributed,
 		&diversionJSON,
 		&cancelJSON,
 	)
@@ -78,6 +90,15 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 			Security:     nullFloat(causeSecurity),
 			LateAircraft: nullFloat(causeLate),
 		}
+		stats.DelayCausesShare = store.DelayCausesShareFromCounts(
+			stats.Delayed,
+			shareCarrier,
+			shareWeather,
+			shareNAS,
+			shareSecurity,
+			shareLate,
+			shareUnattributed,
+		)
 	}
 
 	airports, err := unmarshalAirportCounts(diversionJSON)

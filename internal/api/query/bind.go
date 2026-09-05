@@ -125,7 +125,7 @@ func normalizeQueryStrings(v any) {
 		}
 
 		switch tag {
-		case "origin", "dest", "carrier":
+		case "origin", "dest", "carrier", "state":
 			fv.SetString(strings.ToUpper(strings.TrimSpace(fv.String())))
 		default:
 			fv.SetString(strings.TrimSpace(fv.String()))

@@ -15,6 +15,72 @@ const docTemplateexternal = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/carriers/stats": {
+            "get": {
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). State is a 2-letter code matching origin or dest.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "carriers",
+                    "external"
+                ],
+                "summary": "Carrier performance stats",
+                "parameters": [
+                    {
+                        "maxLength": 2,
+                        "minLength": 2,
+                        "type": "string",
+                        "description": "Marketing carrier code",
+                        "name": "carrier",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Range start (YYYY-MM-DD); required if end_date is set",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Range end (YYYY-MM-DD), on or after start_date; required if start_date is set",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "maxLength": 2,
+                        "minLength": 2,
+                        "type": "string",
+                        "description": "Origin or dest state code",
+                        "name": "state",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.CarrierStats"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/routes/outlook": {
             "get": {
                 "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120).",
@@ -228,6 +294,185 @@ const docTemplateexternal = `{
                 }
             }
         },
+        "model.CarrierAirportStat": {
+            "type": "object",
+            "properties": {
+                "airport": {
+                    "type": "string"
+                },
+                "cancellation_rate": {
+                    "type": "number"
+                },
+                "cancelled": {
+                    "type": "integer"
+                },
+                "delay_rate": {
+                    "type": "number"
+                },
+                "delayed": {
+                    "type": "integer"
+                },
+                "diversion_rate": {
+                    "type": "number"
+                },
+                "diverted": {
+                    "type": "integer"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "on_time": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                }
+            }
+        },
+        "model.CarrierRouteStat": {
+            "type": "object",
+            "properties": {
+                "cancellation_rate": {
+                    "type": "number"
+                },
+                "cancelled": {
+                    "type": "integer"
+                },
+                "delay_rate": {
+                    "type": "number"
+                },
+                "delayed": {
+                    "type": "integer"
+                },
+                "dest": {
+                    "type": "string"
+                },
+                "diversion_rate": {
+                    "type": "number"
+                },
+                "diverted": {
+                    "type": "integer"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "on_time": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                },
+                "origin": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.CarrierStats": {
+            "type": "object",
+            "properties": {
+                "avg_arrival_delay_minutes": {
+                    "type": "number"
+                },
+                "avg_arrival_delay_when_delayed": {
+                    "type": "number"
+                },
+                "avg_departure_delay_minutes": {
+                    "type": "number"
+                },
+                "avg_departure_delay_when_delayed": {
+                    "type": "number"
+                },
+                "best_airports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CarrierAirportStat"
+                    }
+                },
+                "best_routes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CarrierRouteStat"
+                    }
+                },
+                "cancellation_codes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CancellationCodeCount"
+                    }
+                },
+                "cancellation_rate": {
+                    "type": "number"
+                },
+                "cancelled": {
+                    "type": "integer"
+                },
+                "carrier": {
+                    "type": "string"
+                },
+                "delay_causes_avg_minutes": {
+                    "$ref": "#/definitions/model.DelayCausesAvgMinutes"
+                },
+                "delay_causes_share": {
+                    "$ref": "#/definitions/model.DelayCausesShare"
+                },
+                "delay_rate": {
+                    "type": "number"
+                },
+                "delayed": {
+                    "type": "integer"
+                },
+                "diversion_rate": {
+                    "type": "number"
+                },
+                "diverted": {
+                    "type": "integer"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "filters": {
+                    "$ref": "#/definitions/model.CarrierStatsFilters"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "median_arrival_delay_minutes": {
+                    "type": "number"
+                },
+                "median_arrival_delay_when_delayed": {
+                    "type": "number"
+                },
+                "on_time": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "worst_airports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CarrierAirportStat"
+                    }
+                },
+                "worst_routes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CarrierRouteStat"
+                    }
+                }
+            }
+        },
+        "model.CarrierStatsFilters": {
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
         "model.DelayCausesAvgMinutes": {
             "type": "object",
             "properties": {
@@ -241,6 +486,29 @@ const docTemplateexternal = `{
                     "type": "number"
                 },
                 "security": {
+                    "type": "number"
+                },
+                "weather": {
+                    "type": "number"
+                }
+            }
+        },
+        "model.DelayCausesShare": {
+            "type": "object",
+            "properties": {
+                "carrier": {
+                    "type": "number"
+                },
+                "late_aircraft": {
+                    "type": "number"
+                },
+                "nas": {
+                    "type": "number"
+                },
+                "security": {
+                    "type": "number"
+                },
+                "unattributed": {
                     "type": "number"
                 },
                 "weather": {
@@ -340,6 +608,9 @@ const docTemplateexternal = `{
                 "delay_causes_avg_minutes": {
                     "$ref": "#/definitions/model.DelayCausesAvgMinutes"
                 },
+                "delay_causes_share": {
+                    "$ref": "#/definitions/model.DelayCausesShare"
+                },
                 "delay_rate": {
                     "type": "number"
                 },
@@ -417,7 +688,7 @@ var SwaggerInfoexternal = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "flight-tracker API",
-	Description:      "REST API for flight data ingest, job status, and route performance.",
+	Description:      "REST API for flight data ingest, job status, route performance, and carrier performance.",
 	InfoInstanceName: "external",
 	SwaggerTemplate:  docTemplateexternal,
 	LeftDelim:        "{{",

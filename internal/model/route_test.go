@@ -21,6 +21,14 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 			Security:     0.4,
 			LateAircraft: 9.5,
 		},
+		DelayCausesShare: DelayCausesShare{
+			Carrier:      1.0 / 3.0,
+			Weather:      0.125,
+			NAS:          2.0 / 3.0,
+			Security:     0,
+			LateAircraft: 0.5,
+			Unattributed: 0.04,
+		},
 	}
 
 	stats.RoundForResponse()
@@ -40,6 +48,12 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 	assertFloat(t, "delay_causes.nas", stats.DelayCausesAvgMinutes.NAS, 4)
 	assertFloat(t, "delay_causes.security", stats.DelayCausesAvgMinutes.Security, 0)
 	assertFloat(t, "delay_causes.late_aircraft", stats.DelayCausesAvgMinutes.LateAircraft, 10)
+	assertFloat(t, "delay_causes_share.carrier", stats.DelayCausesShare.Carrier, 0.33)
+	assertFloat(t, "delay_causes_share.weather", stats.DelayCausesShare.Weather, 0.13)
+	assertFloat(t, "delay_causes_share.nas", stats.DelayCausesShare.NAS, 0.67)
+	assertFloat(t, "delay_causes_share.security", stats.DelayCausesShare.Security, 0)
+	assertFloat(t, "delay_causes_share.late_aircraft", stats.DelayCausesShare.LateAircraft, 0.5)
+	assertFloat(t, "delay_causes_share.unattributed", stats.DelayCausesShare.Unattributed, 0.04)
 }
 
 func TestRouteOutlookRoundForResponse(t *testing.T) {

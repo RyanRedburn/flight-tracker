@@ -51,6 +51,7 @@ type Store interface {
 	ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)
 	RouteOutlook(ctx context.Context, filter RouteOutlookFilter) (*model.RouteOutlook, error)
+	CarrierStats(ctx context.Context, filter CarrierStatsFilter) (*model.CarrierStats, error)
 	Ping(ctx context.Context) error
 	MigrationVersion(ctx context.Context) (MigrationVersion, error)
 	Close() error

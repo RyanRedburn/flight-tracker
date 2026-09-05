@@ -10,6 +10,15 @@ type DelayCausesAvgMinutes struct {
 	LateAircraft float64 `json:"late_aircraft"`
 }
 
+type DelayCausesShare struct {
+	Carrier      float64 `json:"carrier"`
+	Weather      float64 `json:"weather"`
+	NAS          float64 `json:"nas"`
+	Security     float64 `json:"security"`
+	LateAircraft float64 `json:"late_aircraft"`
+	Unattributed float64 `json:"unattributed"`
+}
+
 type AirportCount struct {
 	Airport string `json:"airport"`
 	Count   int    `json:"count"`
@@ -48,6 +57,7 @@ type RouteStats struct {
 	AvgDepartureDelayMinutes      float64                 `json:"avg_departure_delay_minutes"`
 	AvgDepartureDelayWhenDelayed  float64                 `json:"avg_departure_delay_when_delayed"`
 	DelayCausesAvgMinutes         DelayCausesAvgMinutes   `json:"delay_causes_avg_minutes"`
+	DelayCausesShare              DelayCausesShare        `json:"delay_causes_share"`
 	DiversionAirports             []AirportCount          `json:"diversion_airports"`
 	CancellationCodes             []CancellationCodeCount `json:"cancellation_codes"`
 }
@@ -92,6 +102,7 @@ func (s *RouteStats) RoundForResponse() {
 	s.DelayCausesAvgMinutes.NAS = math.Round(s.DelayCausesAvgMinutes.NAS)
 	s.DelayCausesAvgMinutes.Security = math.Round(s.DelayCausesAvgMinutes.Security)
 	s.DelayCausesAvgMinutes.LateAircraft = math.Round(s.DelayCausesAvgMinutes.LateAircraft)
+	s.DelayCausesShare.round()
 }
 
 // RoundForResponse rounds probabilities to two decimal places and minute
@@ -106,6 +117,15 @@ func (o *RouteOutlook) RoundForResponse() {
 	o.LikelyArrivalDelayWhenDelayed = math.Round(o.LikelyArrivalDelayWhenDelayed)
 	o.MedianArrivalDelayWhenDelayed = math.Round(o.MedianArrivalDelayWhenDelayed)
 	o.LikelyDepartureDelayMinutes = math.Round(o.LikelyDepartureDelayMinutes)
+}
+
+func (s *DelayCausesShare) round() {
+	s.Carrier = roundRate(s.Carrier)
+	s.Weather = roundRate(s.Weather)
+	s.NAS = roundRate(s.NAS)
+	s.Security = roundRate(s.Security)
+	s.LateAircraft = roundRate(s.LateAircraft)
+	s.Unattributed = roundRate(s.Unattributed)
 }
 
 func roundRate(v float64) float64 {

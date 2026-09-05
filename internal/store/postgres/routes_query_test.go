@@ -29,8 +29,8 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 	query, args := buildRouteStatsQuery(store.RouteStatsFilter{
 		Origin:       testAirportORD,
 		Dest:         testAirportLAX,
-		StartDate:    "2026-04-01",
-		EndDate:      "2026-04-30",
+		StartDate:    testStartDate,
+		EndDate:      testEndDate,
 		Carrier:      "UA",
 		FlightNumber: "100",
 		DaysOfWeek:   []int{1, 2},
@@ -54,6 +54,40 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 
 	if len(args) != 7 {
 		t.Fatalf("len(args) = %d, want 7", len(args))
+	}
+}
+
+func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
+	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, store.CarrierStatsFilter{
+		Carrier:   "UA",
+		StartDate: testStartDate,
+		EndDate:   testEndDate,
+		State:     "IL",
+	})
+
+	if !strings.Contains(query, "origin_state = $4 OR dest_state = $4") {
+		t.Fatal("expected state filter in query")
+	}
+
+	if strings.Contains(query, carrierStatsExtraPlaceholder) {
+		t.Fatal("placeholder should be replaced")
+	}
+
+	if len(args) != 4 {
+		t.Fatalf("len(args) = %d, want 4", len(args))
+	}
+
+	noState, args := buildCarrierStatsQuery(store.QueryCarrierStats, store.CarrierStatsFilter{
+		Carrier:   "UA",
+		StartDate: testStartDate,
+		EndDate:   testEndDate,
+	})
+	if strings.Contains(noState, "origin_state") {
+		t.Fatal("state filter should be omitted")
+	}
+
+	if len(args) != 3 {
+		t.Fatalf("len(args) = %d, want 3", len(args))
 	}
 }
 
