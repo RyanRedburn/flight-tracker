@@ -248,6 +248,7 @@ func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (s
 		extra = " AND (origin_state = $4 OR dest_state = $4)"
 		originAirport = "origin_state = $4"
 		destAirport = "dest_state = $4"
+
 		args = append(args, filter.State)
 	}
 
