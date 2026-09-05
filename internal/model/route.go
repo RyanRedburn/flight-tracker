@@ -24,11 +24,6 @@ type AirportCount struct {
 	Count   int    `json:"count"`
 }
 
-type CancellationCodeCount struct {
-	Code  string `json:"code"`
-	Count int    `json:"count"`
-}
-
 type RouteStatsFilters struct {
 	Carrier      string `json:"carrier"`
 	FlightNumber string `json:"flight_number"`
@@ -36,30 +31,29 @@ type RouteStatsFilters struct {
 }
 
 type RouteStats struct {
-	Origin                        string                  `json:"origin"`
-	Dest                          string                  `json:"dest"`
-	StartDate                     string                  `json:"start_date"`
-	EndDate                       string                  `json:"end_date"`
-	Filters                       RouteStatsFilters       `json:"filters"`
-	Flights                       int                     `json:"flights"`
-	OnTime                        int                     `json:"on_time"`
-	Delayed                       int                     `json:"delayed"`
-	Cancelled                     int                     `json:"cancelled"`
-	Diverted                      int                     `json:"diverted"`
-	OnTimeRate                    float64                 `json:"on_time_rate"`
-	DelayRate                     float64                 `json:"delay_rate"`
-	CancellationRate              float64                 `json:"cancellation_rate"`
-	DiversionRate                 float64                 `json:"diversion_rate"`
-	AvgArrivalDelayMinutes        float64                 `json:"avg_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64                 `json:"median_arrival_delay_minutes"`
-	AvgArrivalDelayWhenDelayed    float64                 `json:"avg_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64                 `json:"median_arrival_delay_when_delayed"`
-	AvgDepartureDelayMinutes      float64                 `json:"avg_departure_delay_minutes"`
-	AvgDepartureDelayWhenDelayed  float64                 `json:"avg_departure_delay_when_delayed"`
-	DelayCausesAvgMinutes         DelayCausesAvgMinutes   `json:"delay_causes_avg_minutes"`
-	DelayCausesShare              DelayCausesShare        `json:"delay_causes_share"`
-	DiversionAirports             []AirportCount          `json:"diversion_airports"`
-	CancellationCodes             []CancellationCodeCount `json:"cancellation_codes"`
+	Origin                        string                `json:"origin"`
+	Dest                          string                `json:"dest"`
+	StartDate                     string                `json:"start_date"`
+	EndDate                       string                `json:"end_date"`
+	Filters                       RouteStatsFilters     `json:"filters"`
+	Flights                       int                   `json:"flights"`
+	OnTime                        int                   `json:"on_time"`
+	Delayed                       int                   `json:"delayed"`
+	Cancelled                     int                   `json:"cancelled"`
+	Diverted                      int                   `json:"diverted"`
+	OnTimeRate                    float64               `json:"on_time_rate"`
+	DelayRate                     float64               `json:"delay_rate"`
+	CancellationRate              float64               `json:"cancellation_rate"`
+	DiversionRate                 float64               `json:"diversion_rate"`
+	AvgArrivalDelayMinutes        float64               `json:"avg_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes     float64               `json:"median_arrival_delay_minutes"`
+	AvgArrivalDelayWhenDelayed    float64               `json:"avg_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed float64               `json:"median_arrival_delay_when_delayed"`
+	AvgDepartureDelayMinutes      float64               `json:"avg_departure_delay_minutes"`
+	AvgDepartureDelayWhenDelayed  float64               `json:"avg_departure_delay_when_delayed"`
+	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
+	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
+	DiversionAirports             []AirportCount        `json:"diversion_airports"`
 }
 
 type RouteOutlook struct {

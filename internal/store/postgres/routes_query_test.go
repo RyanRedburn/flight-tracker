@@ -58,36 +58,69 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 }
 
 func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
-	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, store.CarrierStatsFilter{
+	filter := store.CarrierStatsFilter{
 		Carrier:   "UA",
 		StartDate: testStartDate,
 		EndDate:   testEndDate,
 		State:     "IL",
-	})
-
-	if !strings.Contains(query, "origin_state = $4 OR dest_state = $4") {
-		t.Fatal("expected state filter in query")
 	}
 
-	if strings.Contains(query, carrierStatsExtraPlaceholder) {
-		t.Fatal("placeholder should be replaced")
+	for name, template := range map[string]string{
+		"overall":  store.QueryCarrierStats,
+		"routes":   store.QueryCarrierStatsRoutes,
+		"airports": store.QueryCarrierStatsAirports,
+	} {
+		t.Run(name, func(t *testing.T) {
+			query, args := buildCarrierStatsQuery(template, filter)
+			if !strings.Contains(query, "origin_state = $4 OR dest_state = $4") {
+				t.Fatal("expected state filter in query")
+			}
+
+			if strings.Contains(query, carrierStatsExtraPlaceholder) {
+				t.Fatal("placeholder should be replaced")
+			}
+
+			if len(args) != 4 {
+				t.Fatalf("len(args) = %d, want 4", len(args))
+			}
+		})
 	}
 
-	if len(args) != 4 {
-		t.Fatalf("len(args) = %d, want 4", len(args))
+	airports, _ := buildCarrierStatsQuery(store.QueryCarrierStatsAirports, filter)
+	if !strings.Contains(airports, "WHERE origin_state = $4") {
+		t.Fatal("expected ranked origins to be limited to the filtered state")
 	}
 
-	noState, args := buildCarrierStatsQuery(store.QueryCarrierStats, store.CarrierStatsFilter{
+	if !strings.Contains(airports, "WHERE dest_state = $4") {
+		t.Fatal("expected ranked dests to be limited to the filtered state")
+	}
+
+	if strings.Contains(airports, carrierStatsOriginAirportPlaceholder) || strings.Contains(airports, carrierStatsDestAirportPlaceholder) {
+		t.Fatal("airport placeholders should be replaced")
+	}
+
+	noStateFilter := store.CarrierStatsFilter{
 		Carrier:   "UA",
 		StartDate: testStartDate,
 		EndDate:   testEndDate,
-	})
+	}
+
+	noState, args := buildCarrierStatsQuery(store.QueryCarrierStats, noStateFilter)
 	if strings.Contains(noState, "origin_state") {
 		t.Fatal("state filter should be omitted")
 	}
 
 	if len(args) != 3 {
 		t.Fatalf("len(args) = %d, want 3", len(args))
+	}
+
+	noStateAirports, _ := buildCarrierStatsQuery(store.QueryCarrierStatsAirports, noStateFilter)
+	if strings.Contains(noStateAirports, "origin_state = $4") || strings.Contains(noStateAirports, "dest_state = $4") {
+		t.Fatal("airport ranking should not filter by state when omitted")
+	}
+
+	if !strings.Contains(noStateAirports, "WHERE TRUE") {
+		t.Fatal("expected unfiltered airport ranking")
 	}
 }
 

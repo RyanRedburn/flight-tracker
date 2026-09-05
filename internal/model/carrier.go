@@ -34,32 +34,31 @@ type CarrierAirportStat struct {
 }
 
 type CarrierStats struct {
-	Carrier                       string                  `json:"carrier"`
-	StartDate                     string                  `json:"start_date"`
-	EndDate                       string                  `json:"end_date"`
-	Filters                       CarrierStatsFilters     `json:"filters"`
-	Flights                       int                     `json:"flights"`
-	OnTime                        int                     `json:"on_time"`
-	Delayed                       int                     `json:"delayed"`
-	Cancelled                     int                     `json:"cancelled"`
-	Diverted                      int                     `json:"diverted"`
-	OnTimeRate                    float64                 `json:"on_time_rate"`
-	DelayRate                     float64                 `json:"delay_rate"`
-	CancellationRate              float64                 `json:"cancellation_rate"`
-	DiversionRate                 float64                 `json:"diversion_rate"`
-	AvgArrivalDelayMinutes        float64                 `json:"avg_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64                 `json:"median_arrival_delay_minutes"`
-	AvgArrivalDelayWhenDelayed    float64                 `json:"avg_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64                 `json:"median_arrival_delay_when_delayed"`
-	AvgDepartureDelayMinutes      float64                 `json:"avg_departure_delay_minutes"`
-	AvgDepartureDelayWhenDelayed  float64                 `json:"avg_departure_delay_when_delayed"`
-	DelayCausesAvgMinutes         DelayCausesAvgMinutes   `json:"delay_causes_avg_minutes"`
-	DelayCausesShare              DelayCausesShare        `json:"delay_causes_share"`
-	CancellationCodes             []CancellationCodeCount `json:"cancellation_codes"`
-	BestRoutes                    []CarrierRouteStat      `json:"best_routes"`
-	WorstRoutes                   []CarrierRouteStat      `json:"worst_routes"`
-	BestAirports                  []CarrierAirportStat    `json:"best_airports"`
-	WorstAirports                 []CarrierAirportStat    `json:"worst_airports"`
+	Carrier                       string                `json:"carrier"`
+	StartDate                     string                `json:"start_date"`
+	EndDate                       string                `json:"end_date"`
+	Filters                       CarrierStatsFilters   `json:"filters"`
+	Flights                       int                   `json:"flights"`
+	OnTime                        int                   `json:"on_time"`
+	Delayed                       int                   `json:"delayed"`
+	Cancelled                     int                   `json:"cancelled"`
+	Diverted                      int                   `json:"diverted"`
+	OnTimeRate                    float64               `json:"on_time_rate"`
+	DelayRate                     float64               `json:"delay_rate"`
+	CancellationRate              float64               `json:"cancellation_rate"`
+	DiversionRate                 float64               `json:"diversion_rate"`
+	AvgArrivalDelayMinutes        float64               `json:"avg_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes     float64               `json:"median_arrival_delay_minutes"`
+	AvgArrivalDelayWhenDelayed    float64               `json:"avg_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed float64               `json:"median_arrival_delay_when_delayed"`
+	AvgDepartureDelayMinutes      float64               `json:"avg_departure_delay_minutes"`
+	AvgDepartureDelayWhenDelayed  float64               `json:"avg_departure_delay_when_delayed"`
+	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
+	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
+	BestRoutes                    []CarrierRouteStat    `json:"best_routes"`
+	WorstRoutes                   []CarrierRouteStat    `json:"worst_routes"`
+	BestAirports                  []CarrierAirportStat  `json:"best_airports"`
+	WorstAirports                 []CarrierAirportStat  `json:"worst_airports"`
 }
 
 // RoundForResponse rounds rates and shares to two decimal places and minute

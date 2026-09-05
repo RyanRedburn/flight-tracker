@@ -54,7 +54,6 @@ func routerStub() *storetest.Stub {
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
 				DiversionAirports: []model.AirportCount{},
-				CancellationCodes: []model.CancellationCodeCount{},
 			}, nil
 		},
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
@@ -62,11 +61,10 @@ func routerStub() *storetest.Stub {
 		},
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
-				BestRoutes:        []model.CarrierRouteStat{},
-				WorstRoutes:       []model.CarrierRouteStat{},
-				BestAirports:      []model.CarrierAirportStat{},
-				WorstAirports:     []model.CarrierAirportStat{},
-				CancellationCodes: []model.CancellationCodeCount{},
+				BestRoutes:    []model.CarrierRouteStat{},
+				WorstRoutes:   []model.CarrierRouteStat{},
+				BestAirports:  []model.CarrierAirportStat{},
+				WorstAirports: []model.CarrierAirportStat{},
 			}, nil
 		},
 	}

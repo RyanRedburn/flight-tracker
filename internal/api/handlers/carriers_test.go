@@ -20,14 +20,13 @@ func TestCarriersStats(t *testing.T) {
 			}
 
 			return &model.CarrierStats{
-				Carrier:           "UA",
-				Flights:           10,
-				OnTime:            7,
-				BestRoutes:        []model.CarrierRouteStat{},
-				WorstRoutes:       []model.CarrierRouteStat{},
-				BestAirports:      []model.CarrierAirportStat{},
-				WorstAirports:     []model.CarrierAirportStat{},
-				CancellationCodes: []model.CancellationCodeCount{},
+				Carrier:       "UA",
+				Flights:       10,
+				OnTime:        7,
+				BestRoutes:    []model.CarrierRouteStat{},
+				WorstRoutes:   []model.CarrierRouteStat{},
+				BestAirports:  []model.CarrierAirportStat{},
+				WorstAirports: []model.CarrierAirportStat{},
 			}, nil
 		},
 	})
@@ -54,12 +53,11 @@ func TestCarriersStatsEmpty(t *testing.T) {
 	h := NewCarriersHandler(&storetest.Stub{
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
-				Carrier:           "UA",
-				BestRoutes:        []model.CarrierRouteStat{},
-				WorstRoutes:       []model.CarrierRouteStat{},
-				BestAirports:      []model.CarrierAirportStat{},
-				WorstAirports:     []model.CarrierAirportStat{},
-				CancellationCodes: []model.CancellationCodeCount{},
+				Carrier:       "UA",
+				BestRoutes:    []model.CarrierRouteStat{},
+				WorstRoutes:   []model.CarrierRouteStat{},
+				BestAirports:  []model.CarrierAirportStat{},
+				WorstAirports: []model.CarrierAirportStat{},
 			}, nil
 		},
 	})
@@ -77,7 +75,7 @@ func TestCarriersStatsEmpty(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if stats.Flights != 0 || stats.BestRoutes == nil || stats.CancellationCodes == nil {
+	if stats.Flights != 0 || stats.BestRoutes == nil {
 		t.Fatalf("empty stats = %+v", stats)
 	}
 }

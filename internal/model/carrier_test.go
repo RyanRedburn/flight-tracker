@@ -10,7 +10,6 @@ func TestCarrierStatsRoundForResponse(t *testing.T) {
 		DelayCausesShare:       DelayCausesShare{LateAircraft: 2.0 / 3.0, Unattributed: 1.0 / 3.0},
 		BestRoutes:             []CarrierRouteStat{{OnTimeRate: 1.0 / 3.0}},
 		WorstAirports:          []CarrierAirportStat{{DelayRate: 2.0 / 3.0}},
-		CancellationCodes:      []CancellationCodeCount{},
 		WorstRoutes:            []CarrierRouteStat{},
 		BestAirports:           []CarrierAirportStat{},
 	}

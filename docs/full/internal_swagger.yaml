@@ -145,13 +145,6 @@ definitions:
       count:
         type: integer
     type: object
-  model.CancellationCodeCount:
-    properties:
-      code:
-        type: string
-      count:
-        type: integer
-    type: object
   model.CarrierAirportStat:
     properties:
       airport:
@@ -217,10 +210,6 @@ definitions:
       best_routes:
         items:
           $ref: '#/definitions/model.CarrierRouteStat'
-        type: array
-      cancellation_codes:
-        items:
-          $ref: '#/definitions/model.CancellationCodeCount'
         type: array
       cancellation_rate:
         type: number
@@ -388,10 +377,6 @@ definitions:
         type: number
       avg_departure_delay_when_delayed:
         type: number
-      cancellation_codes:
-        items:
-          $ref: '#/definitions/model.CancellationCodeCount'
-        type: array
       cancellation_rate:
         type: number
       cancelled:

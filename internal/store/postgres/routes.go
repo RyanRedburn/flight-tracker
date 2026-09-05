@@ -38,7 +38,6 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		shareLate         int
 		shareUnattributed int
 		diversionJSON     []byte
-		cancelJSON        []byte
 	)
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
@@ -65,7 +64,6 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		&shareLate,
 		&shareUnattributed,
 		&diversionJSON,
-		&cancelJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -106,13 +104,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		return nil, fmt.Errorf("decode diversion airports: %w", err)
 	}
 
-	codes, err := unmarshalCancellationCodes(cancelJSON)
-	if err != nil {
-		return nil, fmt.Errorf("decode cancellation codes: %w", err)
-	}
-
 	stats.DiversionAirports = airports
-	stats.CancellationCodes = codes
 
 	stats.RoundForResponse()
 
@@ -256,7 +248,6 @@ func emptyRouteStats(filter store.RouteStatsFilter) *model.RouteStats {
 			DaysOfWeek:   days,
 		},
 		DiversionAirports: []model.AirportCount{},
-		CancellationCodes: []model.CancellationCodeCount{},
 	}
 }
 
@@ -283,23 +274,6 @@ func unmarshalAirportCounts(raw []byte) ([]model.AirportCount, error) {
 
 	if out == nil {
 		return []model.AirportCount{}, nil
-	}
-
-	return out, nil
-}
-
-func unmarshalCancellationCodes(raw []byte) ([]model.CancellationCodeCount, error) {
-	out := []model.CancellationCodeCount{}
-	if len(raw) == 0 || string(raw) == "null" {
-		return out, nil
-	}
-
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
-
-	if out == nil {
-		return []model.CancellationCodeCount{}, nil
 	}
 
 	return out, nil

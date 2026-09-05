@@ -3,14 +3,17 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-const carrierStatsExtraPlaceholder = "/*extra*/"
+const (
+	carrierStatsExtraPlaceholder         = "/*extra*/"
+	carrierStatsOriginAirportPlaceholder = "/*origin_airport*/"
+	carrierStatsDestAirportPlaceholder   = "/*dest_airport*/"
+)
 
 func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {
 	stats := emptyCarrierStats(filter)
@@ -62,15 +65,14 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 
 func emptyCarrierStats(filter store.CarrierStatsFilter) *model.CarrierStats {
 	return &model.CarrierStats{
-		Carrier:           filter.Carrier,
-		StartDate:         filter.StartDate,
-		EndDate:           filter.EndDate,
-		Filters:           model.CarrierStatsFilters{State: filter.State},
-		CancellationCodes: []model.CancellationCodeCount{},
-		BestRoutes:        []model.CarrierRouteStat{},
-		WorstRoutes:       []model.CarrierRouteStat{},
-		BestAirports:      []model.CarrierAirportStat{},
-		WorstAirports:     []model.CarrierAirportStat{},
+		Carrier:       filter.Carrier,
+		StartDate:     filter.StartDate,
+		EndDate:       filter.EndDate,
+		Filters:       model.CarrierStatsFilters{State: filter.State},
+		BestRoutes:    []model.CarrierRouteStat{},
+		WorstRoutes:   []model.CarrierRouteStat{},
+		BestAirports:  []model.CarrierAirportStat{},
+		WorstAirports: []model.CarrierAirportStat{},
 	}
 }
 
@@ -95,7 +97,6 @@ func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStat
 		shareSecurity     int
 		shareLate         int
 		shareUnattributed int
-		cancelJSON        []byte
 	)
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
@@ -121,7 +122,6 @@ func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStat
 		&shareSecurity,
 		&shareLate,
 		&shareUnattributed,
-		&cancelJSON,
 	)
 	if err != nil {
 		return err
@@ -156,13 +156,6 @@ func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStat
 			shareUnattributed,
 		)
 	}
-
-	codes, err := unmarshalCancellationCodes(cancelJSON)
-	if err != nil {
-		return fmt.Errorf("decode cancellation codes: %w", err)
-	}
-
-	stats.CancellationCodes = codes
 
 	return nil
 }
@@ -247,15 +240,20 @@ func (s *Store) listCarrierAirports(ctx context.Context, filter store.CarrierSta
 func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (string, []any) {
 	args := []any{filter.Carrier, filter.StartDate, filter.EndDate}
 
-	var extra strings.Builder
+	extra := ""
+	originAirport := "TRUE"
+	destAirport := "TRUE"
 
 	if filter.State != "" {
-		fmt.Fprintf(&extra, " AND (origin_state = $4 OR dest_state = $4)")
-
+		extra = " AND (origin_state = $4 OR dest_state = $4)"
+		originAirport = "origin_state = $4"
+		destAirport = "dest_state = $4"
 		args = append(args, filter.State)
 	}
 
-	query := strings.Replace(template, carrierStatsExtraPlaceholder, extra.String(), 1)
+	query := strings.Replace(template, carrierStatsExtraPlaceholder, extra, 1)
+	query = strings.Replace(query, carrierStatsOriginAirportPlaceholder, originAirport, 1)
+	query = strings.Replace(query, carrierStatsDestAirportPlaceholder, destAirport, 1)
 
 	return query, args
 }

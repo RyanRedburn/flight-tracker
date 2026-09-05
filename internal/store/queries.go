@@ -180,7 +180,6 @@ const (
 				nas_delay,
 				security_delay,
 				late_aircraft_delay,
-				cancellation_code,
 				div1_airport,
 				div2_airport,
 				div3_airport,
@@ -250,19 +249,7 @@ const (
 					WHERE is_diverted AND airport IS NOT NULL AND btrim(airport) <> ''
 					GROUP BY btrim(airport)
 				) d
-			) AS diversion_airports,
-			(
-				SELECT COALESCE(
-					json_agg(json_build_object('code', code, 'count', cnt) ORDER BY cnt DESC, code),
-					'[]'::json
-				)
-				FROM (
-					SELECT btrim(cancellation_code) AS code, COUNT(*)::int AS cnt
-					FROM classified
-					WHERE is_cancelled AND cancellation_code IS NOT NULL AND btrim(cancellation_code) <> ''
-					GROUP BY btrim(cancellation_code)
-				) c
-			) AS cancellation_codes
+			) AS diversion_airports
 		FROM with_cause`
 
 	QueryCarrierStatsMaxDate = `
@@ -282,8 +269,7 @@ const (
 				weather_delay,
 				nas_delay,
 				security_delay,
-				late_aircraft_delay,
-				cancellation_code
+				late_aircraft_delay
 			FROM flight_performance
 			WHERE iata_code_marketing_airline = $1
 				AND flight_date >= $2
@@ -334,19 +320,7 @@ const (
 			COUNT(*) FILTER (WHERE primary_cause = 'nas')::int AS share_nas,
 			COUNT(*) FILTER (WHERE primary_cause = 'security')::int AS share_security,
 			COUNT(*) FILTER (WHERE primary_cause = 'late_aircraft')::int AS share_late,
-			COUNT(*) FILTER (WHERE primary_cause = 'unattributed')::int AS share_unattributed,
-			(
-				SELECT COALESCE(
-					json_agg(json_build_object('code', code, 'count', cnt) ORDER BY cnt DESC, code),
-					'[]'::json
-				)
-				FROM (
-					SELECT btrim(cancellation_code) AS code, COUNT(*)::int AS cnt
-					FROM classified
-					WHERE is_cancelled AND cancellation_code IS NOT NULL AND btrim(cancellation_code) <> ''
-					GROUP BY btrim(cancellation_code)
-				) c
-			) AS cancellation_codes
+			COUNT(*) FILTER (WHERE primary_cause = 'unattributed')::int AS share_unattributed
 		FROM with_cause`
 
 	QueryCarrierStatsRoutes = `
@@ -389,6 +363,8 @@ const (
 			SELECT
 				origin,
 				dest,
+				origin_state,
+				dest_state,
 				cancelled,
 				diverted,
 				arr_del15
@@ -402,15 +378,21 @@ const (
 			SELECT
 				origin,
 				dest,
+				origin_state,
+				dest_state,
 				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
 				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
 				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
 			FROM matched
 		),
 		airport_flights AS (
-			SELECT origin AS airport, is_cancelled, is_diverted, is_delayed FROM classified
+			SELECT origin AS airport, is_cancelled, is_diverted, is_delayed
+			FROM classified
+			WHERE /*origin_airport*/
 			UNION ALL
-			SELECT dest AS airport, is_cancelled, is_diverted, is_delayed FROM classified
+			SELECT dest AS airport, is_cancelled, is_diverted, is_delayed
+			FROM classified
+			WHERE /*dest_airport*/
 		)
 		SELECT
 			airport,

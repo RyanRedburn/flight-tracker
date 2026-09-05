@@ -969,17 +969,6 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "model.CancellationCodeCount": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "count": {
-                    "type": "integer"
-                }
-            }
-        },
         "model.CarrierAirportStat": {
             "type": "object",
             "properties": {
@@ -1078,12 +1067,6 @@ const docTemplateinternal = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/model.CarrierRouteStat"
-                    }
-                },
-                "cancellation_codes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.CancellationCodeCount"
                     }
                 },
                 "cancellation_rate": {
@@ -1331,12 +1314,6 @@ const docTemplateinternal = `{
                 },
                 "avg_departure_delay_when_delayed": {
                     "type": "number"
-                },
-                "cancellation_codes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.CancellationCodeCount"
-                    }
                 },
                 "cancellation_rate": {
                     "type": "number"
