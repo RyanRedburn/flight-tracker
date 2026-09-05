@@ -20,19 +20,24 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	query, args := buildRouteStatsQuery(filter)
 
 	var (
-		avgArr           sql.NullFloat64
-		medianArr        sql.NullFloat64
-		avgArrDelayed    sql.NullFloat64
-		medianArrDelayed sql.NullFloat64
-		avgDep           sql.NullFloat64
-		avgDepDelayed    sql.NullFloat64
-		causeCarrier     sql.NullFloat64
-		causeWeather     sql.NullFloat64
-		causeNAS         sql.NullFloat64
-		causeSecurity    sql.NullFloat64
-		causeLate        sql.NullFloat64
-		diversionJSON    []byte
-		cancelJSON       []byte
+		avgArr            sql.NullFloat64
+		medianArr         sql.NullFloat64
+		avgArrDelayed     sql.NullFloat64
+		medianArrDelayed  sql.NullFloat64
+		avgDep            sql.NullFloat64
+		avgDepDelayed     sql.NullFloat64
+		causeCarrier      sql.NullFloat64
+		causeWeather      sql.NullFloat64
+		causeNAS          sql.NullFloat64
+		causeSecurity     sql.NullFloat64
+		causeLate         sql.NullFloat64
+		shareCarrier      int
+		shareWeather      int
+		shareNAS          int
+		shareSecurity     int
+		shareLate         int
+		shareUnattributed int
+		diversionJSON     []byte
 	)
 
 	err := s.db.QueryRowContext(ctx, query, args...).Scan(
@@ -52,8 +57,13 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		&causeNAS,
 		&causeSecurity,
 		&causeLate,
+		&shareCarrier,
+		&shareWeather,
+		&shareNAS,
+		&shareSecurity,
+		&shareLate,
+		&shareUnattributed,
 		&diversionJSON,
-		&cancelJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -78,6 +88,15 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 			Security:     nullFloat(causeSecurity),
 			LateAircraft: nullFloat(causeLate),
 		}
+		stats.DelayCausesShare = store.DelayCausesShareFromCounts(
+			stats.Delayed,
+			shareCarrier,
+			shareWeather,
+			shareNAS,
+			shareSecurity,
+			shareLate,
+			shareUnattributed,
+		)
 	}
 
 	airports, err := unmarshalAirportCounts(diversionJSON)
@@ -85,13 +104,9 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		return nil, fmt.Errorf("decode diversion airports: %w", err)
 	}
 
-	codes, err := unmarshalCancellationCodes(cancelJSON)
-	if err != nil {
-		return nil, fmt.Errorf("decode cancellation codes: %w", err)
-	}
-
 	stats.DiversionAirports = airports
-	stats.CancellationCodes = codes
+
+	stats.RoundForResponse()
 
 	return stats, nil
 }
@@ -180,6 +195,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	out.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
 	out.LikelyDepartureDelayMinutes = nullFloat(avgDep)
 
+	out.RoundForResponse()
+
 	return out, nil
 }
 
@@ -231,7 +248,6 @@ func emptyRouteStats(filter store.RouteStatsFilter) *model.RouteStats {
 			DaysOfWeek:   days,
 		},
 		DiversionAirports: []model.AirportCount{},
-		CancellationCodes: []model.CancellationCodeCount{},
 	}
 }
 
@@ -258,23 +274,6 @@ func unmarshalAirportCounts(raw []byte) ([]model.AirportCount, error) {
 
 	if out == nil {
 		return []model.AirportCount{}, nil
-	}
-
-	return out, nil
-}
-
-func unmarshalCancellationCodes(raw []byte) ([]model.CancellationCodeCount, error) {
-	out := []model.CancellationCodeCount{}
-	if len(raw) == 0 || string(raw) == "null" {
-		return out, nil
-	}
-
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
-
-	if out == nil {
-		return []model.CancellationCodeCount{}, nil
 	}
 
 	return out, nil

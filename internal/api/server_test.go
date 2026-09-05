@@ -54,11 +54,18 @@ func routerStub() *storetest.Stub {
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
 				DiversionAirports: []model.AirportCount{},
-				CancellationCodes: []model.CancellationCodeCount{},
 			}, nil
 		},
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			return &model.RouteOutlook{}, nil
+		},
+		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
+			return &model.CarrierStats{
+				BestRoutes:    []model.CarrierRouteStat{},
+				WorstRoutes:   []model.CarrierRouteStat{},
+				BestAirports:  []model.CarrierAirportStat{},
+				WorstAirports: []model.CarrierAirportStat{},
+			}, nil
 		},
 	}
 }
@@ -82,6 +89,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
+		{http.MethodGet, "/api/v1/carriers/stats?carrier=UA", http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},
 		{http.MethodGet, "/swagger/index.html", http.StatusOK},
@@ -113,6 +121,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec missing /api/v1/routes/outlook")
 	}
 
+	if _, ok := external["/api/v1/carriers/stats"]; !ok {
+		t.Fatal("external spec missing /api/v1/carriers/stats")
+	}
+
 	if _, ok := external["/api/v1/ingest"]; ok {
 		t.Fatal("external spec must not include /api/v1/ingest")
 	}
@@ -133,6 +145,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		"/api/v1/jobs",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
+		"/api/v1/carriers/stats",
 	} {
 		if _, ok := internal[path]; !ok {
 			t.Fatalf("internal spec missing %s", path)

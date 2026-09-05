@@ -44,6 +44,7 @@ type Stub struct {
 	ReplaceWeatherObservationsByMonthFn   func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
 	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
+	CarrierStatsFn                        func(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error)
 	PingFn                                func(ctx context.Context) error
 	MigrationVersionFn                    func(ctx context.Context) (store.MigrationVersion, error)
 	CloseFn                               func() error
@@ -303,6 +304,14 @@ func (s *Stub) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter
 	}
 
 	return s.RouteOutlookFn(ctx, filter)
+}
+
+func (s *Stub) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {
+	if s.CarrierStatsFn == nil {
+		panic("unexpected call: CarrierStats")
+	}
+
+	return s.CarrierStatsFn(ctx, filter)
 }
 
 func (s *Stub) Ping(ctx context.Context) error {

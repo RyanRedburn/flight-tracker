@@ -30,6 +30,7 @@ func newRouter(
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
 	routes := handlers.NewRoutesHandler(s)
+	carriers := handlers.NewCarriersHandler(s)
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths, weatherStations, logger)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
@@ -61,6 +62,7 @@ func newRouter(
 		r.Get("/jobs/{id}", jobs.Get)
 		r.Get("/routes/stats", routes.Stats)
 		r.Get("/routes/outlook", routes.Outlook)
+		r.Get("/carriers/stats", carriers.Stats)
 	})
 
 	return r

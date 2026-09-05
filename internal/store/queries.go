@@ -153,6 +153,20 @@ const (
 		FROM schema_migrations
 		LIMIT 1`
 
+	sqlCauseMax = `GREATEST(COALESCE(carrier_delay, 0), COALESCE(weather_delay, 0), COALESCE(nas_delay, 0), COALESCE(security_delay, 0), COALESCE(late_aircraft_delay, 0))`
+
+	sqlPrimaryCauseCase = `CASE
+					WHEN NOT is_delayed THEN NULL
+					WHEN ` + sqlCauseMax + ` = 0 THEN 'unattributed'
+					WHEN COALESCE(late_aircraft_delay, 0) = ` + sqlCauseMax + ` THEN 'late_aircraft'
+					WHEN COALESCE(carrier_delay, 0) = ` + sqlCauseMax + ` THEN 'carrier'
+					WHEN COALESCE(nas_delay, 0) = ` + sqlCauseMax + ` THEN 'nas'
+					WHEN COALESCE(weather_delay, 0) = ` + sqlCauseMax + ` THEN 'weather'
+					ELSE 'security'
+				END`
+
+	carrierStatsMinSampleSQL = `30`
+
 	QueryRouteStats = `
 		WITH matched AS (
 			SELECT
@@ -166,7 +180,6 @@ const (
 				nas_delay,
 				security_delay,
 				late_aircraft_delay,
-				cancellation_code,
 				div1_airport,
 				div2_airport,
 				div3_airport,
@@ -186,6 +199,12 @@ const (
 				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
 				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
 			FROM matched
+		),
+		with_cause AS (
+			SELECT
+				*,
+				` + sqlPrimaryCauseCase + ` AS primary_cause
+			FROM classified
 		)
 		SELECT
 			COUNT(*)::int AS flights,
@@ -212,6 +231,12 @@ const (
 			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,
 			AVG(COALESCE(security_delay, 0)) FILTER (WHERE is_delayed) AS cause_security,
 			AVG(COALESCE(late_aircraft_delay, 0)) FILTER (WHERE is_delayed) AS cause_late,
+			COUNT(*) FILTER (WHERE primary_cause = 'carrier')::int AS share_carrier,
+			COUNT(*) FILTER (WHERE primary_cause = 'weather')::int AS share_weather,
+			COUNT(*) FILTER (WHERE primary_cause = 'nas')::int AS share_nas,
+			COUNT(*) FILTER (WHERE primary_cause = 'security')::int AS share_security,
+			COUNT(*) FILTER (WHERE primary_cause = 'late_aircraft')::int AS share_late,
+			COUNT(*) FILTER (WHERE primary_cause = 'unattributed')::int AS share_unattributed,
 			(
 				SELECT COALESCE(
 					json_agg(json_build_object('airport', airport, 'count', cnt) ORDER BY cnt DESC, airport),
@@ -224,20 +249,161 @@ const (
 					WHERE is_diverted AND airport IS NOT NULL AND btrim(airport) <> ''
 					GROUP BY btrim(airport)
 				) d
-			) AS diversion_airports,
+			) AS diversion_airports
+		FROM with_cause`
+
+	QueryCarrierStatsMaxDate = `
+		SELECT MAX(flight_date)::text
+		FROM flight_performance
+		WHERE iata_code_marketing_airline = $1`
+
+	QueryCarrierStats = `
+		WITH matched AS (
+			SELECT
+				cancelled,
+				diverted,
+				arr_del15,
+				arr_delay_minutes,
+				dep_delay_minutes,
+				carrier_delay,
+				weather_delay,
+				nas_delay,
+				security_delay,
+				late_aircraft_delay
+			FROM flight_performance
+			WHERE iata_code_marketing_airline = $1
+				AND flight_date >= $2
+				AND flight_date <= $3
+				/*extra*/
+		),
+		classified AS (
+			SELECT
+				*,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		),
+		with_cause AS (
+			SELECT
+				*,
+				` + sqlPrimaryCauseCase + ` AS primary_cause
+			FROM classified
+		)
+		SELECT
+			COUNT(*)::int AS flights,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
+			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
+			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted,
+			AVG(arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS avg_arr,
 			(
-				SELECT COALESCE(
-					json_agg(json_build_object('code', code, 'count', cnt) ORDER BY cnt DESC, code),
-					'[]'::json
-				)
-				FROM (
-					SELECT btrim(cancellation_code) AS code, COUNT(*)::int AS cnt
-					FROM classified
-					WHERE is_cancelled AND cancellation_code IS NOT NULL AND btrim(cancellation_code) <> ''
-					GROUP BY btrim(cancellation_code)
-				) c
-			) AS cancellation_codes
-		FROM classified`
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
+			) AS median_arr,
+			AVG(arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS avg_arr_delayed,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
+			) AS median_arr_delayed,
+			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep,
+			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
+			AVG(COALESCE(carrier_delay, 0)) FILTER (WHERE is_delayed) AS cause_carrier,
+			AVG(COALESCE(weather_delay, 0)) FILTER (WHERE is_delayed) AS cause_weather,
+			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,
+			AVG(COALESCE(security_delay, 0)) FILTER (WHERE is_delayed) AS cause_security,
+			AVG(COALESCE(late_aircraft_delay, 0)) FILTER (WHERE is_delayed) AS cause_late,
+			COUNT(*) FILTER (WHERE primary_cause = 'carrier')::int AS share_carrier,
+			COUNT(*) FILTER (WHERE primary_cause = 'weather')::int AS share_weather,
+			COUNT(*) FILTER (WHERE primary_cause = 'nas')::int AS share_nas,
+			COUNT(*) FILTER (WHERE primary_cause = 'security')::int AS share_security,
+			COUNT(*) FILTER (WHERE primary_cause = 'late_aircraft')::int AS share_late,
+			COUNT(*) FILTER (WHERE primary_cause = 'unattributed')::int AS share_unattributed
+		FROM with_cause`
+
+	QueryCarrierStatsRoutes = `
+		WITH matched AS (
+			SELECT
+				origin,
+				dest,
+				cancelled,
+				diverted,
+				arr_del15
+			FROM flight_performance
+			WHERE iata_code_marketing_airline = $1
+				AND flight_date >= $2
+				AND flight_date <= $3
+				/*extra*/
+		),
+		classified AS (
+			SELECT
+				origin,
+				dest,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		)
+		SELECT
+			origin,
+			dest,
+			COUNT(*)::int AS flights,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
+			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
+			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted
+		FROM classified
+		GROUP BY origin, dest
+		HAVING COUNT(*) >= ` + carrierStatsMinSampleSQL
+
+	QueryCarrierStatsAirports = `
+		WITH matched AS (
+			SELECT
+				origin,
+				dest,
+				origin_state,
+				dest_state,
+				cancelled,
+				diverted,
+				arr_del15
+			FROM flight_performance
+			WHERE iata_code_marketing_airline = $1
+				AND flight_date >= $2
+				AND flight_date <= $3
+				/*extra*/
+		),
+		classified AS (
+			SELECT
+				origin,
+				dest,
+				origin_state,
+				dest_state,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		),
+		airport_flights AS (
+			SELECT origin AS airport, is_cancelled, is_diverted, is_delayed
+			FROM classified
+			WHERE /*origin_airport*/
+			UNION ALL
+			SELECT dest AS airport, is_cancelled, is_diverted, is_delayed
+			FROM classified
+			WHERE /*dest_airport*/
+		)
+		SELECT
+			airport,
+			COUNT(*)::int AS flights,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
+			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
+			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted
+		FROM airport_flights
+		GROUP BY airport
+		HAVING COUNT(*) >= ` + carrierStatsMinSampleSQL
 
 	QueryRouteOutlookMaxDate = `
 		SELECT MAX(flight_date)::text

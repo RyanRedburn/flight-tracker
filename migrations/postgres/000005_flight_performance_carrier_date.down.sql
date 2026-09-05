@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_flight_performance_marketing_airline_date;

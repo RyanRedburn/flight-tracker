@@ -2,7 +2,7 @@
 //
 //	@title						flight-tracker API
 //	@version					1.0
-//	@description				REST API for flight data ingest, job status, and route performance.
+//	@description				REST API for flight data ingest, job status, route performance, and carrier performance.
 //	@host						localhost:8080
 //	@BasePath					/
 //
@@ -14,6 +14,8 @@
 //	@tag.description			Inspect background job status
 //	@tag.name					routes
 //	@tag.description			Route performance stats and booking outlook
+//	@tag.name					carriers
+//	@tag.description			Carrier performance stats
 //
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/external --instanceName external --tags external --parseDependency --parseInternal
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/full --instanceName internal --parseDependency --parseInternal

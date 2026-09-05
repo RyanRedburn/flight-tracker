@@ -12,12 +12,119 @@ definitions:
       count:
         type: integer
     type: object
-  model.CancellationCodeCount:
+  model.CarrierAirportStat:
     properties:
-      code:
+      airport:
         type: string
-      count:
+      cancellation_rate:
+        type: number
+      cancelled:
         type: integer
+      delay_rate:
+        type: number
+      delayed:
+        type: integer
+      diversion_rate:
+        type: number
+      diverted:
+        type: integer
+      flights:
+        type: integer
+      on_time:
+        type: integer
+      on_time_rate:
+        type: number
+    type: object
+  model.CarrierRouteStat:
+    properties:
+      cancellation_rate:
+        type: number
+      cancelled:
+        type: integer
+      delay_rate:
+        type: number
+      delayed:
+        type: integer
+      dest:
+        type: string
+      diversion_rate:
+        type: number
+      diverted:
+        type: integer
+      flights:
+        type: integer
+      on_time:
+        type: integer
+      on_time_rate:
+        type: number
+      origin:
+        type: string
+    type: object
+  model.CarrierStats:
+    properties:
+      avg_arrival_delay_minutes:
+        type: number
+      avg_arrival_delay_when_delayed:
+        type: number
+      avg_departure_delay_minutes:
+        type: number
+      avg_departure_delay_when_delayed:
+        type: number
+      best_airports:
+        items:
+          $ref: '#/definitions/model.CarrierAirportStat'
+        type: array
+      best_routes:
+        items:
+          $ref: '#/definitions/model.CarrierRouteStat'
+        type: array
+      cancellation_rate:
+        type: number
+      cancelled:
+        type: integer
+      carrier:
+        type: string
+      delay_causes_avg_minutes:
+        $ref: '#/definitions/model.DelayCausesAvgMinutes'
+      delay_causes_share:
+        $ref: '#/definitions/model.DelayCausesShare'
+      delay_rate:
+        type: number
+      delayed:
+        type: integer
+      diversion_rate:
+        type: number
+      diverted:
+        type: integer
+      end_date:
+        type: string
+      filters:
+        $ref: '#/definitions/model.CarrierStatsFilters'
+      flights:
+        type: integer
+      median_arrival_delay_minutes:
+        type: number
+      median_arrival_delay_when_delayed:
+        type: number
+      on_time:
+        type: integer
+      on_time_rate:
+        type: number
+      start_date:
+        type: string
+      worst_airports:
+        items:
+          $ref: '#/definitions/model.CarrierAirportStat'
+        type: array
+      worst_routes:
+        items:
+          $ref: '#/definitions/model.CarrierRouteStat'
+        type: array
+    type: object
+  model.CarrierStatsFilters:
+    properties:
+      state:
+        type: string
     type: object
   model.DelayCausesAvgMinutes:
     properties:
@@ -28,6 +135,21 @@ definitions:
       nas:
         type: number
       security:
+        type: number
+      weather:
+        type: number
+    type: object
+  model.DelayCausesShare:
+    properties:
+      carrier:
+        type: number
+      late_aircraft:
+        type: number
+      nas:
+        type: number
+      security:
+        type: number
+      unattributed:
         type: number
       weather:
         type: number
@@ -83,16 +205,14 @@ definitions:
         type: number
       avg_departure_delay_when_delayed:
         type: number
-      cancellation_codes:
-        items:
-          $ref: '#/definitions/model.CancellationCodeCount'
-        type: array
       cancellation_rate:
         type: number
       cancelled:
         type: integer
       delay_causes_avg_minutes:
         $ref: '#/definitions/model.DelayCausesAvgMinutes'
+      delay_causes_share:
+        $ref: '#/definitions/model.DelayCausesShare'
       delay_rate:
         type: number
       delayed:
@@ -140,10 +260,63 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: REST API for flight data ingest, job status, and route performance.
+  description: REST API for flight data ingest, job status, route performance, and
+    carrier performance.
   title: flight-tracker API
   version: "1.0"
 paths:
+  /api/v1/carriers/stats:
+    get:
+      description: Aggregated on-time, delay, cancellation, and diversion stats for
+        a marketing carrier, plus best and worst routes and airports (on-time rate,
+        min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code.
+        Dates are optional together and default to the trailing 90 days ending at
+        the carrier's latest flight date (max span 366 days). State is a 2-letter
+        code matching origin or dest.
+      parameters:
+      - description: Marketing carrier code
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        required: true
+        type: string
+      - description: Range start (YYYY-MM-DD); required if end_date is set
+        format: date
+        in: query
+        name: start_date
+        type: string
+      - description: Range end (YYYY-MM-DD), on or after start_date; required if start_date
+          is set
+        format: date
+        in: query
+        name: end_date
+        type: string
+      - description: Origin or dest state code
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.CarrierStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Carrier performance stats
+      tags:
+      - carriers
+      - external
   /api/v1/routes/outlook:
     get:
       description: On-time, delay, cancellation, and diversion probabilities for a

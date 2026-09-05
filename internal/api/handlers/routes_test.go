@@ -32,9 +32,6 @@ func TestRoutesStats(t *testing.T) {
 				DiversionAirports: []model.AirportCount{
 					{Airport: "MDW", Count: 1},
 				},
-				CancellationCodes: []model.CancellationCodeCount{
-					{Code: "A", Count: 1},
-				},
 			}, nil
 		},
 	})
@@ -63,10 +60,6 @@ func TestRoutesStats(t *testing.T) {
 	if len(stats.DiversionAirports) != 1 || stats.DiversionAirports[0].Airport != "MDW" {
 		t.Errorf("diversion_airports = %+v", stats.DiversionAirports)
 	}
-
-	if len(stats.CancellationCodes) != 1 || stats.CancellationCodes[0].Code != "A" {
-		t.Errorf("cancellation_codes = %+v", stats.CancellationCodes)
-	}
 }
 
 func TestRoutesStatsEmpty(t *testing.T) {
@@ -76,7 +69,6 @@ func TestRoutesStatsEmpty(t *testing.T) {
 				Origin:            testOriginORD,
 				Dest:              testDestLAX,
 				DiversionAirports: []model.AirportCount{},
-				CancellationCodes: []model.CancellationCodeCount{},
 			}, nil
 		},
 	})
@@ -94,7 +86,7 @@ func TestRoutesStatsEmpty(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if stats.Flights != 0 || stats.DiversionAirports == nil || stats.CancellationCodes == nil {
+	if stats.Flights != 0 || stats.DiversionAirports == nil {
 		t.Fatalf("empty stats = %+v", stats)
 	}
 }
