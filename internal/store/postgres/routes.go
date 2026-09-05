@@ -93,6 +93,8 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	stats.DiversionAirports = airports
 	stats.CancellationCodes = codes
 
+	stats.RoundForResponse()
+
 	return stats, nil
 }
 
@@ -179,6 +181,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	out.LikelyArrivalDelayWhenDelayed = nullFloat(avgArrDelayed)
 	out.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
 	out.LikelyDepartureDelayMinutes = nullFloat(avgDep)
+
+	out.RoundForResponse()
 
 	return out, nil
 }

@@ -216,6 +216,8 @@ func AggregateRouteStats(filter RouteStatsFilter, rows []FlightPerf) *model.Rout
 	stats.DiversionAirports = airportCounts(divCounts)
 	stats.CancellationCodes = cancellationCodeCounts(cancelCounts)
 
+	stats.RoundForResponse()
+
 	return stats
 }
 
@@ -300,6 +302,8 @@ func AggregateRouteOutlook(filter RouteOutlookFilter, rows []FlightPerf) *model.
 	out.LikelyArrivalDelayWhenDelayed = mean(arrDelaysDelayed)
 	out.MedianArrivalDelayWhenDelayed = median(arrDelaysDelayed)
 	out.LikelyDepartureDelayMinutes = safeDiv(depDelaySum, float64(depDelayCount))
+
+	out.RoundForResponse()
 
 	return out
 }

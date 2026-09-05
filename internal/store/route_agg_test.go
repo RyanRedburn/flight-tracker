@@ -7,6 +7,7 @@ import (
 
 const (
 	testFlightDate20260401 = "2026-04-01"
+	testEndDate20260430    = "2026-04-30"
 	testAirportORD         = "ORD"
 	testAirportLAX         = "LAX"
 	testFloatNo            = "0.00"
@@ -69,7 +70,7 @@ func TestAggregateRouteStats(t *testing.T) {
 	}
 
 	stats := AggregateRouteStats(RouteStatsFilter{
-		Origin: testAirportORD, Dest: testAirportLAX, StartDate: testFlightDate20260401, EndDate: "2026-04-30",
+		Origin: testAirportORD, Dest: testAirportLAX, StartDate: testFlightDate20260401, EndDate: testEndDate20260430,
 	}, rows)
 
 	if stats.Flights != 4 {
@@ -97,7 +98,7 @@ func TestAggregateRouteStats(t *testing.T) {
 	}
 
 	filtered := AggregateRouteStats(RouteStatsFilter{
-		Origin: testAirportORD, Dest: testAirportLAX, StartDate: testFlightDate20260401, EndDate: "2026-04-30",
+		Origin: testAirportORD, Dest: testAirportLAX, StartDate: testFlightDate20260401, EndDate: testEndDate20260430,
 		DaysOfWeek: []int{3, 4},
 	}, rows)
 	if filtered.Flights != 2 {
@@ -171,5 +172,90 @@ func TestAggregateRouteOutlook(t *testing.T) {
 
 	if !midnight.InsufficientSample {
 		t.Fatal("expected insufficient_sample for size 1")
+	}
+}
+
+func TestAggregateRouteStatsRounding(t *testing.T) {
+	rows := []FlightPerf{
+		roundingPerf("2026-04-01", "3", testFloatNo, "10.40", "1.40", testFloatNo),
+		roundingPerf("2026-04-02", "4", testFloatNo, "10.40", "1.40", testFloatNo),
+		{
+			FlightDate: "2026-04-03", DayOfWeek: "5", Origin: testAirportORD, Dest: testAirportLAX, Carrier: "UA", FlightNumber: "100",
+			CRSDepTime: "0700", ArrDelayMinutes: "20.40", DepDelayMinutes: "15.40", ArrDel15: testFloatYes, DepDel15: testFloatYes,
+			Cancelled: testFloatNo, Diverted: testFloatNo, NASDelay: "10.40",
+		},
+	}
+
+	stats := AggregateRouteStats(RouteStatsFilter{
+		Origin: testAirportORD, Dest: testAirportLAX, StartDate: testFlightDate20260401, EndDate: testEndDate20260430,
+	}, rows)
+
+	if stats.OnTimeRate != 0.67 || stats.DelayRate != 0.33 {
+		t.Errorf("rates = on_time=%v delay=%v, want 0.67 and 0.33", stats.OnTimeRate, stats.DelayRate)
+	}
+
+	if stats.AvgArrivalDelayMinutes != 14 {
+		t.Errorf("avg_arrival_delay_minutes = %v, want 14", stats.AvgArrivalDelayMinutes)
+	}
+
+	if stats.MedianArrivalDelayMinutes != 10 {
+		t.Errorf("median_arrival_delay_minutes = %v, want 10", stats.MedianArrivalDelayMinutes)
+	}
+
+	if stats.AvgArrivalDelayWhenDelayed != 20 {
+		t.Errorf("avg_arrival_delay_when_delayed = %v, want 20", stats.AvgArrivalDelayWhenDelayed)
+	}
+
+	if stats.AvgDepartureDelayMinutes != 6 {
+		t.Errorf("avg_departure_delay_minutes = %v, want 6", stats.AvgDepartureDelayMinutes)
+	}
+
+	if stats.AvgDepartureDelayWhenDelayed != 15 {
+		t.Errorf("avg_departure_delay_when_delayed = %v, want 15", stats.AvgDepartureDelayWhenDelayed)
+	}
+
+	if stats.DelayCausesAvgMinutes.NAS != 10 {
+		t.Errorf("NAS cause avg = %v, want 10", stats.DelayCausesAvgMinutes.NAS)
+	}
+}
+
+func TestAggregateRouteOutlookRounding(t *testing.T) {
+	rows := []FlightPerf{
+		roundingPerf("2025-06-01", "2", testFloatNo, "10.40", "1.40", testFloatNo),
+		roundingPerf("2025-06-08", "2", testFloatNo, "10.40", "1.40", testFloatNo),
+		roundingPerf("2025-06-15", "2", testFloatYes, "20.40", "15.40", testFloatNo),
+	}
+
+	out := AggregateRouteOutlook(RouteOutlookFilter{
+		Origin: testAirportORD, Dest: testAirportLAX, Carrier: "UA", DayOfWeek: 2,
+		DepTime: "0700", DepTimeWindowMinutes: 30,
+	}, rows)
+
+	if out.OnTimeProbability != 0.67 || out.DelayProbability != 0.33 {
+		t.Errorf("probabilities = on_time=%v delay=%v, want 0.67 and 0.33", out.OnTimeProbability, out.DelayProbability)
+	}
+
+	if out.LikelyArrivalDelayMinutes != 14 {
+		t.Errorf("likely_arrival_delay_minutes = %v, want 14", out.LikelyArrivalDelayMinutes)
+	}
+
+	if out.MedianArrivalDelayMinutes != 10 {
+		t.Errorf("median_arrival_delay_minutes = %v, want 10", out.MedianArrivalDelayMinutes)
+	}
+
+	if out.LikelyArrivalDelayWhenDelayed != 20 {
+		t.Errorf("likely_arrival_delay_when_delayed = %v, want 20", out.LikelyArrivalDelayWhenDelayed)
+	}
+
+	if out.LikelyDepartureDelayMinutes != 6 {
+		t.Errorf("likely_departure_delay_minutes = %v, want 6", out.LikelyDepartureDelayMinutes)
+	}
+}
+
+func roundingPerf(date, dayOfWeek, arrDel15, arrDelay, depDelay, cancelled string) FlightPerf {
+	return FlightPerf{
+		FlightDate: date, DayOfWeek: dayOfWeek, Origin: testAirportORD, Dest: testAirportLAX, Carrier: "UA", FlightNumber: "100",
+		CRSDepTime: "0700", ArrDelayMinutes: arrDelay, DepDelayMinutes: depDelay, ArrDel15: arrDel15,
+		Cancelled: cancelled, Diverted: testFloatNo,
 	}
 }
