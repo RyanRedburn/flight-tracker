@@ -44,4 +44,8 @@ test-cover-html:
 	@echo "Coverage report: $(COVERAGE_HTML)"
 
 clean-cover:
+ifeq ($(OS),Windows_NT)
+	-del /Q $(COVERAGE_OUT) $(COVERAGE_HTML)
+else
 	rm -f $(COVERAGE_OUT) $(COVERAGE_HTML)
+endif
