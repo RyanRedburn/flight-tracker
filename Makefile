@@ -19,21 +19,23 @@ test:
 docker-build:
 	docker compose build
 
+# postgres + app only. The migrate sidecar is behind the "migrate" profile so
+# default `up` does not race the app's on-open migrations.
 docker-run:
 	docker compose up
 
 # Run migrations via the migrate sidecar (distroless app image has no shell/make).
 migrate-up:
-	docker compose run --rm migrate up
+	docker compose --profile migrate run --rm migrate up
 
 migrate-down:
-	docker compose run --rm migrate down
+	docker compose --profile migrate run --rm migrate down
 
 migrate-version:
-	docker compose run --rm migrate version
+	docker compose --profile migrate run --rm migrate version
 
 db-shell:
-	docker compose run --rm -it migrate shell
+	docker compose --profile migrate run --rm -it migrate shell
 
 COVERAGE_OUT := coverage.out
 COVERAGE_HTML := coverage.html

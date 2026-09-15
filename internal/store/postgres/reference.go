@@ -28,6 +28,10 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*
 	}
 
 	if err := execCreateJob(ctx, s.db, job); err != nil {
+		if isUniqueViolation(err) {
+			return nil, store.ErrActiveIngestConflict
+		}
+
 		return nil, err
 	}
 

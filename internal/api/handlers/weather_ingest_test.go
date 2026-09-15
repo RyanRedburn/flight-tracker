@@ -12,6 +12,7 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -266,6 +267,39 @@ func TestWeatherIngestForceReimport(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWeatherIngestCreateJobActiveConflict(t *testing.T) {
+	st := weatherIngestSuccessStub()
+
+	st.CreateWeatherIngestJobFn = func(context.Context, int, int, []string) (*model.Job, error) {
+		return nil, store.ErrActiveIngestConflict
+	}
+
+	h := NewWeatherIngestHandler(st, defaultMaxIngestMonths, nil, nil)
+
+	rec := postWeatherIngest(t, h, map[string]any{
+		jsonStartYear:  2024,
+		jsonStartMonth: 1,
+		jsonStations:   []string{testOriginORD},
+	})
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body WeatherIngestConflictResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Error != errActiveIngestMonths {
+		t.Errorf("error = %q, want %q", body.Error, errActiveIngestMonths)
+	}
+
+	if len(body.ActiveIngestMonths) != 1 || body.ActiveIngestMonths[0] != (model.YearMonth{Year: 2024, Month: 1}) {
+		t.Errorf("active_ingest_months = %+v, want [{2024 1}]", body.ActiveIngestMonths)
 	}
 }
 

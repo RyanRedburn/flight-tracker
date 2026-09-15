@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -296,5 +297,37 @@ func TestIngestEndBeforeStart(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestIngestCreateJobActiveConflict(t *testing.T) {
+	st := ingestSuccessStub()
+
+	st.CreateFlightPerformanceIngestJobFn = func(context.Context, int, int) (*model.Job, error) {
+		return nil, store.ErrActiveIngestConflict
+	}
+
+	h := NewIngestHandler(st, defaultMaxIngestMonths)
+
+	rec := postIngest(t, h, map[string]any{
+		jsonStartYear:  2026,
+		jsonStartMonth: 4,
+	})
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body FlightPerformanceIngestConflictResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Error != errActiveIngestMonths {
+		t.Errorf("error = %q, want %q", body.Error, errActiveIngestMonths)
+	}
+
+	if len(body.ActiveIngestMonths) != 1 || body.ActiveIngestMonths[0] != (model.YearMonth{Year: 2026, Month: 4}) {
+		t.Errorf("active_ingest_months = %+v, want [{2026 4}]", body.ActiveIngestMonths)
 	}
 }

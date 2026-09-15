@@ -36,6 +36,10 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 	}
 
 	if _, err := tx.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, job.ID, year, month); err != nil {
+		if isUniqueViolation(err) {
+			return nil, store.ErrActiveIngestConflict
+		}
+
 		return nil, fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
 	}
 
@@ -95,6 +99,10 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 	}
 
 	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month, stationsJSON); err != nil {
+		if isUniqueViolation(err) {
+			return nil, store.ErrActiveIngestConflict
+		}
+
 		return nil, fmt.Errorf("insert weather_ingest_jobs: %w", err)
 	}
 

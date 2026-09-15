@@ -21,19 +21,18 @@ Go service with a REST API and an in-process background worker for importing fli
 
 - Go 1.25+
 - [GNU Make](https://www.gnu.org/software/make/) (Git Bash, WSL, or `choco install make` on Windows)
-- [golangci-lint](https://golangci-lint.run/) v2 (for `make lint`)
 - Docker & Docker Compose (for Postgres and optional containerized runs)
 
 ## Makefile
 
 | Command | Description |
 | --------- | ------------- |
-| `make lint` | Run golangci-lint (uses `.golangci.yml`) |
+| `make lint` | Run pinned golangci-lint `v2.12.2` via `go run` (`.golangci.yml`; no global install) |
 | `make swagger` | Regenerate OpenAPI docs (`docs/external`, `docs/full`) via `go generate` |
 | `make test` | Run all tests |
 | `make test-cover-html` | Full suite with HTML coverage report (`coverage.html`) |
 | `make docker-build` | Build Docker images |
-| `make docker-run` | Start the app via Docker Compose |
+| `make docker-run` | Start postgres and the app via Docker Compose (migrate sidecar is not part of default `up`) |
 | `make migrate-up` | Apply migrations via the migrate sidecar |
 | `make migrate-down` | Roll back one migration |
 | `make migrate-version` | Show current migration version |
@@ -64,7 +63,7 @@ make swagger
 
 Visibility is controlled by swag tags on each handler:
 
-- `external` — included in the user-facing `/swagger/` docs (currently route stats and outlook only)
+- `external` — included in the user-facing `/swagger/` docs (currently route stats, route outlook, and carrier stats)
 - `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
 
 After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
@@ -99,7 +98,7 @@ Environment variables (defaults shown):
 
 ## Docker
 
-Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). The app image has no shell or extra tools — use the migrate sidecar for manual migrations and database inspection.
+Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). Default bring-up (`make docker-run` / `docker compose up`) starts postgres and app only — the app migrates on startup. The migrate sidecar uses the `migrate` profile so it is not started alongside the app (that would double-migrate on first boot). The app image has no shell or extra tools; use the sidecar for manual migrations and database inspection (`make migrate-up`, `make db-shell`).
 
 Optional local overrides: copy [`.env.example`](.env.example) to `.env` (Compose defaults match the example credentials).
 
