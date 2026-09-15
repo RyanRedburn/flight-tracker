@@ -173,6 +173,7 @@ func (h *ReferenceIngestHandler) create(
 		}
 
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+
 		return
 	}
 

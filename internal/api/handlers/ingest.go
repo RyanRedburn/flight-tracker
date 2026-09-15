@@ -118,6 +118,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 			}
 
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+
 			return
 		}
 

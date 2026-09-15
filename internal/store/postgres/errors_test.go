@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestIsUniqueViolation(t *testing.T) {
 		},
 		{
 			name: "other error",
-			err:  fmt.Errorf("boom"),
+			err:  errors.New("boom"),
 			want: false,
 		},
 		{
