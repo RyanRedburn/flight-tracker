@@ -67,7 +67,7 @@ func run() int {
 		}
 	}()
 
-	if err := operator.RecoverStaleJobs(ctx, st, cfg.StaleJobThreshold, logger); err != nil {
+	if err := operator.RecoverStaleJobs(ctx, st, cfg.JobLeaseTTL, logger); err != nil {
 		logger.Error("recover stale jobs", "error", err)
 		return 1
 	}
@@ -91,10 +91,14 @@ func run() int {
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),
 	)
-	worker := operator.NewWorker(st, processor, cfg.WorkerConcurrency, cfg.WorkerPollInterval, logger)
+	worker := operator.NewWorker(st, processor, operator.WorkerConfig{
+		Concurrency:  cfg.WorkerConcurrency,
+		PollInterval: cfg.WorkerPollInterval,
+		LeaseTTL:     cfg.JobLeaseTTL,
+	}, logger)
 
 	worker.Start(ctx)
-	defer worker.Stop(10 * time.Second)
+	defer worker.Stop(15 * time.Second)
 
 	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths, weatherStations)
 
@@ -119,6 +123,8 @@ func run() int {
 	}
 
 	logger.Info("shutting down")
+
+	worker.Shutdown()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

@@ -21,10 +21,11 @@ type Stub struct {
 	GetWeatherIngestJobFn                 func(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
 	ListJobsFn                            func(ctx context.Context, limit int) ([]*model.Job, error)
 	UpdateJobFn                           func(ctx context.Context, job *model.Job) error
-	ClaimNextPendingJobFn                 func(ctx context.Context) (*model.Job, error)
+	ClaimNextPendingJobFn                 func(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJobFn                         func(ctx context.Context, id string, result json.RawMessage) error
 	FailJobFn                             func(ctx context.Context, id, errMsg string) error
-	ResetStaleRunningJobsFn               func(ctx context.Context, olderThan time.Time) (int64, error)
+	HeartbeatJobFn                        func(ctx context.Context, id string, leaseUntil time.Time) error
+	ResetStaleRunningJobsFn               func(ctx context.Context, expiredBefore time.Time) (int64, error)
 	ActiveFlightPerformanceIngestMonthsFn func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonthsFn           func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJobFn                     func(ctx context.Context, jobType string) (bool, error)
@@ -116,12 +117,12 @@ func (s *Stub) UpdateJob(ctx context.Context, job *model.Job) error {
 	return s.UpdateJobFn(ctx, job)
 }
 
-func (s *Stub) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
+func (s *Stub) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error) {
 	if s.ClaimNextPendingJobFn == nil {
 		panic("unexpected call: ClaimNextPendingJob")
 	}
 
-	return s.ClaimNextPendingJobFn(ctx)
+	return s.ClaimNextPendingJobFn(ctx, leaseUntil)
 }
 
 func (s *Stub) CompleteJob(ctx context.Context, id string, result json.RawMessage) error {
@@ -140,12 +141,20 @@ func (s *Stub) FailJob(ctx context.Context, id, errMsg string) error {
 	return s.FailJobFn(ctx, id, errMsg)
 }
 
-func (s *Stub) ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error) {
+func (s *Stub) HeartbeatJob(ctx context.Context, id string, leaseUntil time.Time) error {
+	if s.HeartbeatJobFn == nil {
+		panic("unexpected call: HeartbeatJob")
+	}
+
+	return s.HeartbeatJobFn(ctx, id, leaseUntil)
+}
+
+func (s *Stub) ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Time) (int64, error) {
 	if s.ResetStaleRunningJobsFn == nil {
 		panic("unexpected call: ResetStaleRunningJobs")
 	}
 
-	return s.ResetStaleRunningJobsFn(ctx, olderThan)
+	return s.ResetStaleRunningJobsFn(ctx, expiredBefore)
 }
 
 func (s *Stub) ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {

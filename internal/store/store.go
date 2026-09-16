@@ -29,10 +29,11 @@ type Store interface {
 	GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
 	ListJobs(ctx context.Context, limit int) ([]*model.Job, error)
 	UpdateJob(ctx context.Context, job *model.Job) error
-	ClaimNextPendingJob(ctx context.Context) (*model.Job, error)
+	ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJob(ctx context.Context, id string, result json.RawMessage) error
 	FailJob(ctx context.Context, id, errMsg string) error
-	ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error)
+	HeartbeatJob(ctx context.Context, id string, leaseUntil time.Time) error
+	ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Time) (int64, error)
 	ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJob(ctx context.Context, jobType string) (bool, error)

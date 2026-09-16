@@ -93,6 +93,69 @@ func TestProcessorProcessHandlerFailure(t *testing.T) {
 	}
 }
 
+func TestProcessorProcessFailJobIgnoresCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var failCtxErr error
+
+	var failedMsg string
+
+	st := &storetest.Stub{
+		FailJobFn: func(failCtx context.Context, _, errMsg string) error {
+			failCtxErr = failCtx.Err()
+			failedMsg = errMsg
+
+			return nil
+		},
+	}
+
+	processor := NewProcessor(st, testHandler{jobType: testJobType, err: context.Canceled})
+	job := &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}
+
+	if err := processor.Process(ctx, job); err == nil {
+		t.Fatal("Process() expected error")
+	}
+
+	if failCtxErr != nil {
+		t.Errorf("FailJob ctx.Err() = %v, want nil", failCtxErr)
+	}
+
+	if failedMsg != context.Canceled.Error() {
+		t.Errorf("FailJob msg = %q, want %q", failedMsg, context.Canceled.Error())
+	}
+}
+
+func TestProcessorProcessShutdownCauseMessage(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cancel(ErrInterruptedByShutdown)
+
+	var failedMsg string
+
+	st := &storetest.Stub{
+		FailJobFn: func(failCtx context.Context, _, errMsg string) error {
+			if err := failCtx.Err(); err != nil {
+				t.Errorf("FailJob ctx already done: %v", err)
+			}
+
+			failedMsg = errMsg
+
+			return nil
+		},
+	}
+
+	processor := NewProcessor(st, testHandler{jobType: testJobType, err: context.Canceled})
+	job := &model.Job{ID: "job-3", Type: testJobType, Status: model.JobStatusRunning}
+
+	if err := processor.Process(ctx, job); err == nil {
+		t.Fatal("Process() expected error")
+	}
+
+	if failedMsg != ErrInterruptedByShutdown.Error() {
+		t.Errorf("FailJob msg = %q, want %q", failedMsg, ErrInterruptedByShutdown.Error())
+	}
+}
+
 func TestProcessorProcessUnknownJobType(t *testing.T) {
 	ctx := context.Background()
 
