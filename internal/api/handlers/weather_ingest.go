@@ -69,8 +69,12 @@ type WeatherIngestResponse struct {
 //	@Param			body	body		model.WeatherIngestRequest	true	"Ingest range and optional stations"
 //	@Success		201		{object}	WeatherIngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	WeatherIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest/weather [post]
 func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.WeatherIngestRequest

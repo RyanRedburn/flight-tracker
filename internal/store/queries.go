@@ -475,3 +475,80 @@ const (
 			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep
 		FROM classified`
 )
+
+const (
+	//nolint:gosec // G101: SQL column name key_hash, not a credential
+	QueryCreateAPIKey = `
+		INSERT INTO api_keys (id, prefix, key_hash, role, name, created_at, revoked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+
+	//nolint:gosec // G101: SQL column name key_hash, not a credential
+	QueryLookupAPIKeyByPrefix = `
+		SELECT id, prefix, key_hash, role, name, created_at, revoked_at
+		FROM api_keys
+		WHERE prefix = $1`
+
+	//nolint:gosec // G101: SQL column name key_hash, not a credential
+	QueryGetAPIKey = `
+		SELECT id, prefix, key_hash, role, name, created_at, revoked_at
+		FROM api_keys
+		WHERE id = $1`
+
+	//nolint:gosec // G101: SQL column name key_hash, not a credential
+	QueryListAPIKeys = `
+		SELECT id, prefix, key_hash, role, name, created_at, revoked_at
+		FROM api_keys
+		ORDER BY created_at DESC`
+
+	//nolint:gosec // G101: SQL table name api_keys, not a credential
+	QueryRevokeAPIKey = `
+		UPDATE api_keys
+		SET revoked_at = $1
+		WHERE id = $2 AND revoked_at IS NULL`
+
+	//nolint:gosec // G101: SQL table name api_keys, not a credential
+	QueryCountAPIKeys = `
+		SELECT COUNT(*)
+		FROM api_keys`
+
+	// Atomic token-bucket consume shared by all API replicas.
+	// $1 = bucket_key, $2 = requests per minute (capacity and refill).
+	// Tokens are milli-tokens (1000 = 1 request). INSERT admits the first
+	// request; ON CONFLICT UPDATE admits when refilled tokens >= 1000.
+	QueryConsumeRateLimit = `
+		WITH attempt AS (
+			INSERT INTO rate_limit_buckets AS b (bucket_key, tokens, last_refill_at)
+			VALUES ($1, ($2::int * 1000) - 1000, CLOCK_TIMESTAMP())
+			ON CONFLICT (bucket_key) DO UPDATE
+			SET
+				tokens = LEAST(
+					($2::int * 1000)::bigint,
+					b.tokens + ((EXTRACT(EPOCH FROM (CLOCK_TIMESTAMP() - b.last_refill_at)) * $2::int * 1000) / 60.0)::bigint
+				) - 1000,
+				last_refill_at = CLOCK_TIMESTAMP()
+			WHERE LEAST(
+				($2::int * 1000)::bigint,
+				b.tokens + ((EXTRACT(EPOCH FROM (CLOCK_TIMESTAMP() - b.last_refill_at)) * $2::int * 1000) / 60.0)::bigint
+			) >= 1000
+			RETURNING b.tokens, true AS allowed, CLOCK_TIMESTAMP() AS now_ts
+		),
+		denied AS (
+			SELECT
+				LEAST(
+					($2::int * 1000)::bigint,
+					b.tokens + ((EXTRACT(EPOCH FROM (CLOCK_TIMESTAMP() - b.last_refill_at)) * $2::int * 1000) / 60.0)::bigint
+				) AS tokens,
+				false AS allowed,
+				CLOCK_TIMESTAMP() AS now_ts
+			FROM rate_limit_buckets b
+			WHERE b.bucket_key = $1
+			  AND NOT EXISTS (SELECT 1 FROM attempt)
+		)
+		SELECT allowed, tokens, now_ts FROM attempt
+		UNION ALL
+		SELECT allowed, tokens, now_ts FROM denied`
+
+	QueryDeleteStaleRateLimitBuckets = `
+		DELETE FROM rate_limit_buckets
+		WHERE last_refill_at < $1`
+)

@@ -1,5 +1,37 @@
 basePath: /
 definitions:
+  handlers.APIKeyResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      prefix:
+        type: string
+      revoked_at:
+        type: string
+      role:
+        $ref: '#/definitions/model.APIKeyRole'
+    type: object
+  handlers.CreatedAPIKeyResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      name:
+        type: string
+      prefix:
+        type: string
+      revoked_at:
+        type: string
+      role:
+        $ref: '#/definitions/model.APIKeyRole'
+    type: object
   handlers.ErrorResponse:
     properties:
       error:
@@ -138,6 +170,16 @@ definitions:
           type: string
         type: array
     type: object
+  model.APIKeyRole:
+    enum:
+    - consumer
+    - subscriber
+    - admin
+    type: string
+    x-enum-varnames:
+    - APIKeyRoleConsumer
+    - APIKeyRoleSubscriber
+    - APIKeyRoleAdmin
   model.AirportCount:
     properties:
       airport:
@@ -257,6 +299,13 @@ definitions:
   model.CarrierStatsFilters:
     properties:
       state:
+        type: string
+    type: object
+  model.CreateAPIKeyRequest:
+    properties:
+      name:
+        type: string
+      role:
         type: string
     type: object
   model.DelayCausesAvgMinutes:
@@ -473,8 +522,11 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: REST API for flight data ingest, job status, route performance, and
-    carrier performance.
+  description: 'REST API for flight data ingest, job status, route performance, and
+    carrier performance. Protected routes require an API key (`Authorization: Bearer
+    <key>` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate limits
+    are shared in Postgres across API replicas; 429 responses include `Retry-After`,
+    `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.'
   title: flight-tracker API
   version: "1.0"
 paths:
@@ -522,10 +574,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Carrier performance stats
       tags:
       - carriers
@@ -554,14 +620,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.FlightPerformanceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue flight performance data ingest
       tags:
       - ingest
@@ -589,14 +669,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue airports reference data ingest
       tags:
       - ingest
@@ -624,14 +718,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue countries reference data ingest
       tags:
       - ingest
@@ -659,14 +767,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue regions reference data ingest
       tags:
       - ingest
@@ -697,14 +819,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.WeatherIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue weather observation data ingest
       tags:
       - ingest
@@ -735,14 +871,28 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "409":
           description: Conflict
           schema:
             $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Queue weather station mapping ingest
       tags:
       - ingest
@@ -768,10 +918,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: List jobs
       tags:
       - jobs
@@ -797,17 +961,157 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Get job by ID
       tags:
       - jobs
+      - internal
+  /api/v1/keys:
+    get:
+      description: Returns all API keys, including revoked keys. Hashes and plaintext
+        secrets are never included.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.APIKeyResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List API keys
+      tags:
+      - keys
+      - internal
+    post:
+      consumes:
+      - application/json
+      description: 'Creates a hashed API key. The plaintext key is returned once;
+        subsequent authentication uses Authorization: Bearer or X-API-Key.'
+      parameters:
+      - description: Role and optional name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreatedAPIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create API key
+      tags:
+      - keys
+      - internal
+  /api/v1/keys/{id}/revoke:
+    post:
+      description: Revokes an API key. Already-revoked keys return the current metadata.
+      parameters:
+      - description: API key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Revoke API key
+      tags:
+      - keys
       - internal
   /api/v1/routes/outlook:
     get:
@@ -866,10 +1170,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Route booking outlook
       tags:
       - routes
@@ -936,10 +1254,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Route performance stats
       tags:
       - routes
@@ -954,10 +1286,24 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/store.MigrationVersion'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Database migration version
       tags:
       - health
@@ -995,15 +1341,10 @@ paths:
       tags:
       - health
       - internal
+securityDefinitions:
+  ApiKeyAuth:
+    description: API key as `Bearer <key>`. `X-API-Key` is also accepted.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
-tags:
-- description: Liveness, readiness, and database migration version
-  name: health
-- description: Queue flight performance, weather, and reference data import jobs
-  name: ingest
-- description: Inspect background job status
-  name: jobs
-- description: Route performance stats and booking outlook
-  name: routes
-- description: Carrier performance stats
-  name: carriers

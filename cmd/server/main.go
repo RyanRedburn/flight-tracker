@@ -2,9 +2,14 @@
 //
 //	@title						flight-tracker API
 //	@version					1.0
-//	@description				REST API for flight data ingest, job status, route performance, and carrier performance.
+//	@description				REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer <key>` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate limits are shared in Postgres across API replicas; 429 responses include `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 //	@host						localhost:8080
 //	@BasePath					/
+//
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in							header
+//	@name						Authorization
+//	@description				API key as `Bearer <key>`. `X-API-Key` is also accepted.
 //
 //	@tag.name					health
 //	@tag.description			Liveness, readiness, and database migration version
@@ -16,6 +21,8 @@
 //	@tag.description			Route performance stats and booking outlook
 //	@tag.name					carriers
 //	@tag.description			Carrier performance stats
+//	@tag.name					keys
+//	@tag.description			Admin API key management
 //
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/external --instanceName external --tags external --parseDependency --parseInternal
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/api -o ../../docs/full --instanceName internal --parseDependency --parseInternal
@@ -32,6 +39,7 @@ import (
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api"
+	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
 	"github.com/RyanRedburn/flight-tracker/internal/config"
 	"github.com/RyanRedburn/flight-tracker/internal/database"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
@@ -72,6 +80,25 @@ func run() int {
 		return 1
 	}
 
+	created, prefix, err := api.BootstrapAdminKey(ctx, st, cfg.AuthBootstrapAdminKey)
+	if err != nil {
+		logger.Error("bootstrap admin API key", "error", err)
+		return 1
+	}
+
+	if created {
+		logger.Info("bootstrapped admin API key", "prefix", prefix)
+	}
+
+	if err := api.RequireAPIKeysIfAuthEnabled(ctx, st, cfg.AuthDisabled); err != nil {
+		logger.Error("auth startup check", "error", err)
+		return 1
+	}
+
+	if cfg.AuthDisabled {
+		logger.Warn("API authentication and rate limits are disabled (AUTH_DISABLED=true); do not use this in production")
+	}
+
 	btsDownloader := bts.NewDownloader(cfg.BTSBaseURL, cfg.BTSDownloadTimeout)
 	flightPerformanceIngest := bts.NewService(st, btsDownloader)
 
@@ -100,7 +127,18 @@ func run() int {
 	worker.Start(ctx)
 	defer worker.Stop(15 * time.Second)
 
-	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths, weatherStations)
+	server := api.NewServer(cfg.HTTPAddr, st, logger, cfg.MaxIngestMonths, weatherStations, api.Security{
+		Disabled:          cfg.AuthDisabled,
+		RateLimitDisabled: cfg.RateLimitDisabled,
+		TrustProxy:        cfg.RateLimitTrustProxy,
+		Limits: middleware.RateLimits{
+			AnonRPM:        cfg.RateLimitAnonRPM,
+			ConsumerRPM:    cfg.RateLimitConsumerRPM,
+			SubscriberRPM:  cfg.RateLimitSubscriberRPM,
+			AdminRPM:       cfg.RateLimitAdminRPM,
+			AdminIngestRPM: cfg.RateLimitAdminIngestRPM,
+		},
+	})
 
 	serverErr := make(chan error, 1)
 

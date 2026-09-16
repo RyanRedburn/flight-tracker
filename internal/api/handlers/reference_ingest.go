@@ -44,8 +44,12 @@ type ReferenceIngestResponse struct {
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest/countries [post]
 func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceCountries)
@@ -61,8 +65,12 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest/regions [post]
 func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceRegions)
@@ -78,8 +86,12 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest/airports [post]
 func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceAirports)
@@ -95,8 +107,12 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest/weather-stations [post]
 func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, model.JobTypeImportWeatherStations, datasetWeatherStations, h.store.HasWeatherStationsData)

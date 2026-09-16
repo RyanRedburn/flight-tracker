@@ -27,7 +27,11 @@ func NewCarriersHandler(s store.Store) *CarriersHandler {
 //	@Param			state		query		string	false	"Origin or dest state code"	minlength(2)	maxlength(2)
 //	@Success		200			{object}	model.CarrierStats
 //	@Failure		400			{object}	ErrorResponse
+//	@Failure		401			{object}	ErrorResponse
+//	@Failure		403			{object}	ErrorResponse
+//	@Failure		429			{object}	ErrorResponse
 //	@Failure		500			{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/carriers/stats [get]
 func (h *CarriersHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseCarrierStats(r)
