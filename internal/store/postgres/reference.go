@@ -33,17 +33,23 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := lockIngestJob(ctx, tx, jobType, 0, 0); err != nil {
-		return nil, err
+	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, jobType, 0); err != nil {
+		return nil, fmt.Errorf("advisory lock: %w", err)
 	}
 
-	active, err := activeIngestJob(ctx, tx, jobType)
-	if err != nil {
-		return nil, err
-	}
+	var exists int
 
-	if active {
+	err = tx.QueryRowContext(ctx, store.QueryActiveIngestJob,
+		jobType,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	).Scan(&exists)
+	if err == nil {
 		return nil, store.ErrActiveIngestConflict
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
 
 	if err := execCreateJob(ctx, tx, job); err != nil {
