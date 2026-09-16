@@ -31,15 +31,24 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := lockIngestJob(ctx, tx, model.JobTypeImportFlightPerformance, year, month); err != nil {
+		return nil, err
+	}
+
+	active, err := listActiveRequestedMonths(ctx, tx, store.QueryActiveFlightPerformanceIngestMonths, []model.YearMonth{{Year: year, Month: month}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(active) > 0 {
+		return nil, store.ErrActiveIngestConflict
+	}
+
 	if err := execCreateJob(ctx, tx, job); err != nil {
 		return nil, err
 	}
 
 	if _, err := tx.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, job.ID, year, month); err != nil {
-		if isUniqueViolation(err) {
-			return nil, store.ErrActiveIngestConflict
-		}
-
 		return nil, fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
 	}
 
@@ -94,15 +103,24 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := lockIngestJob(ctx, tx, model.JobTypeImportWeatherObservations, year, month); err != nil {
+		return nil, err
+	}
+
+	active, err := listActiveRequestedMonths(ctx, tx, store.QueryActiveWeatherIngestMonths, []model.YearMonth{{Year: year, Month: month}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(active) > 0 {
+		return nil, store.ErrActiveIngestConflict
+	}
+
 	if err := execCreateJob(ctx, tx, job); err != nil {
 		return nil, err
 	}
 
 	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month, stationsJSON); err != nil {
-		if isUniqueViolation(err) {
-			return nil, store.ErrActiveIngestConflict
-		}
-
 		return nil, fmt.Errorf("insert weather_ingest_jobs: %w", err)
 	}
 
@@ -248,102 +266,15 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 		return nil, nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	activeSet := make(map[model.YearMonth]struct{}, len(months))
-
-	requested := make(map[model.YearMonth]struct{}, len(months))
-	for _, ym := range months {
-		requested[ym] = struct{}{}
-	}
-
-	var active []model.YearMonth
-
-	for rows.Next() {
-		var ym model.YearMonth
-		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
-			return nil, err
-		}
-
-		if _, ok := requested[ym]; !ok {
-			continue
-		}
-
-		if _, seen := activeSet[ym]; seen {
-			continue
-		}
-
-		activeSet[ym] = struct{}{}
-		active = append(active, ym)
-	}
-
-	return active, rows.Err()
+	return listActiveRequestedMonths(ctx, s.db, store.QueryActiveFlightPerformanceIngestMonths, months)
 }
 
 func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryActiveWeatherIngestMonths,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	activeSet := make(map[model.YearMonth]struct{}, len(months))
-
-	requested := make(map[model.YearMonth]struct{}, len(months))
-	for _, ym := range months {
-		requested[ym] = struct{}{}
-	}
-
-	var active []model.YearMonth
-
-	for rows.Next() {
-		var ym model.YearMonth
-		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
-			return nil, err
-		}
-
-		if _, ok := requested[ym]; !ok {
-			continue
-		}
-
-		if _, seen := activeSet[ym]; seen {
-			continue
-		}
-
-		activeSet[ym] = struct{}{}
-		active = append(active, ym)
-	}
-
-	return active, rows.Err()
+	return listActiveRequestedMonths(ctx, s.db, store.QueryActiveWeatherIngestMonths, months)
 }
 
 func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
-	var exists int
-
-	err := s.db.QueryRowContext(ctx, store.QueryActiveIngestJob,
-		jobType,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
-	).Scan(&exists)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return activeIngestJob(ctx, s.db, jobType)
 }
 
 func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {

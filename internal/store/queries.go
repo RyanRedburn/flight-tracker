@@ -49,6 +49,8 @@ const (
 		SET status = $1, started_at = NULL, updated_at = $2
 		WHERE status = $3 AND started_at IS NOT NULL AND started_at < $4`
 
+	QueryAdvisoryXactLock = `SELECT pg_advisory_xact_lock(hashtext($1), $2::int)`
+
 	QueryCreateFlightPerformanceIngestJob = `
 		INSERT INTO flight_performance_ingest_jobs (job_id, year, month)
 		VALUES ($1, $2, $3)`

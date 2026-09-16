@@ -27,12 +27,31 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*
 		UpdatedAt: now,
 	}
 
-	if err := execCreateJob(ctx, s.db, job); err != nil {
-		if isUniqueViolation(err) {
-			return nil, store.ErrActiveIngestConflict
-		}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
 
+	if err := lockIngestJob(ctx, tx, jobType, 0, 0); err != nil {
 		return nil, err
+	}
+
+	active, err := activeIngestJob(ctx, tx, jobType)
+	if err != nil {
+		return nil, err
+	}
+
+	if active {
+		return nil, store.ErrActiveIngestConflict
+	}
+
+	if err := execCreateJob(ctx, tx, job); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
 	}
 
 	return job, nil
