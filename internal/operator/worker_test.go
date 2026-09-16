@@ -78,6 +78,7 @@ func TestWorkerStopFailsInFlightJobWithLiveContext(t *testing.T) {
 			}
 
 			mu.Lock()
+
 			failCalls = append(failCalls, failCall{id: id, msg: errMsg})
 			mu.Unlock()
 
@@ -112,6 +113,7 @@ func TestWorkerStopFailsInFlightJobWithLiveContext(t *testing.T) {
 	}
 
 	found := false
+
 	for _, call := range failCalls {
 		if call.id == testJobID && call.msg == ErrInterruptedByShutdown.Error() {
 			found = true
@@ -130,6 +132,7 @@ func TestWorkerStopIdleExits(t *testing.T) {
 	st := &storetest.Stub{
 		ClaimNextPendingJobFn: func(ctx context.Context, _ time.Time) (*model.Job, error) {
 			<-ctx.Done()
+
 			return nil, ctx.Err()
 		},
 	}
@@ -173,6 +176,7 @@ func TestWorkerShutdownStopsClaiming(t *testing.T) {
 	worker.Shutdown()
 
 	afterShutdown := claims.Load()
+
 	time.Sleep(80 * time.Millisecond)
 
 	if got := claims.Load(); got > afterShutdown+1 {
@@ -222,6 +226,7 @@ func TestWorkerHeartbeatWhileProcessInFlight(t *testing.T) {
 	}, logger)
 
 	before := time.Now().UTC()
+
 	worker.Start(context.Background())
 
 	select {
@@ -262,6 +267,7 @@ func TestWorkerClaimPassesLeaseUntil(t *testing.T) {
 
 	ttl := 90 * time.Second
 	before := time.Now().UTC()
+
 	worker := NewWorker(st, NewProcessor(st), WorkerConfig{
 		Concurrency:       1,
 		PollInterval:      time.Hour,
@@ -295,6 +301,7 @@ func TestWorkerReclaimLoopCallsReset(t *testing.T) {
 	st := &storetest.Stub{
 		ClaimNextPendingJobFn: func(ctx context.Context, _ time.Time) (*model.Job, error) {
 			<-ctx.Done()
+
 			return nil, ctx.Err()
 		},
 		ResetStaleRunningJobsFn: func(_ context.Context, expiredBefore time.Time) (int64, error) {

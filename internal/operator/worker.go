@@ -126,17 +126,20 @@ func (w *Worker) poll(ctx context.Context, logger *slog.Logger, workerID int) {
 
 	if err != nil {
 		logger.Error("claim job failed", "error", err)
+
 		return
 	}
 
 	processCtx, cancel := context.WithCancelCause(context.Background())
 
 	w.mu.Lock()
+
 	w.inFlight[workerID] = inFlightJob{id: job.ID, cancel: cancel}
 	w.mu.Unlock()
 
 	defer func() {
 		w.mu.Lock()
+
 		delete(w.inFlight, workerID)
 		w.mu.Unlock()
 	}()
@@ -163,11 +166,13 @@ func (w *Worker) poll(ctx context.Context, logger *slog.Logger, workerID int) {
 	}
 
 	err = w.processor.Process(processCtx, job)
+
 	close(stopHB)
 	<-doneHB
 
 	if err != nil {
 		logger.Error("job failed", "job_id", job.ID, "error", err)
+
 		return
 	}
 
@@ -187,6 +192,7 @@ func (w *Worker) runHeartbeat(stop <-chan struct{}, jobID string, logger *slog.L
 
 			hbCtx, cancel := context.WithTimeout(context.Background(), w.heartbeatInterval)
 			err := w.store.HeartbeatJob(hbCtx, jobID, leaseUntil)
+
 			cancel()
 
 			if err == nil {
@@ -242,10 +248,12 @@ func (w *Worker) Shutdown() {
 		}
 
 		w.mu.Lock()
+
 		inflight := make([]inFlightJob, 0, len(w.inFlight))
 		for _, job := range w.inFlight {
 			inflight = append(inflight, job)
 		}
+
 		w.mu.Unlock()
 
 		for _, job := range inflight {
