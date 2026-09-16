@@ -9,20 +9,18 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-func RecoverStaleJobs(ctx context.Context, s store.Store, threshold time.Duration, logger *slog.Logger) error {
-	if threshold <= 0 {
+func RecoverStaleJobs(ctx context.Context, s store.Store, leaseTTL time.Duration, logger *slog.Logger) error {
+	if leaseTTL <= 0 {
 		return nil
 	}
 
-	cutoff := time.Now().UTC().Add(-threshold)
-
-	reset, err := s.ResetStaleRunningJobs(ctx, cutoff)
+	reset, err := s.ResetStaleRunningJobs(ctx, time.Now().UTC())
 	if err != nil {
 		return fmt.Errorf("reset stale running jobs: %w", err)
 	}
 
 	if reset > 0 {
-		logger.Info("reset stale running jobs", "count", reset, "threshold", threshold)
+		logger.Info("reclaimed expired job leases", "count", reset, "lease_ttl", leaseTTL)
 	}
 
 	return nil

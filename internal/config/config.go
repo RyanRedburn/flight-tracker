@@ -19,7 +19,7 @@ type Config struct {
 	MigrationsPath             string        `env:"MIGRATIONS_PATH" envDefault:"migrations/postgres"`
 	WorkerConcurrency          int           `env:"WORKER_CONCURRENCY" envDefault:"2"`
 	WorkerPollInterval         time.Duration `env:"WORKER_POLL_INTERVAL" envDefault:"5s"`
-	StaleJobThreshold          time.Duration `env:"STALE_JOB_THRESHOLD" envDefault:"30m"`
+	JobLeaseTTL                time.Duration `env:"JOB_LEASE_TTL" envDefault:"90s"`
 	BTSDownloadTimeout         time.Duration `env:"BTS_DOWNLOAD_TIMEOUT" envDefault:"10m"`
 	BTSBaseURL                 string        `env:"BTS_BASE_URL" envDefault:"https://transtats.bts.gov/PREZIP"`
 	IEMASOSBaseURL             string        `env:"IEM_ASOS_BASE_URL" envDefault:"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"`
@@ -54,6 +54,10 @@ func Load() (Config, error) {
 
 	if cfg.MaxIngestMonths < 1 {
 		return Config{}, errors.New("MAX_INGEST_MONTHS must be >= 1")
+	}
+
+	if cfg.JobLeaseTTL < 0 {
+		return Config{}, errors.New("JOB_LEASE_TTL must be >= 0")
 	}
 
 	return cfg, nil

@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -28,7 +29,7 @@ func NewProcessor(s store.Store, handlers ...JobHandler) *Processor {
 func (p *Processor) Process(ctx context.Context, job *model.Job) error {
 	handler, ok := p.handlers[job.Type]
 	if !ok {
-		if err := p.store.FailJob(ctx, job.ID, fmt.Sprintf("unknown job type %q", job.Type)); err != nil {
+		if err := p.store.FailJob(context.WithoutCancel(ctx), job.ID, fmt.Sprintf("unknown job type %q", job.Type)); err != nil {
 			return fmt.Errorf("fail job: %w", err)
 		}
 
@@ -37,14 +38,19 @@ func (p *Processor) Process(ctx context.Context, job *model.Job) error {
 
 	result, err := handler.Process(ctx, job)
 	if err != nil {
-		if failErr := p.store.FailJob(ctx, job.ID, err.Error()); failErr != nil {
+		msg := err.Error()
+		if errors.Is(context.Cause(ctx), ErrInterruptedByShutdown) {
+			msg = ErrInterruptedByShutdown.Error()
+		}
+
+		if failErr := p.store.FailJob(context.WithoutCancel(ctx), job.ID, msg); failErr != nil && !errors.Is(failErr, store.ErrJobStatusConflict) {
 			return fmt.Errorf("process: %w; fail job: %v", err, failErr)
 		}
 
 		return err
 	}
 
-	if err := p.store.CompleteJob(ctx, job.ID, result); err != nil {
+	if err := p.store.CompleteJob(context.WithoutCancel(ctx), job.ID, result); err != nil {
 		return fmt.Errorf("complete job: %w", err)
 	}
 

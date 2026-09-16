@@ -31,23 +31,28 @@ const (
 
 	QueryClaimNextPendingJobUpdate = `
 		UPDATE jobs
-		SET status = $1, started_at = $2, updated_at = $3
-		WHERE id = $4 AND status = $5`
+		SET status = $1, started_at = $2, updated_at = $3, lease_expires_at = $4
+		WHERE id = $5 AND status = $6`
 
 	QueryCompleteJob = `
 		UPDATE jobs
-		SET status = $1, result = $2, error = $3, ended_at = $4, updated_at = $5
+		SET status = $1, result = $2, error = $3, ended_at = $4, updated_at = $5, lease_expires_at = NULL
 		WHERE id = $6 AND status = $7`
 
 	QueryFailJob = `
 		UPDATE jobs
-		SET status = $1, error = $2, ended_at = $3, updated_at = $4
+		SET status = $1, error = $2, ended_at = $3, updated_at = $4, lease_expires_at = NULL
 		WHERE id = $5 AND status = $6`
+
+	QueryHeartbeatJob = `
+		UPDATE jobs
+		SET lease_expires_at = $1, updated_at = $2
+		WHERE id = $3 AND status = $4`
 
 	QueryResetStaleRunningJobs = `
 		UPDATE jobs
-		SET status = $1, started_at = NULL, updated_at = $2
-		WHERE status = $3 AND started_at IS NOT NULL AND started_at < $4`
+		SET status = $1, started_at = NULL, lease_expires_at = NULL, updated_at = $2
+		WHERE status = $3 AND lease_expires_at IS NOT NULL AND lease_expires_at < $4`
 
 	// Transaction-scoped lock: hashtext(job_type) + year*100+month (0 for type-only jobs).
 	// A plain check-then-insert in a transaction is not enough under READ COMMITTED.

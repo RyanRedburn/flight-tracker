@@ -19,9 +19,9 @@ func TestRecoverStaleJobs(t *testing.T) {
 	var called bool
 
 	st := &storetest.Stub{
-		ResetStaleRunningJobsFn: func(_ context.Context, olderThan time.Time) (int64, error) {
+		ResetStaleRunningJobsFn: func(_ context.Context, expiredBefore time.Time) (int64, error) {
 			called = true
-			gotCutoff = olderThan
+			gotCutoff = expiredBefore
 
 			return 1, nil
 		},
@@ -39,15 +39,12 @@ func TestRecoverStaleJobs(t *testing.T) {
 		t.Fatal("expected ResetStaleRunningJobs to be called")
 	}
 
-	wantMin := before.Add(-time.Hour)
-	wantMax := after.Add(-time.Hour)
-
-	if gotCutoff.Before(wantMin) || gotCutoff.After(wantMax) {
-		t.Errorf("olderThan = %v, want between %v and %v", gotCutoff, wantMin, wantMax)
+	if gotCutoff.Before(before) || gotCutoff.After(after) {
+		t.Errorf("expiredBefore = %v, want between %v and %v", gotCutoff, before, after)
 	}
 }
 
-func TestRecoverStaleJobsZeroThreshold(t *testing.T) {
+func TestRecoverStaleJobsZeroTTL(t *testing.T) {
 	st := &storetest.Stub{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 

@@ -84,7 +84,7 @@ Environment variables (defaults shown):
 | `MIGRATIONS_PATH` | `migrations/postgres` | Migration folder |
 | `WORKER_CONCURRENCY` | `2` | Background worker goroutines |
 | `WORKER_POLL_INTERVAL` | `5s` | How often workers poll for pending jobs |
-| `STALE_JOB_THRESHOLD` | `30m` | Reset stuck `running` jobs on startup |
+| `JOB_LEASE_TTL` | `90s` | How long a running job's lease lasts without a heartbeat. Expired leases are requeued to `pending` (crash/OOM/SIGKILL). `0` disables reclaim. Heartbeats run about every TTL/3 while `Process` is in flight. |
 | `BTS_DOWNLOAD_TIMEOUT` | `10m` | HTTP timeout for BTS (flight performance source) zip downloads |
 | `BTS_BASE_URL` | `https://transtats.bts.gov/PREZIP` | BTS zip base URL (override in tests) |
 | `IEM_ASOS_BASE_URL` | `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py` | IEM ASOS CGI endpoint (override in tests) |
@@ -109,7 +109,9 @@ make docker-run            # start the stack (foreground)
 docker compose up --build  # build and start in one step
 ```
 
-The app listens on port 8080. Postgres data is stored in the `postgres-data` volume. Postgres is published on host port `5432` for local tooling.
+The app listens on port 8080. Postgres data is stored in the `postgres-data` volume. Postgres is published on host port `5432` for local tooling. Compose sends SIGTERM to the app with a **30s** `stop_grace_period` so workers can abort in-flight jobs and persist `failed` before the container is killed. That window is for HTTP drain plus status writes — not for finishing a multi-minute download.
+
+If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at least ~30s). Do not size it to cover a full BTS/IEM download; SIGTERM aborts work and marks the job failed.
 
 ## API examples
 
@@ -242,6 +244,14 @@ Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field
 - Recommended load order: **countries → regions → airports → at least one BTS month → weather-stations → weather observations** (no FK constraints; order is for data consistency only).
 
 Source adapter: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
+
+### Job leases and shutdown
+
+Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` and write `lease_expires_at` (claim sets the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
+
+- **Crash / SIGKILL / OOM / missed heartbeat:** when `lease_expires_at` is in the past, any replica requeues the row to `pending` and clears `started_at`. Reclaim runs at startup (expired leases only — never all `running` rows) and periodically while the process is up. `JOB_LEASE_TTL` defaults to 90s, long enough to miss a few heartbeats, not as long as a 10-minute BTS download.
+- **SIGINT / SIGTERM:** workers stop claiming immediately (they do not keep polling during HTTP drain), cancel in-flight `Process`, and persist `failed` with `interrupted by shutdown` using a context that is not cancelled. Idle workers exit. After shutdown-fail, re-POST the ingest (`force` if data already exists).
+- Requeue after crash is safe: loads are transactional `Replace*` (full replace). Shutdown-fail is not an automatic retry.
 
 ## Migrations
 

@@ -13,7 +13,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("MIGRATIONS_PATH", "")
 	t.Setenv("WORKER_CONCURRENCY", "")
 	t.Setenv("WORKER_POLL_INTERVAL", "")
-	t.Setenv("STALE_JOB_THRESHOLD", "")
+	t.Setenv("JOB_LEASE_TTL", "")
 	t.Setenv("BTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("BTS_BASE_URL", "")
 	t.Setenv("IEM_ASOS_BASE_URL", "")
@@ -55,8 +55,8 @@ func TestLoadDefaults(t *testing.T) {
 		t.Errorf("WorkerPollInterval = %v, want 5s", cfg.WorkerPollInterval)
 	}
 
-	if cfg.StaleJobThreshold != 30*time.Minute {
-		t.Errorf("StaleJobThreshold = %v, want 30m", cfg.StaleJobThreshold)
+	if cfg.JobLeaseTTL != 90*time.Second {
+		t.Errorf("JobLeaseTTL = %v, want 90s", cfg.JobLeaseTTL)
 	}
 
 	if cfg.BTSDownloadTimeout != 10*time.Minute {
@@ -150,6 +150,15 @@ func TestLoadInvalidMaxIngestMonths(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() expected error for MAX_INGEST_MONTHS=0")
+	}
+}
+
+func TestLoadInvalidJobLeaseTTL(t *testing.T) {
+	t.Setenv("JOB_LEASE_TTL", "-1s")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for JOB_LEASE_TTL=-1s")
 	}
 }
 

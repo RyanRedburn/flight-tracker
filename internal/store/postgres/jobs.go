@@ -175,7 +175,7 @@ func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.W
 	return &detail, nil
 }
 
-func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
+func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -195,10 +195,16 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context) (*model.Job, error) {
 
 	now := time.Now().UTC()
 
+	var leaseExpires any
+	if !leaseUntil.IsZero() {
+		leaseExpires = leaseUntil.UTC()
+	}
+
 	res, err := tx.ExecContext(ctx, store.QueryClaimNextPendingJobUpdate,
 		string(model.JobStatusRunning),
 		now,
 		now,
+		leaseExpires,
 		job.ID,
 		string(model.JobStatusPending),
 	)
@@ -263,14 +269,30 @@ func (s *Store) FailJob(ctx context.Context, id, errMsg string) error {
 	return expectOneRowAffected(res, store.ErrJobStatusConflict)
 }
 
-func (s *Store) ResetStaleRunningJobs(ctx context.Context, olderThan time.Time) (int64, error) {
+func (s *Store) HeartbeatJob(ctx context.Context, id string, leaseUntil time.Time) error {
+	now := time.Now().UTC()
+
+	res, err := s.db.ExecContext(ctx, store.QueryHeartbeatJob,
+		leaseUntil.UTC(),
+		now,
+		id,
+		string(model.JobStatusRunning),
+	)
+	if err != nil {
+		return err
+	}
+
+	return expectOneRowAffected(res, store.ErrJobStatusConflict)
+}
+
+func (s *Store) ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Time) (int64, error) {
 	now := time.Now().UTC()
 
 	res, err := s.db.ExecContext(ctx, store.QueryResetStaleRunningJobs,
 		string(model.JobStatusPending),
 		now,
 		string(model.JobStatusRunning),
-		olderThan.UTC(),
+		expiredBefore.UTC(),
 	)
 	if err != nil {
 		return 0, err
