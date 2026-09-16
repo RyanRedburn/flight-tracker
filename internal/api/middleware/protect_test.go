@@ -15,6 +15,8 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
+const testAPIKeyID = "key-1"
+
 func TestExtractAPIKey(t *testing.T) {
 	secret, _, err := model.GenerateAPIKey()
 	if err != nil {
@@ -109,7 +111,7 @@ func TestProtectorRequire(t *testing.T) {
 	}
 
 	active := &model.APIKey{
-		ID:        "key-1",
+		ID:        testAPIKeyID,
 		Prefix:    prefix,
 		KeyHash:   model.HashAPIKey(plaintext),
 		Role:      model.APIKeyRoleConsumer,
@@ -288,7 +290,7 @@ func TestProtectorShieldDenyOmitsSharedHeaders(t *testing.T) {
 	}
 
 	key := &model.APIKey{
-		ID:        "key-1",
+		ID:        testAPIKeyID,
 		Prefix:    prefix,
 		KeyHash:   model.HashAPIKey(plaintext),
 		Role:      model.APIKeyRoleConsumer,
@@ -376,7 +378,7 @@ func TestProtectorRateLimitBuckets(t *testing.T) {
 	}
 
 	active := &model.APIKey{
-		ID:        "key-1",
+		ID:        testAPIKeyID,
 		Prefix:    prefix,
 		KeyHash:   model.HashAPIKey(plaintext),
 		Role:      model.APIKeyRoleConsumer,
@@ -476,9 +478,11 @@ func TestProtectorRateLimitBuckets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotBucket string
-			var gotRPM int
-			var consumeCalls int
+			var (
+				gotBucket    string
+				gotRPM       int
+				consumeCalls int
+			)
 
 			stub := &storetest.Stub{
 				LookupAPIKeyByPrefixFn: func(_ context.Context, gotPrefix string) (*model.APIKey, error) {

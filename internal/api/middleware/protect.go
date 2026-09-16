@@ -103,6 +103,7 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 				}
 
 				handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrUnauthorized)
+
 				return
 			}
 
