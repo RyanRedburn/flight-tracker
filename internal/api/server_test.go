@@ -297,6 +297,7 @@ func testRateLimits() middleware.RateLimits {
 		SubscriberRPM:  120,
 		AdminRPM:       300,
 		AdminIngestRPM: 10,
+		AuthFailRPM:    30,
 	}
 }
 

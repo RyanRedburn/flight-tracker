@@ -41,6 +41,7 @@ type Config struct {
 	RateLimitSubscriberRPM     int           `env:"RATE_LIMIT_SUBSCRIBER_RPM" envDefault:"120"`
 	RateLimitAdminRPM          int           `env:"RATE_LIMIT_ADMIN_RPM" envDefault:"300"`
 	RateLimitAdminIngestRPM    int           `env:"RATE_LIMIT_ADMIN_INGEST_RPM" envDefault:"10"`
+	RateLimitAuthFailRPM       int           `env:"RATE_LIMIT_AUTH_FAIL_RPM" envDefault:"30"`
 }
 
 func Load() (Config, error) {
@@ -95,6 +96,10 @@ func Load() (Config, error) {
 
 	if cfg.RateLimitAdminIngestRPM < 1 {
 		return Config{}, errors.New("RATE_LIMIT_ADMIN_INGEST_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitAuthFailRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_AUTH_FAIL_RPM must be >= 1")
 	}
 
 	return cfg, nil

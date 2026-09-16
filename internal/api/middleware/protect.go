@@ -41,6 +41,7 @@ type RateLimits struct {
 	SubscriberRPM  int
 	AdminRPM       int
 	AdminIngestRPM int
+	AuthFailRPM    int
 }
 
 type ProtectorConfig struct {
@@ -54,6 +55,7 @@ type Protector struct {
 	store  store.Store
 	cfg    ProtectorConfig
 	shield *burstShield
+	nowFn  func() time.Time
 }
 
 func NewProtector(s store.Store, cfg ProtectorConfig) *Protector {
@@ -61,6 +63,7 @@ func NewProtector(s store.Store, cfg ProtectorConfig) *Protector {
 		store:  s,
 		cfg:    cfg,
 		shield: newBurstShield(),
+		nowFn:  func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -86,13 +89,7 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 				return
 			}
 
-			presented, err := extractAPIKey(r)
-			if err != nil {
-				handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrUnauthorized)
-				return
-			}
-
-			identity, err := p.authenticate(r.Context(), presented)
+			identity, err := p.resolveIdentity(r)
 			if err != nil {
 				handlers.WriteError(w, http.StatusInternalServerError, handlers.ErrAuthUnavailable)
 				return
@@ -100,14 +97,16 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 
 			r = r.WithContext(context.WithValue(r.Context(), identityContextKey{}, identity))
 
-			if !p.cfg.RateLimitDisabled {
-				if !p.enforceRateLimit(w, r, identity, surface) {
+			if !identity.Valid {
+				if !p.applyRateLimit(w, r, identity, store.RateLimitSurfaceAuthFail) {
 					return
 				}
+
+				handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrUnauthorized)
+				return
 			}
 
-			if !identity.Valid {
-				handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrUnauthorized)
+			if !p.applyRateLimit(w, r, identity, surface) {
 				return
 			}
 
@@ -119,6 +118,23 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func (p *Protector) resolveIdentity(r *http.Request) (Identity, error) {
+	presented, err := extractAPIKey(r)
+	if err != nil || presented == "" {
+		return Identity{}, nil
+	}
+
+	return p.authenticate(r.Context(), presented)
+}
+
+func (p *Protector) applyRateLimit(w http.ResponseWriter, r *http.Request, identity Identity, surface string) bool {
+	if p.cfg.RateLimitDisabled {
+		return true
+	}
+
+	return p.enforceRateLimit(w, r, identity, surface)
 }
 
 func (p *Protector) authenticate(ctx context.Context, presented string) (Identity, error) {
@@ -152,10 +168,13 @@ func (p *Protector) authenticate(ctx context.Context, presented string) (Identit
 func (p *Protector) enforceRateLimit(w http.ResponseWriter, r *http.Request, identity Identity, surface string) bool {
 	rpm := p.limitRPM(identity, surface)
 	key := rateLimitBucketKey(identity, surface, clientIP(r, p.cfg.TrustProxy))
-	now := time.Now().UTC()
+	now := p.nowFn()
 
 	if !p.shield.allow(key, now) {
-		writeRateLimited(w, store.RateLimitResultFromMilli(false, 0, rpm, now))
+		// Local flood shed only. Advertised X-RateLimit-* headers come from Postgres.
+		writeRetryAfter(w, shieldRetryAfter)
+		handlers.WriteError(w, http.StatusTooManyRequests, handlers.ErrRateLimitExceeded)
+
 		return false
 	}
 
@@ -176,6 +195,10 @@ func (p *Protector) enforceRateLimit(w http.ResponseWriter, r *http.Request, ide
 }
 
 func (p *Protector) limitRPM(identity Identity, surface string) int {
+	if surface == store.RateLimitSurfaceAuthFail {
+		return p.cfg.Limits.AuthFailRPM
+	}
+
 	if !identity.Valid {
 		return p.cfg.Limits.AnonRPM
 	}
@@ -248,14 +271,18 @@ func setRateLimitHeaders(w http.ResponseWriter, result store.RateLimitResult) {
 
 func writeRateLimited(w http.ResponseWriter, result store.RateLimitResult) {
 	setRateLimitHeaders(w, result)
+	writeRetryAfter(w, result.RetryAfter)
 
-	retryAfter := int(result.RetryAfter.Seconds())
-	if retryAfter < 1 {
-		retryAfter = 1
+	handlers.WriteError(w, http.StatusTooManyRequests, handlers.ErrRateLimitExceeded)
+}
+
+func writeRetryAfter(w http.ResponseWriter, retryAfter time.Duration) {
+	sec := int(retryAfter.Seconds())
+	if sec < 1 {
+		sec = 1
 	}
 
-	w.Header().Set(headerRetryAfter, strconv.Itoa(retryAfter))
-	handlers.WriteError(w, http.StatusTooManyRequests, handlers.ErrRateLimitExceeded)
+	w.Header().Set(headerRetryAfter, strconv.Itoa(sec))
 }
 
 var (

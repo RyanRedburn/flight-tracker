@@ -110,11 +110,12 @@ Environment variables (defaults shown):
 | `RATE_LIMIT_DISABLED` | `false` | When `true`, skip rate limits but still authenticate. `AUTH_DISABLED=true` also skips rate limits. |
 | `RATE_LIMIT_TRUST_PROXY` | `false` | When `true`, anonymous limits use the right-most `X-Forwarded-For` hop (then `X-Real-IP`, then `RemoteAddr`). Enable only behind a single trusted reverse proxy. There is no hop-count stripping of extra forwarded addresses. |
 | `AUTH_BOOTSTRAP_ADMIN_KEY` | empty | One-time admin key inserted if `api_keys` is empty. Must be `ftk_<8 hex>_<32 hex>`. Unset after first boot. Concurrent replicas treat a unique conflict as success. |
-| `RATE_LIMIT_ANON_RPM` | `60` | Shared requests/minute for unauthenticated requests (IP-keyed; probes are not limited). |
+| `RATE_LIMIT_ANON_RPM` | `60` | Shared requests/minute for true anonymous public routes (`ip|<ip>|<surface>`). Probes are not limited. Failed credentials do **not** use this bucket. |
 | `RATE_LIMIT_CONSUMER_RPM` | `120` | Shared requests/minute for `consumer` keys. |
 | `RATE_LIMIT_SUBSCRIBER_RPM` | `120` | Shared requests/minute for `subscriber` keys (same access as `consumer` in v1). |
 | `RATE_LIMIT_ADMIN_RPM` | `300` | Shared requests/minute for `admin` keys on non-ingest surfaces. |
 | `RATE_LIMIT_ADMIN_INGEST_RPM` | `10` | Shared requests/minute for `admin` ingest POSTs so a loop cannot flood the job queue. |
+| `RATE_LIMIT_AUTH_FAIL_RPM` | `30` | Shared requests/minute for missing, invalid, or revoked credentials on protected routes (`ip|<ip>|auth_fail`). Keeps auth spam from exhausting the anonymous public IP quota. |
 
 ### Authentication and rate limiting
 
@@ -130,7 +131,7 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
 | `admin` | Everything: ingest, jobs, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
 
-`/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid key → **401**, wrong role → **403**).
+`/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid/revoked key → **401**, or **429** if the auth-fail IP bucket is exhausted; wrong role → **403**).
 
 **Bootstrap.** Auth enabled with an empty `api_keys` table refuses to start (not fail-open). Either:
 
@@ -141,9 +142,15 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 python3 -c "import secrets; print('ftk_' + secrets.token_hex(4) + '_' + secrets.token_hex(16))"
 ```
 
-**Rate limits.** Postgres holds a token bucket per identity × surface (`key|<id>|<surface>` when authenticated, `ip|<client ip>|<surface>` when not). Capacity and refill equal the configured requests/minute, so N replicas cannot multiply the advertised cap. A small per-process burst shield (200 rps) only sheds floods before they hit Postgres; it is not the advertised quota.
+**Rate limits.** Postgres holds a token bucket per identity × surface. Capacity and refill equal the configured requests/minute, so N replicas cannot multiply the advertised cap. A small per-process burst shield (200 rps) only sheds floods before they hit Postgres; it is not the advertised quota.
 
-On every rate-limited response:
+| Bucket | When |
+| --- | --- |
+| `key|<id>|<surface>` | Valid API key (`external`, `internal`, or `ingest`) |
+| `ip|<client ip>|auth_fail` | Missing, invalid, or revoked credentials on a **protected** route (`RATE_LIMIT_AUTH_FAIL_RPM`) |
+| `ip|<client ip>|<surface>` | True anonymous public routes (none in v1 besides unlimited probes). Not used for failed credentials. |
+
+Shared-store (Postgres) responses include:
 
 | Header | Meaning |
 | --- | --- |
@@ -151,6 +158,8 @@ On every rate-limited response:
 | `X-RateLimit-Remaining` | Whole tokens left (0 on **429**) |
 | `X-RateLimit-Reset` | Unix timestamp (UTC seconds) when the bucket is projected to be full, or when the next request is allowed on **429** |
 | `Retry-After` | Seconds until the next token (**429** only) |
+
+A process-local burst-shield **429** includes `Retry-After` only. It does not set `X-RateLimit-*`; those headers always reflect the shared Postgres bucket.
 
 **Client IP.** Default is `RemoteAddr` (correct for Compose port publish / a directly reached process). `RATE_LIMIT_TRUST_PROXY=true` uses the right-most `X-Forwarded-For` address. Do not enable that on an untrusted network; spoofed extra hops are not stripped.
 

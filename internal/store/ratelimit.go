@@ -9,6 +9,9 @@ const (
 	RateLimitSurfaceExternal = "external"
 	RateLimitSurfaceInternal = "internal"
 	RateLimitSurfaceIngest   = "ingest"
+	// RateLimitSurfaceAuthFail is the shared IP bucket for missing, invalid, or
+	// revoked credentials on protected routes. It is not the anonymous public quota.
+	RateLimitSurfaceAuthFail = "auth_fail"
 
 	MilliTokensPerRequest = 1000
 )

@@ -12,6 +12,7 @@ const (
 	shieldCapacity     = 200
 	shieldRefillPerSec = 200.0
 	shieldIdleTTL      = 2 * time.Minute
+	shieldRetryAfter   = time.Second
 )
 
 type burstShield struct {

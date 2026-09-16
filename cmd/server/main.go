@@ -137,6 +137,7 @@ func run() int {
 			SubscriberRPM:  cfg.RateLimitSubscriberRPM,
 			AdminRPM:       cfg.RateLimitAdminRPM,
 			AdminIngestRPM: cfg.RateLimitAdminIngestRPM,
+			AuthFailRPM:    cfg.RateLimitAuthFailRPM,
 		},
 	})
 

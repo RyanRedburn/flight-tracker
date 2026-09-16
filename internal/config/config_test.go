@@ -33,6 +33,7 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("RATE_LIMIT_SUBSCRIBER_RPM", "")
 	t.Setenv("RATE_LIMIT_ADMIN_RPM", "")
 	t.Setenv("RATE_LIMIT_ADMIN_INGEST_RPM", "")
+	t.Setenv("RATE_LIMIT_AUTH_FAIL_RPM", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -139,6 +140,10 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.RateLimitAdminIngestRPM != 10 {
 		t.Errorf("RateLimitAdminIngestRPM = %d, want 10", cfg.RateLimitAdminIngestRPM)
 	}
+
+	if cfg.RateLimitAuthFailRPM != 30 {
+		t.Errorf("RateLimitAuthFailRPM = %d, want 30", cfg.RateLimitAuthFailRPM)
+	}
 }
 
 func TestLoadFromEnv(t *testing.T) {
@@ -224,6 +229,15 @@ func TestLoadInvalidRateLimit(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() expected error for RATE_LIMIT_ADMIN_INGEST_RPM=0")
+	}
+}
+
+func TestLoadInvalidAuthFailRPM(t *testing.T) {
+	t.Setenv("RATE_LIMIT_AUTH_FAIL_RPM", "0")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for RATE_LIMIT_AUTH_FAIL_RPM=0")
 	}
 }
 
