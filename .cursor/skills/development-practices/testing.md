@@ -37,4 +37,6 @@ Assert status code first, then decode JSON into the exported response type when 
 
 ## Postgres package tests
 
-`internal/store/postgres/*_test.go` tests SQL builders, COPY encoding, and helpers. Do not introduce tests that require a running database unless the user explicitly asks for integration tests.
+`internal/store/postgres/*_test.go` tests SQL builders, COPY encoding, and helpers that assemble or execute query logic. Do not introduce tests that require a running database unless the user explicitly asks for integration tests.
+
+Do **not** write unit tests whose only purpose is to assert raw SQL query string constants in `internal/store/queries.go` (or equivalent `Query*` consts). No `queries_test.go`-style checks such as `strings.Contains(QueryFoo, "…")`. Still OK: postgres package tests for SQL builders, COPY encoding, and helpers; `storetest` stubs; handler and operator behavior tests.

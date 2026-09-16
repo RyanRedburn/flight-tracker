@@ -26,7 +26,7 @@ Handlers and ingest services call the interface. Only `internal/database` and `p
 2. Add `Query*` SQL (parameterized `$1`, `$2`, … — no string-concatenated user input).
 3. Implement on `postgres.Store`.
 4. Add `FooFn` + method on `storetest.Stub`. Unset Fn must `panic("unexpected call: Foo")`.
-5. Tests: stub consumers in handler/operator tests; query-builder tests in `postgres` if SQL is assembled dynamically.
+5. Tests: stub consumers in handler/operator tests; query-builder tests in `postgres` if SQL is assembled dynamically. Do not unit-test static `Query*` string literals (`strings.Contains` on constants in `queries.go`); test dynamic builders and behavior instead.
 
 `var _ store.Store = (*Stub)(nil)` must keep compiling.
 
@@ -68,7 +68,7 @@ make migrate-version
 
 Do not hand-edit already-applied files on `main`; add a new pair.
 
-There are **no** live-DB tests. Exercise SQL builders and COPY helpers with unit tests. Manual check: `docker compose up -d postgres` then `go run ./cmd/server`.
+There are **no** live-DB tests. Exercise SQL builders and COPY helpers with unit tests. Do not unit-test static `Query*` string literals. Manual check: `docker compose up -d postgres` then `go run ./cmd/server`.
 
 ## Driver
 
