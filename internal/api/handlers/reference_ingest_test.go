@@ -300,6 +300,35 @@ func TestWeatherStationsIngestExistingDataConflict(t *testing.T) {
 	}
 }
 
+func TestReferenceIngestCreateJobActiveConflict(t *testing.T) {
+	st := referenceSuccessStub()
+
+	st.CreateReferenceIngestJobFn = func(context.Context, string) (*model.Job, error) {
+		return nil, store.ErrActiveIngestConflict
+	}
+
+	h := NewReferenceIngestHandler(st)
+
+	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body ReferenceIngestConflictResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Error != errActiveReferenceIngest {
+		t.Errorf("error = %q, want %q", body.Error, errActiveReferenceIngest)
+	}
+
+	if body.JobType != model.JobTypeImportCountries {
+		t.Errorf("job_type = %q, want %q", body.JobType, model.JobTypeImportCountries)
+	}
+}
+
 func TestWeatherStationsIngestForceReimport(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())
 

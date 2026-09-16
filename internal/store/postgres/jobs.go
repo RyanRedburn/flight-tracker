@@ -31,6 +31,28 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, model.JobTypeImportFlightPerformance, year*100+month); err != nil {
+		return nil, fmt.Errorf("advisory lock: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	active, err := collectRequestedActiveMonths(rows, []model.YearMonth{{Year: year, Month: month}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(active) > 0 {
+		return nil, store.ErrActiveIngestConflict
+	}
+
 	if err := execCreateJob(ctx, tx, job); err != nil {
 		return nil, err
 	}
@@ -89,6 +111,28 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, model.JobTypeImportWeatherObservations, year*100+month); err != nil {
+		return nil, fmt.Errorf("advisory lock: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, store.QueryActiveWeatherIngestMonths,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	active, err := collectRequestedActiveMonths(rows, []model.YearMonth{{Year: year, Month: month}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(active) > 0 {
+		return nil, store.ErrActiveIngestConflict
+	}
 
 	if err := execCreateJob(ctx, tx, job); err != nil {
 		return nil, err
@@ -249,34 +293,7 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 	}
 	defer rows.Close()
 
-	activeSet := make(map[model.YearMonth]struct{}, len(months))
-
-	requested := make(map[model.YearMonth]struct{}, len(months))
-	for _, ym := range months {
-		requested[ym] = struct{}{}
-	}
-
-	var active []model.YearMonth
-
-	for rows.Next() {
-		var ym model.YearMonth
-		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
-			return nil, err
-		}
-
-		if _, ok := requested[ym]; !ok {
-			continue
-		}
-
-		if _, seen := activeSet[ym]; seen {
-			continue
-		}
-
-		activeSet[ym] = struct{}{}
-		active = append(active, ym)
-	}
-
-	return active, rows.Err()
+	return collectRequestedActiveMonths(rows, months)
 }
 
 func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
@@ -289,34 +306,7 @@ func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.Ye
 	}
 	defer rows.Close()
 
-	activeSet := make(map[model.YearMonth]struct{}, len(months))
-
-	requested := make(map[model.YearMonth]struct{}, len(months))
-	for _, ym := range months {
-		requested[ym] = struct{}{}
-	}
-
-	var active []model.YearMonth
-
-	for rows.Next() {
-		var ym model.YearMonth
-		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
-			return nil, err
-		}
-
-		if _, ok := requested[ym]; !ok {
-			continue
-		}
-
-		if _, seen := activeSet[ym]; seen {
-			continue
-		}
-
-		activeSet[ym] = struct{}{}
-		active = append(active, ym)
-	}
-
-	return active, rows.Err()
+	return collectRequestedActiveMonths(rows, months)
 }
 
 func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
@@ -384,6 +374,37 @@ func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMo
 	}
 
 	return withData, nil
+}
+
+func collectRequestedActiveMonths(rows *sql.Rows, months []model.YearMonth) ([]model.YearMonth, error) {
+	activeSet := make(map[model.YearMonth]struct{}, len(months))
+
+	requested := make(map[model.YearMonth]struct{}, len(months))
+	for _, ym := range months {
+		requested[ym] = struct{}{}
+	}
+
+	var active []model.YearMonth
+
+	for rows.Next() {
+		var ym model.YearMonth
+		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
+			return nil, err
+		}
+
+		if _, ok := requested[ym]; !ok {
+			continue
+		}
+
+		if _, seen := activeSet[ym]; seen {
+			continue
+		}
+
+		activeSet[ym] = struct{}{}
+		active = append(active, ym)
+	}
+
+	return active, rows.Err()
 }
 
 func execCreateJob(ctx context.Context, exec sqlExecContext, job *model.Job) error {

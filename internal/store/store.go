@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ErrNotFound          = errors.New("not found")
-	ErrJobStatusConflict = errors.New("job status conflict")
+	ErrNotFound             = errors.New("not found")
+	ErrJobStatusConflict    = errors.New("job status conflict")
+	ErrActiveIngestConflict = errors.New("active ingest job conflict")
 )
 
 type MigrationVersion struct {

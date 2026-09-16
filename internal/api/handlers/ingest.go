@@ -79,7 +79,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if len(active) > 0 {
 		writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
-			Error:              "ingest jobs already pending or running for one or more requested months",
+			Error:              errActiveIngestMonths,
 			ActiveIngestMonths: active,
 		})
 
@@ -108,7 +108,17 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	for _, ym := range months {
 		job, err := h.store.CreateFlightPerformanceIngestJob(ctx, ym.Year, ym.Month)
 		if err != nil {
+			if errors.Is(err, store.ErrActiveIngestConflict) {
+				writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
+					Error:              errActiveIngestMonths,
+					ActiveIngestMonths: []model.YearMonth{ym},
+				})
+
+				return
+			}
+
 			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+
 			return
 		}
 

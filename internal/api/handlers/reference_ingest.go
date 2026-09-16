@@ -137,7 +137,7 @@ func (h *ReferenceIngestHandler) create(
 
 	if active {
 		writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
-			Error:   "ingest job already pending or running for this dataset",
+			Error:   errActiveReferenceIngest,
 			JobType: jobType,
 		})
 
@@ -163,7 +163,17 @@ func (h *ReferenceIngestHandler) create(
 
 	job, err := h.store.CreateReferenceIngestJob(ctx, jobType)
 	if err != nil {
+		if errors.Is(err, store.ErrActiveIngestConflict) {
+			writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+				Error:   errActiveReferenceIngest,
+				JobType: jobType,
+			})
+
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+
 		return
 	}
 

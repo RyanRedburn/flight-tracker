@@ -28,11 +28,15 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-flight}:${POSTGRES_PASSWORD:-flight}@postgres:5432/${POSTGRES_DB:-flight_tracker}?sslmode=disable
       MIGRATIONS_PATH: /migrations/postgres
 
+  # Opt-in sidecar for make migrate-* / db-shell. A profile keeps default
+  # `docker compose up` from starting migrate alongside app (which already
+  # migrates on DB open), avoiding a first-boot dirty-schema race.
   migrate:
     build:
       context: .
       dockerfile: docker/migrate/Dockerfile
     image: flight-tracker-migrate:latest
+    profiles: ["migrate"]
     depends_on:
       postgres:
         condition: service_healthy
