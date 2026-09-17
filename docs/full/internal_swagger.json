@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer \u003ckey\u003e` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate limits are shared in Postgres across API replicas; 429 responses include `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.",
+        "description": "REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer \u003ckey\u003e` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate-limited responses return 429 with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.",
         "title": "flight-tracker API",
         "contact": {},
         "version": "1.0"
