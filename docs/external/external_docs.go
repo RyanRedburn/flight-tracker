@@ -742,7 +742,7 @@ var SwaggerInfoexternal = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "flight-tracker API",
-	Description:      "REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer <key>` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate-limited responses return 429 with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.",
+	Description:      "REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer <key>` or `X-API-Key`). Rate-limited responses return 429 with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.",
 	InfoInstanceName: "external",
 	SwaggerTemplate:  docTemplateexternal,
 	LeftDelim:        "{{",

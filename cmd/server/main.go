@@ -2,7 +2,7 @@
 //
 //	@title						flight-tracker API
 //	@version					1.0
-//	@description				REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer <key>` or `X-API-Key`). `/health` and `/ready` are unauthenticated. Rate-limited responses return 429 with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
+//	@description				REST API for flight data ingest, job status, route performance, and carrier performance. Protected routes require an API key (`Authorization: Bearer <key>` or `X-API-Key`). Rate-limited responses return 429 with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.
 //	@host						localhost:8080
 //	@BasePath					/
 //
