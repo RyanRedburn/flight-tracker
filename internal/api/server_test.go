@@ -12,9 +12,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
+)
+
+const (
+	pathHealth              = "/health"
+	pathDBVersion           = "/db/version"
+	pathIngestCountries     = "/api/v1/ingest/countries"
+	pathCarrierStatsUA      = "/api/v1/carriers/stats?carrier=UA"
+	pathSwaggerInternalHTML = "/swagger/internal/index.html"
 )
 
 func testLogger() *slog.Logger {
@@ -71,29 +80,29 @@ func routerStub() *storetest.Stub {
 }
 
 func TestNewRouterRoutes(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24, nil)
+	handler := newRouter(routerStub(), testLogger(), 24, nil, Security{Disabled: true})
 
 	tests := []struct {
 		method     string
 		path       string
 		wantStatus int
 	}{
-		{http.MethodGet, "/health", http.StatusOK},
+		{http.MethodGet, pathHealth, http.StatusOK},
 		{http.MethodGet, "/ready", http.StatusOK},
-		{http.MethodGet, "/db/version", http.StatusOK},
+		{http.MethodGet, pathDBVersion, http.StatusOK},
 		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
-		{http.MethodPost, "/api/v1/ingest/countries", http.StatusCreated},
+		{http.MethodPost, pathIngestCountries, http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/weather-stations", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
-		{http.MethodGet, "/api/v1/carriers/stats?carrier=UA", http.StatusOK},
+		{http.MethodGet, pathCarrierStatsUA, http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},
 		{http.MethodGet, "/swagger/index.html", http.StatusOK},
-		{http.MethodGet, "/swagger/internal/index.html", http.StatusOK},
+		{http.MethodGet, pathSwaggerInternalHTML, http.StatusOK},
 	}
 
 	for _, tt := range tests {
@@ -110,7 +119,7 @@ func TestNewRouterRoutes(t *testing.T) {
 }
 
 func TestSwaggerSpecSurfaces(t *testing.T) {
-	handler := newRouter(routerStub(), testLogger(), 24, nil)
+	handler := newRouter(routerStub(), testLogger(), 24, nil, Security{Disabled: true})
 
 	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
@@ -133,16 +142,21 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec must not include /api/v1/ingest/weather-stations")
 	}
 
-	if _, ok := external["/health"]; ok {
+	if _, ok := external[pathHealth]; ok {
 		t.Fatal("external spec must not include /health")
+	}
+
+	if _, ok := external["/api/v1/keys"]; ok {
+		t.Fatal("external spec must not include /api/v1/keys")
 	}
 
 	internal := fetchSwaggerPaths(t, handler, "/swagger/internal/doc.json")
 	for _, path := range []string{
-		"/health",
+		pathHealth,
 		"/api/v1/ingest",
 		"/api/v1/ingest/weather-stations",
 		"/api/v1/jobs",
+		"/api/v1/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
 		"/api/v1/carriers/stats",
@@ -179,7 +193,7 @@ func fetchSwaggerPaths(t *testing.T, handler http.Handler, path string) map[stri
 }
 
 func TestServerShutdown(t *testing.T) {
-	s := NewServer("unused", routerStub(), testLogger(), 24, nil)
+	s := NewServer("unused", routerStub(), testLogger(), 24, nil, Security{Disabled: true})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -191,7 +205,7 @@ func TestServerShutdown(t *testing.T) {
 		serveErr <- s.httpServer.Serve(ln)
 	}()
 
-	resp, err := http.Get("http://" + ln.Addr().String() + "/health")
+	resp, err := http.Get("http://" + ln.Addr().String() + pathHealth)
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
@@ -212,4 +226,119 @@ func TestServerShutdown(t *testing.T) {
 	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		t.Fatalf("Serve() error = %v", err)
 	}
+}
+
+func TestNewRouterProbesStayOpenWhenAuthEnabled(t *testing.T) {
+	handler := newRouter(routerStub(), testLogger(), 24, nil, Security{})
+
+	req := httptest.NewRequest(http.MethodGet, pathHealth, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestNewRouterAuthEnabled(t *testing.T) {
+	adminPlain, adminStub := stubWithAPIKey(t, model.APIKeyRoleAdmin)
+	consumerPlain, consumerStub := stubWithAPIKey(t, model.APIKeyRoleConsumer)
+	subscriberPlain, subscriberStub := stubWithAPIKey(t, model.APIKeyRoleSubscriber)
+
+	sec := Security{Limits: testRateLimits()}
+
+	tests := []struct {
+		name       string
+		stub       *storetest.Stub
+		method     string
+		path       string
+		key        string
+		wantStatus int
+	}{
+		{name: "probe unauthenticated", stub: adminStub, method: http.MethodGet, path: pathHealth, wantStatus: http.StatusOK},
+		{name: "ready unauthenticated", stub: adminStub, method: http.MethodGet, path: "/ready", wantStatus: http.StatusOK},
+		{name: "stats missing key", stub: adminStub, method: http.MethodGet, path: pathCarrierStatsUA, wantStatus: http.StatusUnauthorized},
+		{name: "stats consumer", stub: consumerStub, method: http.MethodGet, path: pathCarrierStatsUA, key: consumerPlain, wantStatus: http.StatusOK},
+		{name: "stats subscriber", stub: subscriberStub, method: http.MethodGet, path: pathCarrierStatsUA, key: subscriberPlain, wantStatus: http.StatusOK},
+		{name: "ingest consumer forbidden", stub: consumerStub, method: http.MethodPost, path: pathIngestCountries, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "ingest subscriber forbidden", stub: subscriberStub, method: http.MethodPost, path: pathIngestCountries, key: subscriberPlain, wantStatus: http.StatusForbidden},
+		{name: "ingest admin", stub: adminStub, method: http.MethodPost, path: pathIngestCountries, key: adminPlain, wantStatus: http.StatusCreated},
+		{name: "db version consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathDBVersion, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "db version admin", stub: adminStub, method: http.MethodGet, path: pathDBVersion, key: adminPlain, wantStatus: http.StatusOK},
+		{name: "external swagger consumer", stub: consumerStub, method: http.MethodGet, path: "/swagger/index.html", key: consumerPlain, wantStatus: http.StatusOK},
+		{name: "internal swagger consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "internal swagger admin", stub: adminStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: adminPlain, wantStatus: http.StatusOK},
+		{name: "keys admin", stub: adminStub, method: http.MethodGet, path: "/api/v1/keys", key: adminPlain, wantStatus: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := newRouter(tt.stub, testLogger(), 24, nil, sec)
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+
+			if tt.key != "" {
+				req.Header.Set("Authorization", "Bearer "+tt.key)
+			}
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+		})
+	}
+}
+
+func testRateLimits() middleware.RateLimits {
+	return middleware.RateLimits{
+		AnonRPM:        60,
+		ConsumerRPM:    120,
+		SubscriberRPM:  120,
+		AdminRPM:       300,
+		AdminIngestRPM: 10,
+		AuthFailRPM:    30,
+	}
+}
+
+func stubWithAPIKey(t *testing.T, role model.APIKeyRole) (string, *storetest.Stub) {
+	t.Helper()
+
+	plaintext, prefix, err := model.GenerateAPIKey()
+	if err != nil {
+		t.Fatalf("GenerateAPIKey: %v", err)
+	}
+
+	key := &model.APIKey{
+		ID:        "key-" + string(role),
+		Prefix:    prefix,
+		KeyHash:   model.HashAPIKey(plaintext),
+		Role:      role,
+		CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	stub := routerStub()
+	stub.LookupAPIKeyByPrefixFn = func(_ context.Context, got string) (*model.APIKey, error) {
+		if got == key.Prefix {
+			copied := *key
+			copied.KeyHash = append([]byte(nil), key.KeyHash...)
+
+			return &copied, nil
+		}
+
+		return nil, store.ErrNotFound
+	}
+	stub.ConsumeRateLimitFn = func(context.Context, string, int) (store.RateLimitResult, error) {
+		return store.RateLimitResult{
+			Allowed:   true,
+			Limit:     300,
+			Remaining: 299,
+			ResetUnix: time.Now().Add(time.Minute).Unix(),
+		}, nil
+	}
+	stub.ListAPIKeysFn = func(context.Context) ([]*model.APIKey, error) {
+		return []*model.APIKey{}, nil
+	}
+
+	return plaintext, stub
 }

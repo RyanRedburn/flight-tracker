@@ -30,7 +30,11 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 //	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
 //	@Success		200				{object}	model.RouteStats
 //	@Failure		400				{object}	ErrorResponse
+//	@Failure		401				{object}	ErrorResponse
+//	@Failure		403				{object}	ErrorResponse
+//	@Failure		429				{object}	ErrorResponse
 //	@Failure		500				{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/stats [get]
 func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteStats(r)
@@ -62,7 +66,11 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 //	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 30, max 120)"	minimum(1)	maximum(120)
 //	@Success		200							{object}	model.RouteOutlook
 //	@Failure		400							{object}	ErrorResponse
+//	@Failure		401							{object}	ErrorResponse
+//	@Failure		403							{object}	ErrorResponse
+//	@Failure		429							{object}	ErrorResponse
 //	@Failure		500							{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/outlook [get]
 func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteOutlook(r)

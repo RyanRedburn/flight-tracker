@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/model"
+
 	"github.com/caarlos0/env/v11"
 )
 
@@ -30,6 +32,16 @@ type Config struct {
 	OurAirportsDownloadTimeout time.Duration `env:"OURAIRPORTS_DOWNLOAD_TIMEOUT" envDefault:"5m"`
 	MaxIngestMonths            int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
 	LogLevel                   slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
+	AuthDisabled               bool          `env:"AUTH_DISABLED" envDefault:"false"`
+	RateLimitDisabled          bool          `env:"RATE_LIMIT_DISABLED" envDefault:"false"`
+	RateLimitTrustProxy        bool          `env:"RATE_LIMIT_TRUST_PROXY" envDefault:"false"`
+	AuthBootstrapAdminKey      string        `env:"AUTH_BOOTSTRAP_ADMIN_KEY"`
+	RateLimitAnonRPM           int           `env:"RATE_LIMIT_ANON_RPM" envDefault:"60"`
+	RateLimitConsumerRPM       int           `env:"RATE_LIMIT_CONSUMER_RPM" envDefault:"120"`
+	RateLimitSubscriberRPM     int           `env:"RATE_LIMIT_SUBSCRIBER_RPM" envDefault:"120"`
+	RateLimitAdminRPM          int           `env:"RATE_LIMIT_ADMIN_RPM" envDefault:"300"`
+	RateLimitAdminIngestRPM    int           `env:"RATE_LIMIT_ADMIN_INGEST_RPM" envDefault:"10"`
+	RateLimitAuthFailRPM       int           `env:"RATE_LIMIT_AUTH_FAIL_RPM" envDefault:"30"`
 }
 
 func Load() (Config, error) {
@@ -58,6 +70,36 @@ func Load() (Config, error) {
 
 	if cfg.JobLeaseTTL < 0 {
 		return Config{}, errors.New("JOB_LEASE_TTL must be >= 0")
+	}
+
+	if cfg.AuthBootstrapAdminKey != "" {
+		if _, err := model.ParseAPIKeyPrefix(cfg.AuthBootstrapAdminKey); err != nil {
+			return Config{}, fmt.Errorf("AUTH_BOOTSTRAP_ADMIN_KEY: %w", err)
+		}
+	}
+
+	if cfg.RateLimitAnonRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_ANON_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitConsumerRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_CONSUMER_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitSubscriberRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_SUBSCRIBER_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitAdminRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_ADMIN_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitAdminIngestRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_ADMIN_INGEST_RPM must be >= 1")
+	}
+
+	if cfg.RateLimitAuthFailRPM < 1 {
+		return Config{}, errors.New("RATE_LIMIT_AUTH_FAIL_RPM must be >= 1")
 	}
 
 	return cfg, nil

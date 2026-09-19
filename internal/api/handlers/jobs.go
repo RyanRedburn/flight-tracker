@@ -47,8 +47,12 @@ type JobResponse struct {
 //	@Param			id	path		string	true	"Job ID"
 //	@Success		200	{object}	JobResponse
 //	@Failure		400	{object}	ErrorResponse
+//	@Failure		401	{object}	ErrorResponse
+//	@Failure		403	{object}	ErrorResponse
 //	@Failure		404	{object}	ErrorResponse
+//	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/jobs/{id} [get]
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -87,7 +91,11 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 //	@Param			limit	query		int	false	"Max jobs to return (1-500, default 50)"
 //	@Success		200		{array}		JobResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/jobs [get]
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit, err := query.ParseJobsList(r)

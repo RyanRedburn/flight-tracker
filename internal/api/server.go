@@ -26,6 +26,7 @@ func newRouter(
 	logger *slog.Logger,
 	maxIngestMonths int,
 	weatherStations handlers.WeatherStationResolver,
+	sec Security,
 ) http.Handler {
 	health := handlers.NewHealthHandler(s)
 	jobs := handlers.NewJobsHandler(s)
@@ -34,35 +35,63 @@ func newRouter(
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths, weatherStations, logger)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
+	keys := handlers.NewKeysHandler(s)
+	protect := middleware.NewProtector(s, middleware.ProtectorConfig{
+		Disabled:          sec.Disabled,
+		RateLimitDisabled: sec.Disabled || sec.RateLimitDisabled,
+		TrustProxy:        sec.TrustProxy,
+		Limits:            sec.Limits,
+	})
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.RequestLog(logger))
 
-	// Register the more specific internal UI path before /swagger/*.
-	r.Get("/swagger/internal/*", httpSwagger.Handler(
-		httpSwagger.InstanceName("internal"),
-	))
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.InstanceName("external"),
-	))
-
 	r.Get("/health", health.Liveness)
 	r.Get("/ready", health.Readiness)
-	r.Get("/db/version", health.DatabaseVersion)
+
+	r.Group(func(r chi.Router) {
+		r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceInternal))
+		r.Get("/db/version", health.DatabaseVersion)
+		// More specific internal UI path before /swagger/*.
+		r.Get("/swagger/internal/*", httpSwagger.Handler(
+			httpSwagger.InstanceName("internal"),
+		))
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceExternal))
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.InstanceName("external"),
+		))
+	})
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/ingest", ingestHandler.Create)
-		r.Post("/ingest/weather", weatherIngest.Create)
-		r.Post("/ingest/countries", referenceIngest.CreateCountries)
-		r.Post("/ingest/regions", referenceIngest.CreateRegions)
-		r.Post("/ingest/airports", referenceIngest.CreateAirports)
-		r.Post("/ingest/weather-stations", referenceIngest.CreateWeatherStations)
-		r.Get("/jobs", jobs.List)
-		r.Get("/jobs/{id}", jobs.Get)
-		r.Get("/routes/stats", routes.Stats)
-		r.Get("/routes/outlook", routes.Outlook)
-		r.Get("/carriers/stats", carriers.Stats)
+		r.Group(func(r chi.Router) {
+			r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceIngest))
+			r.Post("/ingest", ingestHandler.Create)
+			r.Post("/ingest/weather", weatherIngest.Create)
+			r.Post("/ingest/countries", referenceIngest.CreateCountries)
+			r.Post("/ingest/regions", referenceIngest.CreateRegions)
+			r.Post("/ingest/airports", referenceIngest.CreateAirports)
+			r.Post("/ingest/weather-stations", referenceIngest.CreateWeatherStations)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceInternal))
+			r.Get("/jobs", jobs.List)
+			r.Get("/jobs/{id}", jobs.Get)
+			r.Get("/keys", keys.List)
+			r.Post("/keys", keys.Create)
+			r.Post("/keys/{id}/revoke", keys.Revoke)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceExternal))
+			r.Get("/routes/stats", routes.Stats)
+			r.Get("/routes/outlook", routes.Outlook)
+			r.Get("/carriers/stats", carriers.Stats)
+		})
 	})
 
 	return r
@@ -74,11 +103,12 @@ func NewServer(
 	logger *slog.Logger,
 	maxIngestMonths int,
 	weatherStations handlers.WeatherStationResolver,
+	sec Security,
 ) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:              addr,
-			Handler:           newRouter(s, logger, maxIngestMonths, weatherStations),
+			Handler:           newRouter(s, logger, maxIngestMonths, weatherStations, sec),
 			ReadHeaderTimeout: 5 * time.Second,
 		},
 	}

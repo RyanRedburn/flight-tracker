@@ -14,6 +14,7 @@ Go service with a REST API and an in-process background worker for importing fli
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, carrier performance stats, booking outlook probabilities, and job status
+- Hashed API keys in Postgres (`consumer`, `subscriber`, `admin`) with shared, multi-replica rate limits
 - SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker Compose with Postgres and a migrate sidecar
 
@@ -50,6 +51,14 @@ go run ./cmd/server
 
 Defaults expect Postgres at `localhost:5432` with the credentials in [`.env.example`](.env.example). Or run the full stack with `make docker-run`.
 
+Local `go run` does not load `.env`. Auth is **on** by default (`AUTH_DISABLED=false`). For unauthenticated local use:
+
+```bash
+AUTH_DISABLED=true go run ./cmd/server
+```
+
+Compose defaults `AUTH_DISABLED=true` so `make docker-run` stays usable without keys. Do not ship that value to production.
+
 Swagger UI (after the server is running):
 
 - External (user-facing): [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
@@ -65,6 +74,8 @@ Visibility is controlled by swag tags on each handler:
 
 - `external` — included in the user-facing `/swagger/` docs (currently route stats, route outlook, and carrier stats)
 - `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
+
+When authentication is enabled, `/swagger/` requires a `consumer`, `subscriber`, or `admin` key, and `/swagger/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
 
 After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
 
@@ -95,6 +106,62 @@ Environment variables (defaults shown):
 | `OURAIRPORTS_DOWNLOAD_TIMEOUT` | `5m` | HTTP timeout for OurAirports CSV downloads |
 | `MAX_INGEST_MONTHS` | `24` | Max months per flight-performance ingest request |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
+| `AUTH_DISABLED` | `false` | When `true`, skip API authentication **and** rate limits. Explicit local/dev fail-open; the process logs a warning. Production must leave this false. |
+| `RATE_LIMIT_DISABLED` | `false` | When `true`, skip rate limits but still authenticate. `AUTH_DISABLED=true` also skips rate limits. |
+| `RATE_LIMIT_TRUST_PROXY` | `false` | When `true`, anonymous limits use the right-most `X-Forwarded-For` hop (then `X-Real-IP`, then `RemoteAddr`). Enable only behind a single trusted reverse proxy. There is no hop-count stripping of extra forwarded addresses. |
+| `AUTH_BOOTSTRAP_ADMIN_KEY` | empty | One-time admin key inserted if `api_keys` is empty. Must be `ftk_<8 hex>_<32 hex>`. Unset after first boot. Concurrent replicas treat a unique conflict as success. |
+| `RATE_LIMIT_ANON_RPM` | `60` | Shared requests/minute for true anonymous public routes (`ip|<ip>|<surface>`). Probes are not limited. Failed credentials do **not** use this bucket. |
+| `RATE_LIMIT_CONSUMER_RPM` | `120` | Shared requests/minute for `consumer` keys. |
+| `RATE_LIMIT_SUBSCRIBER_RPM` | `120` | Shared requests/minute for `subscriber` keys (same access as `consumer` in v1). |
+| `RATE_LIMIT_ADMIN_RPM` | `300` | Shared requests/minute for `admin` keys on non-ingest surfaces. |
+| `RATE_LIMIT_ADMIN_INGEST_RPM` | `10` | Shared requests/minute for `admin` ingest POSTs so a loop cannot flood the job queue. |
+| `RATE_LIMIT_AUTH_FAIL_RPM` | `30` | Shared requests/minute for missing, invalid, or revoked credentials on protected routes (`ip|<ip>|auth_fail`). Keeps auth spam from exhausting the anonymous public IP quota. |
+
+### Authentication and rate limiting
+
+API replicas share one Postgres. Auth and advertised rate limits are **not** per-process.
+
+**Credentials.** Send the plaintext key as `Authorization: Bearer <key>` (primary) or `X-API-Key: <key>`. If both are present they must match. Keys are stored as SHA-256 hashes keyed by an 8-character prefix (`ftk_<prefix>_<secret>`); the plaintext is returned only at creation. Lookup is by prefix, then a constant-time hash compare.
+
+**Roles.**
+
+| Role | Access |
+| --- | --- |
+| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/carriers/*`) and `/swagger/` |
+| `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
+| `admin` | Everything: ingest, jobs, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
+
+`/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid/revoked key → **401**, or **429** if the auth-fail IP bucket is exhausted; wrong role → **403**).
+
+**Bootstrap.** Auth enabled with an empty `api_keys` table refuses to start (not fail-open). Either:
+
+1. Set `AUTH_BOOTSTRAP_ADMIN_KEY` to a generated `ftk_…` value for the first process start, then unset it, or
+2. Run once with `AUTH_DISABLED=true`, `POST /api/v1/keys` as below, then restart with auth enabled.
+
+```bash
+python3 -c "import secrets; print('ftk_' + secrets.token_hex(4) + '_' + secrets.token_hex(16))"
+```
+
+**Rate limits.** Postgres holds a token bucket per identity × surface. Capacity and refill equal the configured requests/minute, so N replicas cannot multiply the advertised cap. A small per-process burst shield (200 rps) only sheds floods before they hit Postgres; it is not the advertised quota.
+
+| Bucket | When |
+| --- | --- |
+| `key|<id>|<surface>` | Valid API key (`external`, `internal`, or `ingest`) |
+| `ip|<client ip>|auth_fail` | Missing, invalid, or revoked credentials on a **protected** route (`RATE_LIMIT_AUTH_FAIL_RPM`) |
+| `ip|<client ip>|<surface>` | True anonymous public routes (none in v1 besides unlimited probes). Not used for failed credentials. |
+
+Shared-store (Postgres) responses include:
+
+| Header | Meaning |
+| --- | --- |
+| `X-RateLimit-Limit` | Configured requests/minute for this identity and surface |
+| `X-RateLimit-Remaining` | Whole tokens left (0 on **429**) |
+| `X-RateLimit-Reset` | Unix timestamp (UTC seconds) when the bucket is projected to be full, or when the next request is allowed on **429** |
+| `Retry-After` | Seconds until the next token (**429** only) |
+
+A process-local burst-shield **429** includes `Retry-After` only. It does not set `X-RateLimit-*`; those headers always reflect the shared Postgres bucket.
+
+**Client IP.** Default is `RemoteAddr` (correct for Compose port publish / a directly reached process). `RATE_LIMIT_TRUST_PROXY=true` uses the right-most `X-Forwarded-For` address. Do not enable that on an untrusted network; spoofed extra hops are not stripped.
 
 ## Docker
 
@@ -115,6 +182,8 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 
 ## API examples
 
+When `AUTH_DISABLED=true`, the examples below work as written. With authentication enabled, send the key on every protected request (`/health` and `/ready` never need it): `-H "Authorization: Bearer $API_KEY"`.
+
 ```bash
 # Liveness
 curl http://localhost:8080/health
@@ -122,8 +191,8 @@ curl http://localhost:8080/health
 # Readiness (database ping)
 curl http://localhost:8080/ready
 
-# Database migration version
-curl http://localhost:8080/db/version
+# Database migration version (admin)
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/db/version
 
 # Queue flight performance data import for a single month
 curl -X POST http://localhost:8080/api/v1/ingest \
@@ -191,6 +260,19 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 # dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days)
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&start_date=2025-01-01&end_date=2025-03-31"
+
+# Create an API key (admin; plaintext secret is returned only once)
+curl -X POST http://localhost:8080/api/v1/keys \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"consumer","name":"docs example"}'
+
+# List API keys (hashes and plaintext secrets are never included)
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys
+
+# Revoke a key (idempotent)
+curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
+  -H "Authorization: Bearer $API_KEY"
 ```
 
 ### Ingest behavior

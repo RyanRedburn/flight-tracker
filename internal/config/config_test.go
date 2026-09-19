@@ -24,6 +24,16 @@ func TestLoadDefaults(t *testing.T) {
 	t.Setenv("OURAIRPORTS_DOWNLOAD_TIMEOUT", "")
 	t.Setenv("MAX_INGEST_MONTHS", "")
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("AUTH_DISABLED", "")
+	t.Setenv("RATE_LIMIT_DISABLED", "")
+	t.Setenv("RATE_LIMIT_TRUST_PROXY", "")
+	t.Setenv("AUTH_BOOTSTRAP_ADMIN_KEY", "")
+	t.Setenv("RATE_LIMIT_ANON_RPM", "")
+	t.Setenv("RATE_LIMIT_CONSUMER_RPM", "")
+	t.Setenv("RATE_LIMIT_SUBSCRIBER_RPM", "")
+	t.Setenv("RATE_LIMIT_ADMIN_RPM", "")
+	t.Setenv("RATE_LIMIT_ADMIN_INGEST_RPM", "")
+	t.Setenv("RATE_LIMIT_AUTH_FAIL_RPM", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -98,6 +108,42 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogLevel != slog.LevelInfo {
 		t.Errorf("LogLevel = %v, want info", cfg.LogLevel)
 	}
+
+	if cfg.AuthDisabled {
+		t.Error("AuthDisabled = true, want false")
+	}
+
+	if cfg.RateLimitDisabled {
+		t.Error("RateLimitDisabled = true, want false")
+	}
+
+	if cfg.RateLimitTrustProxy {
+		t.Error("RateLimitTrustProxy = true, want false")
+	}
+
+	if cfg.RateLimitAnonRPM != 60 {
+		t.Errorf("RateLimitAnonRPM = %d, want 60", cfg.RateLimitAnonRPM)
+	}
+
+	if cfg.RateLimitConsumerRPM != 120 {
+		t.Errorf("RateLimitConsumerRPM = %d, want 120", cfg.RateLimitConsumerRPM)
+	}
+
+	if cfg.RateLimitSubscriberRPM != 120 {
+		t.Errorf("RateLimitSubscriberRPM = %d, want 120", cfg.RateLimitSubscriberRPM)
+	}
+
+	if cfg.RateLimitAdminRPM != 300 {
+		t.Errorf("RateLimitAdminRPM = %d, want 300", cfg.RateLimitAdminRPM)
+	}
+
+	if cfg.RateLimitAdminIngestRPM != 10 {
+		t.Errorf("RateLimitAdminIngestRPM = %d, want 10", cfg.RateLimitAdminIngestRPM)
+	}
+
+	if cfg.RateLimitAuthFailRPM != 30 {
+		t.Errorf("RateLimitAuthFailRPM = %d, want 30", cfg.RateLimitAuthFailRPM)
+	}
 }
 
 func TestLoadFromEnv(t *testing.T) {
@@ -159,6 +205,48 @@ func TestLoadInvalidJobLeaseTTL(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() expected error for JOB_LEASE_TTL=-1s")
+	}
+}
+
+func TestLoadAuthDisabled(t *testing.T) {
+	t.Setenv("AUTH_DISABLED", "true")
+	t.Setenv("RATE_LIMIT_DISABLED", "true")
+	t.Setenv("RATE_LIMIT_TRUST_PROXY", "true")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.AuthDisabled || !cfg.RateLimitDisabled || !cfg.RateLimitTrustProxy {
+		t.Fatalf("flags = %+v", cfg)
+	}
+}
+
+func TestLoadInvalidRateLimit(t *testing.T) {
+	t.Setenv("RATE_LIMIT_ADMIN_INGEST_RPM", "0")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for RATE_LIMIT_ADMIN_INGEST_RPM=0")
+	}
+}
+
+func TestLoadInvalidAuthFailRPM(t *testing.T) {
+	t.Setenv("RATE_LIMIT_AUTH_FAIL_RPM", "0")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for RATE_LIMIT_AUTH_FAIL_RPM=0")
+	}
+}
+
+func TestLoadInvalidBootstrapKey(t *testing.T) {
+	t.Setenv("AUTH_BOOTSTRAP_ADMIN_KEY", "not-a-key")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() expected error for invalid AUTH_BOOTSTRAP_ADMIN_KEY")
 	}
 }
 

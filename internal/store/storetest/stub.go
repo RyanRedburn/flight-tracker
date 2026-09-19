@@ -48,6 +48,13 @@ type Stub struct {
 	CarrierStatsFn                        func(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error)
 	PingFn                                func(ctx context.Context) error
 	MigrationVersionFn                    func(ctx context.Context) (store.MigrationVersion, error)
+	CreateAPIKeyFn                        func(ctx context.Context, key *model.APIKey) error
+	LookupAPIKeyByPrefixFn                func(ctx context.Context, prefix string) (*model.APIKey, error)
+	GetAPIKeyFn                           func(ctx context.Context, id string) (*model.APIKey, error)
+	ListAPIKeysFn                         func(ctx context.Context) ([]*model.APIKey, error)
+	RevokeAPIKeyFn                        func(ctx context.Context, id string, revokedAt time.Time) error
+	CountAPIKeysFn                        func(ctx context.Context) (int64, error)
+	ConsumeRateLimitFn                    func(ctx context.Context, bucketKey string, requestsPerMinute int) (store.RateLimitResult, error)
 	CloseFn                               func() error
 }
 
@@ -337,6 +344,62 @@ func (s *Stub) MigrationVersion(ctx context.Context) (store.MigrationVersion, er
 	}
 
 	return s.MigrationVersionFn(ctx)
+}
+
+func (s *Stub) CreateAPIKey(ctx context.Context, key *model.APIKey) error {
+	if s.CreateAPIKeyFn == nil {
+		panic("unexpected call: CreateAPIKey")
+	}
+
+	return s.CreateAPIKeyFn(ctx, key)
+}
+
+func (s *Stub) LookupAPIKeyByPrefix(ctx context.Context, prefix string) (*model.APIKey, error) {
+	if s.LookupAPIKeyByPrefixFn == nil {
+		panic("unexpected call: LookupAPIKeyByPrefix")
+	}
+
+	return s.LookupAPIKeyByPrefixFn(ctx, prefix)
+}
+
+func (s *Stub) GetAPIKey(ctx context.Context, id string) (*model.APIKey, error) {
+	if s.GetAPIKeyFn == nil {
+		panic("unexpected call: GetAPIKey")
+	}
+
+	return s.GetAPIKeyFn(ctx, id)
+}
+
+func (s *Stub) ListAPIKeys(ctx context.Context) ([]*model.APIKey, error) {
+	if s.ListAPIKeysFn == nil {
+		panic("unexpected call: ListAPIKeys")
+	}
+
+	return s.ListAPIKeysFn(ctx)
+}
+
+func (s *Stub) RevokeAPIKey(ctx context.Context, id string, revokedAt time.Time) error {
+	if s.RevokeAPIKeyFn == nil {
+		panic("unexpected call: RevokeAPIKey")
+	}
+
+	return s.RevokeAPIKeyFn(ctx, id, revokedAt)
+}
+
+func (s *Stub) CountAPIKeys(ctx context.Context) (int64, error) {
+	if s.CountAPIKeysFn == nil {
+		panic("unexpected call: CountAPIKeys")
+	}
+
+	return s.CountAPIKeysFn(ctx)
+}
+
+func (s *Stub) ConsumeRateLimit(ctx context.Context, bucketKey string, requestsPerMinute int) (store.RateLimitResult, error) {
+	if s.ConsumeRateLimitFn == nil {
+		panic("unexpected call: ConsumeRateLimit")
+	}
+
+	return s.ConsumeRateLimitFn(ctx, bucketKey, requestsPerMinute)
 }
 
 func (s *Stub) Close() error {

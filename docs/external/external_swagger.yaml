@@ -260,8 +260,10 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: REST API for flight data ingest, job status, route performance, and
-    carrier performance.
+  description: 'REST API for flight data ingest, job status, route performance, and
+    carrier performance. Protected routes require an API key (`Authorization: Bearer
+    <key>` or `X-API-Key`). Rate-limited responses return 429 with `Retry-After`,
+    `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.'
   title: flight-tracker API
   version: "1.0"
 paths:
@@ -309,10 +311,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Carrier performance stats
       tags:
       - carriers
@@ -374,10 +390,24 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Route booking outlook
       tags:
       - routes
@@ -444,12 +474,32 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
       summary: Route performance stats
       tags:
       - routes
       - external
+securityDefinitions:
+  ApiKeyAuth:
+    description: API key as `Bearer <key>`. `X-API-Key` is also accepted.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

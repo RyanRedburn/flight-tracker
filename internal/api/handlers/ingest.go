@@ -43,8 +43,12 @@ type IngestResponse struct {
 //	@Param			body	body		model.IngestRequest	true	"Ingest range"
 //	@Success		201		{object}	IngestResponse
 //	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
 //	@Failure		409		{object}	FlightPerformanceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
 //	@Router			/api/v1/ingest [post]
 func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.IngestRequest

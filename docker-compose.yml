@@ -28,6 +28,8 @@ services:
       DATABASE_DRIVER: postgres
       DATABASE_URL: postgres://${POSTGRES_USER:-flight}:${POSTGRES_PASSWORD:-flight}@postgres:5432/${POSTGRES_DB:-flight_tracker}?sslmode=disable
       MIGRATIONS_PATH: /migrations/postgres
+      # Compose is local/dev: explicit fail-open. Unset or set false for production.
+      AUTH_DISABLED: ${AUTH_DISABLED:-true}
 
   # Opt-in sidecar for make migrate-* / db-shell. A profile keeps default
   # `docker compose up` from starting migrate alongside app (which already

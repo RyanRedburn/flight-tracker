@@ -13,6 +13,7 @@ var (
 	ErrNotFound             = errors.New("not found")
 	ErrJobStatusConflict    = errors.New("job status conflict")
 	ErrActiveIngestConflict = errors.New("active ingest job conflict")
+	ErrConflict             = errors.New("conflict")
 )
 
 type MigrationVersion struct {
@@ -56,5 +57,12 @@ type Store interface {
 	CarrierStats(ctx context.Context, filter CarrierStatsFilter) (*model.CarrierStats, error)
 	Ping(ctx context.Context) error
 	MigrationVersion(ctx context.Context) (MigrationVersion, error)
+	CreateAPIKey(ctx context.Context, key *model.APIKey) error
+	LookupAPIKeyByPrefix(ctx context.Context, prefix string) (*model.APIKey, error)
+	GetAPIKey(ctx context.Context, id string) (*model.APIKey, error)
+	ListAPIKeys(ctx context.Context) ([]*model.APIKey, error)
+	RevokeAPIKey(ctx context.Context, id string, revokedAt time.Time) error
+	CountAPIKeys(ctx context.Context) (int64, error)
+	ConsumeRateLimit(ctx context.Context, bucketKey string, requestsPerMinute int) (RateLimitResult, error)
 	Close() error
 }
