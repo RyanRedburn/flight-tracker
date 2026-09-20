@@ -18,7 +18,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates (same definition and 0–1 scale as on_time_rate) and flight counts for the same filters. The field is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

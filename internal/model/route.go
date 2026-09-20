@@ -31,10 +31,8 @@ type RouteStatsFilters struct {
 }
 
 // CarrierOnTime is per-marketing-carrier on-time performance for a route.
-// OnTimeRate uses the same definition and scale as RouteStats.OnTimeRate.
 type CarrierOnTime struct {
-	Carrier string `json:"carrier"`
-	// On-time rate (0–1), same definition and rounding as the aggregate on_time_rate.
+	Carrier    string  `json:"carrier"`
 	OnTimeRate float64 `json:"on_time_rate"`
 	Flights    int     `json:"flights"`
 }

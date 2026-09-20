@@ -250,8 +250,8 @@ curl http://localhost:8080/api/v1/jobs
 
 # Route performance stats for a date range (required: origin, dest, start_date, end_date;
 # optional: carrier, flight_number [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).
-# Omit carrier to include carrier_on_time (per-marketing-carrier on_time_rate, same 0–1 scale as
-# the aggregate on_time_rate, plus flight counts). The field is omitted entirely when carrier is set.
+# Omit carrier to include carrier_on_time (per-marketing-carrier on_time_rate plus flight counts).
+# The field is omitted entirely when carrier is set.
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&days_of_week=1,2,3,4,5"
 
