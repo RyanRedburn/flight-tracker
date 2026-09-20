@@ -74,7 +74,7 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 }
 
 func TestRouteStatsCarrierOnTimeRatesJSON(t *testing.T) {
-	omitted, err := json.Marshal(RouteStats{Origin: "ORD", Dest: "LAX"})
+	omitted, err := json.Marshal(RouteStats{})
 	if err != nil {
 		t.Fatalf("marshal omitted: %v", err)
 	}
@@ -84,8 +84,6 @@ func TestRouteStatsCarrierOnTimeRatesJSON(t *testing.T) {
 	}
 
 	empty, err := json.Marshal(RouteStats{
-		Origin:             "ORD",
-		Dest:               "LAX",
 		CarrierOnTimeRates: []CarrierOnTimeRate{},
 	})
 	if err != nil {

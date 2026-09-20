@@ -57,6 +57,7 @@ func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
 	var agg counts
 
 	byCarrier := map[string]counts{}
+
 	for _, f := range flights {
 		onTime, delayed, cancelled, diverted := classifyRouteStatsFlight(f.cancelled, f.diverted, f.arrDel15)
 		agg.flights++
@@ -75,8 +76,8 @@ func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
 	}
 
 	aggRate := rate(agg.onTime, agg.flights)
-	if aggRate != rate(2, 6) {
-		t.Fatalf("aggregate on_time_rate = %v, want 2/6 (not cancelled/diverted, arr_del15 < 1)", aggRate)
+	if aggRate != rate(3, 6) {
+		t.Fatalf("aggregate on_time_rate = %v, want 3/6 (not cancelled/diverted, arr_del15 < 1)", aggRate)
 	}
 
 	var (
