@@ -17,7 +17,7 @@ const routeStatsExtraPlaceholder = "/*extra*/"
 func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 	stats := emptyRouteStats(filter)
 
-	query, args := buildRouteStatsQuery(filter)
+	query, args := buildRouteStatsQuery(store.QueryRouteStats, filter)
 
 	var (
 		avgArr            sql.NullFloat64
@@ -105,6 +105,15 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	}
 
 	stats.DiversionAirports = airports
+
+	if filter.Carrier == "" {
+		rates, err := s.listRouteCarrierOnTimeRates(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.CarrierOnTimeRates = rates
+	}
 
 	stats.RoundForResponse()
 
@@ -200,7 +209,51 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	return out, nil
 }
 
-func buildRouteStatsQuery(filter store.RouteStatsFilter) (string, []any) {
+func (s *Store) listRouteCarrierOnTimeRates(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTimeRate, error) {
+	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTimeRates, filter)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]model.CarrierOnTimeRate, 0)
+
+	for rows.Next() {
+		var item model.CarrierOnTimeRate
+		if err := rows.Scan(
+			&item.Carrier,
+			&item.Flights,
+			&item.OnTime,
+			&item.Delayed,
+			&item.Cancelled,
+			&item.Diverted,
+		); err != nil {
+			return nil, err
+		}
+
+		item = store.CarrierOnTimeRateFromCounts(
+			item.Carrier,
+			item.Flights,
+			item.OnTime,
+			item.Delayed,
+			item.Cancelled,
+			item.Diverted,
+		)
+		out = append(out, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	store.SortCarrierOnTimeRates(out)
+
+	return out, nil
+}
+
+func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (string, []any) {
 	args := []any{filter.Origin, filter.Dest, filter.StartDate, filter.EndDate}
 	n := 5
 
@@ -226,7 +279,7 @@ func buildRouteStatsQuery(filter store.RouteStatsFilter) (string, []any) {
 		args = append(args, filter.DaysOfWeek)
 	}
 
-	query := strings.Replace(store.QueryRouteStats, routeStatsExtraPlaceholder, extra.String(), 1)
+	query := strings.Replace(template, routeStatsExtraPlaceholder, extra.String(), 1)
 
 	return query, args
 }
