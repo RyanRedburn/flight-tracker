@@ -41,8 +41,9 @@ definitions:
         type: string
       flights:
         type: integer
-      on_time:
-        description: On-time rate (0–1), same definition and rounding as on_time_rate.
+      on_time_rate:
+        description: On-time rate (0–1), same definition and rounding as the aggregate
+          on_time_rate.
         type: number
     type: object
   model.CarrierRouteStat:
@@ -221,7 +222,7 @@ definitions:
         type: integer
       carrier_on_time:
         description: Present only when the carrier query filter is omitted. Sorted
-          by on_time desc, then flights desc, then carrier asc.
+          by on_time_rate desc, then flights desc, then carrier asc.
         items:
           $ref: '#/definitions/model.CarrierOnTime'
         type: array

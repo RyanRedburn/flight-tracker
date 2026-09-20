@@ -35,7 +35,7 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 			Unattributed: 0.04,
 		},
 		CarrierOnTime: []CarrierOnTime{
-			{OnTime: 1.0 / 3.0},
+			{OnTimeRate: 1.0 / 3.0},
 		},
 	}
 
@@ -62,7 +62,7 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 	assertFloat(t, "delay_causes_share.security", stats.DelayCausesShare.Security, 0)
 	assertFloat(t, "delay_causes_share.late_aircraft", stats.DelayCausesShare.LateAircraft, 0.5)
 	assertFloat(t, "delay_causes_share.unattributed", stats.DelayCausesShare.Unattributed, 0.04)
-	assertFloat(t, "carrier_on_time[0].on_time", stats.CarrierOnTime[0].OnTime, 0.33)
+	assertFloat(t, "carrier_on_time[0].on_time_rate", stats.CarrierOnTime[0].OnTimeRate, 0.33)
 }
 
 func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
@@ -89,9 +89,9 @@ func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 
 	populated, err := json.Marshal(RouteStats{
 		CarrierOnTime: []CarrierOnTime{{
-			Carrier: "UA",
-			OnTime:  0.82,
-			Flights: 1204,
+			Carrier:    "UA",
+			OnTimeRate: 0.82,
+			Flights:    1204,
 		}},
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 		t.Fatalf("decode carrier_on_time: %v", err)
 	}
 
-	if len(rows) != 1 || rows[0].Carrier != "UA" || rows[0].OnTime != 0.82 || rows[0].Flights != 1204 {
+	if len(rows) != 1 || rows[0].Carrier != "UA" || rows[0].OnTimeRate != 0.82 || rows[0].Flights != 1204 {
 		t.Fatalf("carrier_on_time = %+v", rows)
 	}
 }

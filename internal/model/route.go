@@ -31,12 +31,12 @@ type RouteStatsFilters struct {
 }
 
 // CarrierOnTime is per-marketing-carrier on-time performance for a route.
-// OnTime is the on-time rate (0–1), same definition and scale as RouteStats.OnTimeRate.
+// OnTimeRate uses the same definition and scale as RouteStats.OnTimeRate.
 type CarrierOnTime struct {
 	Carrier string `json:"carrier"`
-	// On-time rate (0–1), same definition and rounding as on_time_rate.
-	OnTime  float64 `json:"on_time"`
-	Flights int     `json:"flights"`
+	// On-time rate (0–1), same definition and rounding as the aggregate on_time_rate.
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
 }
 
 type RouteStats struct {
@@ -63,7 +63,7 @@ type RouteStats struct {
 	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
 	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
 	DiversionAirports             []AirportCount        `json:"diversion_airports"`
-	// Present only when the carrier query filter is omitted. Sorted by on_time desc, then flights desc, then carrier asc.
+	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
 
@@ -129,7 +129,7 @@ func (o *RouteOutlook) RoundForResponse() {
 }
 
 func (s *CarrierOnTime) round() {
-	s.OnTime = roundRate(s.OnTime)
+	s.OnTimeRate = roundRate(s.OnTimeRate)
 }
 
 func (s *DelayCausesShare) round() {

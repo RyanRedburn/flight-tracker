@@ -82,8 +82,8 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 
 	for carrier, c := range byCarrier {
 		item := CarrierOnTimeFromCounts(carrier, c.onTime, c.flights)
-		if item.OnTime != rate(c.onTime, c.flights) {
-			t.Errorf("%s on_time = %v, want on_time_count/flights", carrier, item.OnTime)
+		if item.OnTimeRate != rate(c.onTime, c.flights) {
+			t.Errorf("%s on_time_rate = %v, want on_time_count/flights", carrier, item.OnTimeRate)
 		}
 
 		items = append(items, item)
@@ -114,10 +114,10 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 
 func TestSortCarrierOnTime(t *testing.T) {
 	items := []model.CarrierOnTime{
-		{Carrier: "UA", OnTime: 0.5, Flights: 2},
-		{Carrier: "B6", OnTime: 0.5, Flights: 2},
-		{Carrier: "AA", OnTime: 0.5, Flights: 10},
-		{Carrier: "DL", OnTime: 1, Flights: 1},
+		{Carrier: "UA", OnTimeRate: 0.5, Flights: 2},
+		{Carrier: "B6", OnTimeRate: 0.5, Flights: 2},
+		{Carrier: "AA", OnTimeRate: 0.5, Flights: 10},
+		{Carrier: "DL", OnTimeRate: 1, Flights: 1},
 	}
 
 	SortCarrierOnTime(items)
