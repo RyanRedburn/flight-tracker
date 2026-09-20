@@ -107,12 +107,12 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	stats.DiversionAirports = airports
 
 	if filter.Carrier == "" {
-		rates, err := s.listRouteCarrierOnTimeRates(ctx, filter)
+		rows, err := s.listRouteCarrierOnTime(ctx, filter)
 		if err != nil {
 			return nil, err
 		}
 
-		stats.CarrierOnTimeRates = rates
+		stats.CarrierOnTime = rows
 	}
 
 	stats.RoundForResponse()
@@ -209,8 +209,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	return out, nil
 }
 
-func (s *Store) listRouteCarrierOnTimeRates(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTimeRate, error) {
-	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTimeRates, filter)
+func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTime, error) {
+	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, filter)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -218,29 +218,14 @@ func (s *Store) listRouteCarrierOnTimeRates(ctx context.Context, filter store.Ro
 	}
 	defer rows.Close()
 
-	out := make([]model.CarrierOnTimeRate, 0)
+	out := make([]model.CarrierOnTime, 0)
 
 	for rows.Next() {
-		var item model.CarrierOnTimeRate
-		if err := rows.Scan(
-			&item.Carrier,
-			&item.Flights,
-			&item.OnTime,
-			&item.Delayed,
-			&item.Cancelled,
-			&item.Diverted,
-		); err != nil {
+		var item model.CarrierOnTime
+		if err := rows.Scan(&item.Carrier, &item.OnTime, &item.Flights); err != nil {
 			return nil, err
 		}
 
-		item = store.CarrierOnTimeRateFromCounts(
-			item.Carrier,
-			item.Flights,
-			item.OnTime,
-			item.Delayed,
-			item.Cancelled,
-			item.Diverted,
-		)
 		out = append(out, item)
 	}
 
@@ -248,7 +233,7 @@ func (s *Store) listRouteCarrierOnTimeRates(ctx context.Context, filter store.Ro
 		return nil, err
 	}
 
-	store.SortCarrierOnTimeRates(out)
+	store.SortCarrierOnTime(out)
 
 	return out, nil
 }

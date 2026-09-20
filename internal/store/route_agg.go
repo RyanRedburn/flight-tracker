@@ -56,25 +56,10 @@ func HHMMToMinutes(hhmm string) (int, bool) {
 	return h*60 + m, true
 }
 
-func CarrierOnTimeRateFromCounts(carrier string, flights, onTime, delayed, cancelled, diverted int) model.CarrierOnTimeRate {
-	return model.CarrierOnTimeRate{
-		Carrier:          carrier,
-		Flights:          flights,
-		OnTime:           onTime,
-		Delayed:          delayed,
-		Cancelled:        cancelled,
-		Diverted:         diverted,
-		OnTimeRate:       rate(onTime, flights),
-		DelayRate:        rate(delayed, flights),
-		CancellationRate: rate(cancelled, flights),
-		DiversionRate:    rate(diverted, flights),
-	}
-}
-
-func SortCarrierOnTimeRates(items []model.CarrierOnTimeRate) {
+func SortCarrierOnTime(items []model.CarrierOnTime) {
 	sort.Slice(items, func(i, j int) bool {
-		if items[i].OnTimeRate != items[j].OnTimeRate {
-			return items[i].OnTimeRate > items[j].OnTimeRate
+		if ri, rj := rate(items[i].OnTime, items[i].Flights), rate(items[j].OnTime, items[j].Flights); ri != rj {
+			return ri > rj
 		}
 
 		if items[i].Flights != items[j].Flights {

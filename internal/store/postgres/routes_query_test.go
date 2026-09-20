@@ -58,7 +58,7 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 }
 
 func TestBuildRouteStatsCarrierOnTimeQueryFilters(t *testing.T) {
-	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTimeRates, store.RouteStatsFilter{
+	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, store.RouteStatsFilter{
 		Origin:     testAirportORD,
 		Dest:       testAirportLAX,
 		StartDate:  testStartDate,

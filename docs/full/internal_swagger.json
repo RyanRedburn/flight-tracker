@@ -996,7 +996,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time_rates lists per-marketing-carrier on-time rates for the same filters (same on-time definition as the aggregate). The field is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time and flight counts for the same filters (same on-time definition as the aggregate). The field is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1528,38 +1528,17 @@
                 }
             }
         },
-        "model.CarrierOnTimeRate": {
+        "model.CarrierOnTime": {
             "type": "object",
             "properties": {
-                "cancellation_rate": {
-                    "type": "number"
-                },
-                "cancelled": {
-                    "type": "integer"
-                },
                 "carrier": {
                     "type": "string"
-                },
-                "delay_rate": {
-                    "type": "number"
-                },
-                "delayed": {
-                    "type": "integer"
-                },
-                "diversion_rate": {
-                    "type": "number"
-                },
-                "diverted": {
-                    "type": "integer"
                 },
                 "flights": {
                     "type": "integer"
                 },
                 "on_time": {
                     "type": "integer"
-                },
-                "on_time_rate": {
-                    "type": "number"
                 }
             }
         },
@@ -1891,11 +1870,11 @@
                 "cancelled": {
                     "type": "integer"
                 },
-                "carrier_on_time_rates": {
-                    "description": "Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.",
+                "carrier_on_time": {
+                    "description": "Present only when the carrier query filter is omitted. Sorted by on_time/flights desc, then flights desc, then carrier asc.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.CarrierOnTimeRate"
+                        "$ref": "#/definitions/model.CarrierOnTime"
                     }
                 },
                 "delay_causes_avg_minutes": {

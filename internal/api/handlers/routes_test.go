@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	testOriginORD          = "ORD"
-	testDestLAX            = "LAX"
-	testDestJFK            = "JFK"
-	jsonCarrierOnTimeRates = "carrier_on_time_rates"
+	testOriginORD     = "ORD"
+	testDestLAX       = "LAX"
+	testDestJFK       = "JFK"
+	jsonCarrierOnTime = "carrier_on_time"
 )
 
 func TestRoutesStats(t *testing.T) {
@@ -64,8 +64,8 @@ func TestRoutesStats(t *testing.T) {
 		t.Errorf("diversion_airports = %+v", stats.DiversionAirports)
 	}
 
-	if jsonHasKey(t, body, jsonCarrierOnTimeRates) {
-		t.Fatalf("carrier_on_time_rates should be omitted when carrier is set: %s", body)
+	if jsonHasKey(t, body, jsonCarrierOnTime) {
+		t.Fatalf("carrier_on_time should be omitted when carrier is set: %s", body)
 	}
 }
 
@@ -73,10 +73,10 @@ func TestRoutesStatsEmpty(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
-				Origin:             testOriginORD,
-				Dest:               testDestLAX,
-				DiversionAirports:  []model.AirportCount{},
-				CarrierOnTimeRates: []model.CarrierOnTimeRate{},
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
+				DiversionAirports: []model.AirportCount{},
+				CarrierOnTime:     []model.CarrierOnTime{},
 			}, nil
 		},
 	})
@@ -100,16 +100,16 @@ func TestRoutesStatsEmpty(t *testing.T) {
 		t.Fatalf("empty stats = %+v", stats)
 	}
 
-	if stats.CarrierOnTimeRates == nil {
-		t.Fatal("carrier_on_time_rates should be present when carrier is omitted")
+	if stats.CarrierOnTime == nil {
+		t.Fatal("carrier_on_time should be present when carrier is omitted")
 	}
 
-	if !jsonHasKey(t, body, jsonCarrierOnTimeRates) {
-		t.Fatalf("carrier_on_time_rates missing from JSON: %s", body)
+	if !jsonHasKey(t, body, jsonCarrierOnTime) {
+		t.Fatalf("carrier_on_time missing from JSON: %s", body)
 	}
 }
 
-func TestRoutesStatsCarrierOnTimeRates(t *testing.T) {
+func TestRoutesStatsCarrierOnTime(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 			if filter.Carrier != "" {
@@ -122,9 +122,9 @@ func TestRoutesStatsCarrierOnTimeRates(t *testing.T) {
 				Flights: 10,
 				OnTime:  8,
 				Delayed: 2,
-				CarrierOnTimeRates: []model.CarrierOnTimeRate{
-					{Carrier: "UA", Flights: 6, OnTime: 5, Delayed: 1, OnTimeRate: 0.83},
-					{Carrier: "AA", Flights: 4, OnTime: 3, Delayed: 1, OnTimeRate: 0.75},
+				CarrierOnTime: []model.CarrierOnTime{
+					{Carrier: "UA", OnTime: 5, Flights: 6},
+					{Carrier: "AA", OnTime: 3, Flights: 4},
 				},
 			}, nil
 		},
@@ -143,16 +143,16 @@ func TestRoutesStatsCarrierOnTimeRates(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if len(stats.CarrierOnTimeRates) != 2 {
-		t.Fatalf("carrier_on_time_rates len = %d, want 2", len(stats.CarrierOnTimeRates))
+	if len(stats.CarrierOnTime) != 2 {
+		t.Fatalf("carrier_on_time len = %d, want 2", len(stats.CarrierOnTime))
 	}
 
-	if stats.CarrierOnTimeRates[0].Carrier != "UA" || stats.CarrierOnTimeRates[0].OnTimeRate != 0.83 {
-		t.Errorf("first rate = %+v", stats.CarrierOnTimeRates[0])
+	if stats.CarrierOnTime[0].Carrier != "UA" || stats.CarrierOnTime[0].OnTime != 5 {
+		t.Errorf("first row = %+v", stats.CarrierOnTime[0])
 	}
 
-	if stats.CarrierOnTimeRates[1].Carrier != "AA" || stats.CarrierOnTimeRates[1].Flights != 4 {
-		t.Errorf("second rate = %+v", stats.CarrierOnTimeRates[1])
+	if stats.CarrierOnTime[1].Carrier != "AA" || stats.CarrierOnTime[1].Flights != 4 {
+		t.Errorf("second row = %+v", stats.CarrierOnTime[1])
 	}
 }
 

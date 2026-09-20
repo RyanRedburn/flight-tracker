@@ -33,8 +33,8 @@ func TestHHMMToMinutes(t *testing.T) {
 	}
 }
 
-func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
-	// Same classification as QueryRouteStats / QueryRouteStatsCarrierOnTimeRates:
+func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
+	// Same classification as QueryRouteStats / QueryRouteStatsCarrierOnTime:
 	// cancelled, else diverted, else delayed when arr_del15 >= 1, else on-time.
 	type flight struct {
 		carrier                       string
@@ -51,7 +51,7 @@ func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
 	}
 
 	type counts struct {
-		flights, onTime, delayed, cancelled, diverted int
+		flights, onTime int
 	}
 
 	var agg counts
@@ -59,58 +59,41 @@ func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
 	byCarrier := map[string]counts{}
 
 	for _, f := range flights {
-		onTime, delayed, cancelled, diverted := classifyRouteStatsFlight(f.cancelled, f.diverted, f.arrDel15)
+		onTime := classifyRouteStatsOnTime(f.cancelled, f.diverted, f.arrDel15)
 		agg.flights++
 		agg.onTime += onTime
-		agg.delayed += delayed
-		agg.cancelled += cancelled
-		agg.diverted += diverted
 
 		cur := byCarrier[f.carrier]
 		cur.flights++
 		cur.onTime += onTime
-		cur.delayed += delayed
-		cur.cancelled += cancelled
-		cur.diverted += diverted
 		byCarrier[f.carrier] = cur
 	}
 
-	aggRate := rate(agg.onTime, agg.flights)
-	if aggRate != rate(3, 6) {
-		t.Fatalf("aggregate on_time_rate = %v, want 3/6 (not cancelled/diverted, arr_del15 < 1)", aggRate)
+	if agg.onTime != 3 || agg.flights != 6 {
+		t.Fatalf("aggregate on_time/flights = %d/%d, want 3/6 (not cancelled/diverted, arr_del15 < 1)", agg.onTime, agg.flights)
 	}
 
 	var (
-		items                    []model.CarrierOnTimeRate
-		sumFlights, sumOnTime    int
-		sumDelayed, sumCancelled int
-		sumDiverted              int
+		items                 []model.CarrierOnTime
+		sumFlights, sumOnTime int
 	)
 
 	for carrier, c := range byCarrier {
-		item := CarrierOnTimeRateFromCounts(carrier, c.flights, c.onTime, c.delayed, c.cancelled, c.diverted)
-		if item.OnTimeRate != rate(c.onTime, c.flights) {
-			t.Errorf("%s on_time_rate = %v, want on_time/flights", carrier, item.OnTimeRate)
-		}
-
+		item := model.CarrierOnTime{Carrier: carrier, OnTime: c.onTime, Flights: c.flights}
 		items = append(items, item)
 		sumFlights += item.Flights
 		sumOnTime += item.OnTime
-		sumDelayed += item.Delayed
-		sumCancelled += item.Cancelled
-		sumDiverted += item.Diverted
 	}
 
-	if sumFlights != agg.flights || sumOnTime != agg.onTime || sumDelayed != agg.delayed || sumCancelled != agg.cancelled || sumDiverted != agg.diverted {
-		t.Fatalf("per-carrier counts do not partition aggregate: summed=%d/%d/%d/%d/%d agg=%+v",
-			sumFlights, sumOnTime, sumDelayed, sumCancelled, sumDiverted, agg)
+	if sumFlights != agg.flights || sumOnTime != agg.onTime {
+		t.Fatalf("per-carrier counts do not partition aggregate: summed=%d/%d agg=%+v", sumFlights, sumOnTime, agg)
 	}
 
-	if rate(sumOnTime, sumFlights) != aggRate {
-		t.Fatalf("partitioned on_time_rate = %v, want aggregate %v", rate(sumOnTime, sumFlights), aggRate)
+	if rate(sumOnTime, sumFlights) != rate(agg.onTime, agg.flights) {
+		t.Fatalf("partitioned on_time/flights = %d/%d, want aggregate %d/%d", sumOnTime, sumFlights, agg.onTime, agg.flights)
 	}
 
-	SortCarrierOnTimeRates(items)
+	SortCarrierOnTime(items)
 
 	wantOrder := []string{"DL", "AA", "UA"}
 	if len(items) != len(wantOrder) {
@@ -124,15 +107,15 @@ func TestCarrierOnTimeRateFromCountsMatchesAggregateOnTime(t *testing.T) {
 	}
 }
 
-func TestSortCarrierOnTimeRates(t *testing.T) {
-	items := []model.CarrierOnTimeRate{
-		{Carrier: "UA", Flights: 5, OnTimeRate: 0.5},
-		{Carrier: "B6", Flights: 5, OnTimeRate: 0.5},
-		{Carrier: "AA", Flights: 10, OnTimeRate: 0.5},
-		{Carrier: "DL", Flights: 1, OnTimeRate: 1},
+func TestSortCarrierOnTime(t *testing.T) {
+	items := []model.CarrierOnTime{
+		{Carrier: "UA", OnTime: 1, Flights: 2},
+		{Carrier: "B6", OnTime: 1, Flights: 2},
+		{Carrier: "AA", OnTime: 5, Flights: 10},
+		{Carrier: "DL", OnTime: 1, Flights: 1},
 	}
 
-	SortCarrierOnTimeRates(items)
+	SortCarrierOnTime(items)
 
 	want := []string{"DL", "AA", "B6", "UA"}
 	for i, carrier := range want {
@@ -142,25 +125,18 @@ func TestSortCarrierOnTimeRates(t *testing.T) {
 	}
 }
 
-func TestCarrierOnTimeRateFromCountsZeroFlights(t *testing.T) {
-	got := CarrierOnTimeRateFromCounts("UA", 0, 0, 0, 0, 0)
-	if got.OnTimeRate != 0 || got.DelayRate != 0 || got.CancellationRate != 0 || got.DiversionRate != 0 {
-		t.Fatalf("zero flights rates = %+v, want zeros", got)
-	}
-}
-
-// classifyRouteStatsFlight mirrors the SQL in QueryRouteStats and
-// QueryRouteStatsCarrierOnTimeRates: cancelled takes priority, then diverted,
+// classifyRouteStatsOnTime mirrors the SQL in QueryRouteStats and
+// QueryRouteStatsCarrierOnTime: cancelled takes priority, then diverted,
 // then delayed when arr_del15 >= 1. On-time is the remaining operated flights.
-func classifyRouteStatsFlight(cancelled, diverted, arrDel15 float64) (onTime, delayed, isCancelled, isDiverted int) {
+func classifyRouteStatsOnTime(cancelled, diverted, arrDel15 float64) int {
 	switch {
 	case cancelled >= 1:
-		return 0, 0, 1, 0
+		return 0
 	case diverted >= 1:
-		return 0, 0, 0, 1
+		return 0
 	case arrDel15 >= 1:
-		return 0, 1, 0, 0
+		return 0
 	default:
-		return 1, 0, 0, 0
+		return 1
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const jsonCarrierOnTimeRates = "carrier_on_time_rates"
+const jsonCarrierOnTime = "carrier_on_time"
 
 func TestRouteStatsRoundForResponse(t *testing.T) {
 	stats := RouteStats{
@@ -34,14 +34,6 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 			LateAircraft: 0.5,
 			Unattributed: 0.04,
 		},
-		CarrierOnTimeRates: []CarrierOnTimeRate{
-			{
-				OnTimeRate:       1.0 / 3.0,
-				DelayRate:        2.0 / 3.0,
-				CancellationRate: 0.125,
-				DiversionRate:    0.5,
-			},
-		},
 	}
 
 	stats.RoundForResponse()
@@ -67,53 +59,48 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 	assertFloat(t, "delay_causes_share.security", stats.DelayCausesShare.Security, 0)
 	assertFloat(t, "delay_causes_share.late_aircraft", stats.DelayCausesShare.LateAircraft, 0.5)
 	assertFloat(t, "delay_causes_share.unattributed", stats.DelayCausesShare.Unattributed, 0.04)
-	assertFloat(t, "carrier_on_time_rates[0].on_time_rate", stats.CarrierOnTimeRates[0].OnTimeRate, 0.33)
-	assertFloat(t, "carrier_on_time_rates[0].delay_rate", stats.CarrierOnTimeRates[0].DelayRate, 0.67)
-	assertFloat(t, "carrier_on_time_rates[0].cancellation_rate", stats.CarrierOnTimeRates[0].CancellationRate, 0.13)
-	assertFloat(t, "carrier_on_time_rates[0].diversion_rate", stats.CarrierOnTimeRates[0].DiversionRate, 0.5)
 }
 
-func TestRouteStatsCarrierOnTimeRatesJSON(t *testing.T) {
+func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 	omitted, err := json.Marshal(RouteStats{})
 	if err != nil {
 		t.Fatalf("marshal omitted: %v", err)
 	}
 
-	if jsonHasField(t, omitted, jsonCarrierOnTimeRates) {
-		t.Fatalf("carrier_on_time_rates should be omitted when nil: %s", omitted)
+	if jsonHasField(t, omitted, jsonCarrierOnTime) {
+		t.Fatalf("carrier_on_time should be omitted when nil: %s", omitted)
 	}
 
 	empty, err := json.Marshal(RouteStats{
-		CarrierOnTimeRates: []CarrierOnTimeRate{},
+		CarrierOnTime: []CarrierOnTime{},
 	})
 	if err != nil {
 		t.Fatalf("marshal empty: %v", err)
 	}
 
-	raw := jsonField(t, empty, jsonCarrierOnTimeRates)
+	raw := jsonField(t, empty, jsonCarrierOnTime)
 	if string(raw) != "[]" {
-		t.Fatalf("empty carrier_on_time_rates = %s, want []", raw)
+		t.Fatalf("empty carrier_on_time = %s, want []", raw)
 	}
 
 	populated, err := json.Marshal(RouteStats{
-		CarrierOnTimeRates: []CarrierOnTimeRate{{
-			Carrier:    "UA",
-			Flights:    1204,
-			OnTime:     987,
-			OnTimeRate: 0.82,
+		CarrierOnTime: []CarrierOnTime{{
+			Carrier: "UA",
+			OnTime:  987,
+			Flights: 1204,
 		}},
 	})
 	if err != nil {
 		t.Fatalf("marshal populated: %v", err)
 	}
 
-	var rates []CarrierOnTimeRate
-	if err := json.Unmarshal(jsonField(t, populated, jsonCarrierOnTimeRates), &rates); err != nil {
-		t.Fatalf("decode rates: %v", err)
+	var rows []CarrierOnTime
+	if err := json.Unmarshal(jsonField(t, populated, jsonCarrierOnTime), &rows); err != nil {
+		t.Fatalf("decode carrier_on_time: %v", err)
 	}
 
-	if len(rates) != 1 || rates[0].Carrier != "UA" || rates[0].Flights != 1204 || rates[0].OnTimeRate != 0.82 {
-		t.Fatalf("rates = %+v", rates)
+	if len(rows) != 1 || rows[0].Carrier != "UA" || rows[0].OnTime != 987 || rows[0].Flights != 1204 {
+		t.Fatalf("carrier_on_time = %+v", rows)
 	}
 }
 

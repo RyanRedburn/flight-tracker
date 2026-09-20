@@ -261,7 +261,7 @@ const (
 			) AS diversion_airports
 		FROM with_cause`
 
-	QueryRouteStatsCarrierOnTimeRates = `
+	QueryRouteStatsCarrierOnTime = `
 		WITH matched AS (
 			SELECT
 				iata_code_marketing_airline,
@@ -285,11 +285,8 @@ const (
 		)
 		SELECT
 			COALESCE(iata_code_marketing_airline, '') AS carrier,
-			COUNT(*)::int AS flights,
 			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
-			COUNT(*) FILTER (WHERE is_delayed)::int AS delayed,
-			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
-			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted
+			COUNT(*)::int AS flights
 		FROM classified
 		GROUP BY 1`
 
