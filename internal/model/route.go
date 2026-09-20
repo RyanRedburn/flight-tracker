@@ -30,6 +30,13 @@ type RouteStatsFilters struct {
 	DaysOfWeek   []int  `json:"days_of_week"`
 }
 
+// CarrierOnTime is per-marketing-carrier on-time performance for a route.
+type CarrierOnTime struct {
+	Carrier    string  `json:"carrier"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+}
+
 type RouteStats struct {
 	Origin                        string                `json:"origin"`
 	Dest                          string                `json:"dest"`
@@ -54,6 +61,8 @@ type RouteStats struct {
 	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
 	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
 	DiversionAirports             []AirportCount        `json:"diversion_airports"`
+	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
+	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
 
 type RouteOutlook struct {
@@ -97,6 +106,10 @@ func (s *RouteStats) RoundForResponse() {
 	s.DelayCausesAvgMinutes.Security = math.Round(s.DelayCausesAvgMinutes.Security)
 	s.DelayCausesAvgMinutes.LateAircraft = math.Round(s.DelayCausesAvgMinutes.LateAircraft)
 	s.DelayCausesShare.round()
+
+	for i := range s.CarrierOnTime {
+		s.CarrierOnTime[i].round()
+	}
 }
 
 // RoundForResponse rounds probabilities to two decimal places and minute
@@ -111,6 +124,10 @@ func (o *RouteOutlook) RoundForResponse() {
 	o.LikelyArrivalDelayWhenDelayed = math.Round(o.LikelyArrivalDelayWhenDelayed)
 	o.MedianArrivalDelayWhenDelayed = math.Round(o.MedianArrivalDelayWhenDelayed)
 	o.LikelyDepartureDelayMinutes = math.Round(o.LikelyDepartureDelayMinutes)
+}
+
+func (s *CarrierOnTime) round() {
+	s.OnTimeRate = roundRate(s.OnTimeRate)
 }
 
 func (s *DelayCausesShare) round() {

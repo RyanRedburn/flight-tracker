@@ -26,7 +26,7 @@ func TestToPgx5URL(t *testing.T) {
 }
 
 func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
-	query, args := buildRouteStatsQuery(store.RouteStatsFilter{
+	query, args := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
 		Origin:       testAirportORD,
 		Dest:         testAirportLAX,
 		StartDate:    testStartDate,
@@ -54,6 +54,32 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 
 	if len(args) != 7 {
 		t.Fatalf("len(args) = %d, want 7", len(args))
+	}
+}
+
+func TestBuildRouteStatsCarrierOnTimeQueryFilters(t *testing.T) {
+	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, store.RouteStatsFilter{
+		Origin:     testAirportORD,
+		Dest:       testAirportLAX,
+		StartDate:  testStartDate,
+		EndDate:    testEndDate,
+		DaysOfWeek: []int{1, 2},
+	})
+
+	if strings.Contains(query, "iata_code_marketing_airline =") {
+		t.Fatal("unfiltered companion query should not constrain a single carrier")
+	}
+
+	if !strings.Contains(query, "day_of_week = ANY") {
+		t.Fatal("expected days_of_week filter in companion query")
+	}
+
+	if strings.Contains(query, routeStatsExtraPlaceholder) {
+		t.Fatal("placeholder should be replaced")
+	}
+
+	if len(args) != 5 {
+		t.Fatalf("len(args) = %d, want 5", len(args))
 	}
 }
 

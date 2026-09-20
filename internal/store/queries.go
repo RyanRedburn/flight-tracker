@@ -261,6 +261,35 @@ const (
 			) AS diversion_airports
 		FROM with_cause`
 
+	QueryRouteStatsCarrierOnTime = `
+		WITH matched AS (
+			SELECT
+				iata_code_marketing_airline,
+				cancelled,
+				diverted,
+				arr_del15
+			FROM flight_performance
+			WHERE origin = $1
+				AND dest = $2
+				AND flight_date >= $3
+				AND flight_date <= $4
+				/*extra*/
+		),
+		classified AS (
+			SELECT
+				iata_code_marketing_airline,
+				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
+				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+			FROM matched
+		)
+		SELECT
+			COALESCE(iata_code_marketing_airline, '') AS carrier,
+			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+			COUNT(*)::int AS flights
+		FROM classified
+		GROUP BY 1`
+
 	QueryCarrierStatsMaxDate = `
 		SELECT MAX(flight_date)::text
 		FROM flight_performance

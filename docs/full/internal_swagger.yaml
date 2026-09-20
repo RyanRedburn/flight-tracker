@@ -210,6 +210,15 @@ definitions:
       on_time_rate:
         type: number
     type: object
+  model.CarrierOnTime:
+    properties:
+      carrier:
+        type: string
+      flights:
+        type: integer
+      on_time_rate:
+        type: number
+    type: object
   model.CarrierRouteStat:
     properties:
       cancellation_rate:
@@ -430,6 +439,12 @@ definitions:
         type: number
       cancelled:
         type: integer
+      carrier_on_time:
+        description: Present only when the carrier query filter is omitted. Sorted
+          by on_time_rate desc, then flights desc, then carrier asc.
+        items:
+          $ref: '#/definitions/model.CarrierOnTime'
+        type: array
       delay_causes_avg_minutes:
         $ref: '#/definitions/model.DelayCausesAvgMinutes'
       delay_causes_share:
@@ -1195,7 +1210,9 @@ paths:
     get:
       description: Aggregated on-time, delay, cancellation, and diversion stats for
         a route over a date range (max 366 days). Origin and dest are 3-letter airport
-        codes. Days of week use 1=Monday through 7=Sunday.
+        codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted,
+        carrier_on_time lists per-marketing-carrier on-time rates and flight counts
+        for the same filters. The field is omitted entirely when carrier is set.
       parameters:
       - description: Origin airport IATA code
         in: query

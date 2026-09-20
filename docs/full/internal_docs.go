@@ -1002,7 +1002,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1534,6 +1534,20 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "model.CarrierOnTime": {
+            "type": "object",
+            "properties": {
+                "carrier": {
+                    "type": "string"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                }
+            }
+        },
         "model.CarrierRouteStat": {
             "type": "object",
             "properties": {
@@ -1861,6 +1875,13 @@ const docTemplateinternal = `{
                 },
                 "cancelled": {
                     "type": "integer"
+                },
+                "carrier_on_time": {
+                    "description": "Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CarrierOnTime"
+                    }
                 },
                 "delay_causes_avg_minutes": {
                     "$ref": "#/definitions/model.DelayCausesAvgMinutes"

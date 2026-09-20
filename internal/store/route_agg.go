@@ -1,6 +1,7 @@
 package store
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -53,6 +54,28 @@ func HHMMToMinutes(hhmm string) (int, bool) {
 	}
 
 	return h*60 + m, true
+}
+
+func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierOnTime {
+	return model.CarrierOnTime{
+		Carrier:    carrier,
+		OnTimeRate: rate(onTime, flights),
+		Flights:    flights,
+	}
+}
+
+func SortCarrierOnTime(items []model.CarrierOnTime) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].OnTimeRate != items[j].OnTimeRate {
+			return items[i].OnTimeRate > items[j].OnTimeRate
+		}
+
+		if items[i].Flights != items[j].Flights {
+			return items[i].Flights > items[j].Flights
+		}
+
+		return items[i].Carrier < items[j].Carrier
+	})
 }
 
 func DelayCausesShareFromCounts(delayed, carrier, weather, nas, security, late, unattributed int) model.DelayCausesShare {

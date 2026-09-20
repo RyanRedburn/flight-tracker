@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	testOriginORD = "ORD"
-	testDestLAX   = "LAX"
-	testDestJFK   = "JFK"
+	testOriginORD     = "ORD"
+	testDestLAX       = "LAX"
+	testDestJFK       = "JFK"
+	jsonCarrierOnTime = "carrier_on_time"
 )
 
 func TestRoutesStats(t *testing.T) {
@@ -44,8 +45,10 @@ func TestRoutesStats(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 
+	body := rec.Body.Bytes()
+
 	var stats model.RouteStats
-	if err := json.NewDecoder(rec.Body).Decode(&stats); err != nil {
+	if err := json.Unmarshal(body, &stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -60,6 +63,10 @@ func TestRoutesStats(t *testing.T) {
 	if len(stats.DiversionAirports) != 1 || stats.DiversionAirports[0].Airport != "MDW" {
 		t.Errorf("diversion_airports = %+v", stats.DiversionAirports)
 	}
+
+	if jsonHasKey(t, body, jsonCarrierOnTime) {
+		t.Fatalf("carrier_on_time should be omitted when carrier is set: %s", body)
+	}
 }
 
 func TestRoutesStatsEmpty(t *testing.T) {
@@ -69,6 +76,7 @@ func TestRoutesStatsEmpty(t *testing.T) {
 				Origin:            testOriginORD,
 				Dest:              testDestLAX,
 				DiversionAirports: []model.AirportCount{},
+				CarrierOnTime:     []model.CarrierOnTime{},
 			}, nil
 		},
 	})
@@ -81,13 +89,70 @@ func TestRoutesStatsEmpty(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 
+	body := rec.Body.Bytes()
+
 	var stats model.RouteStats
-	if err := json.NewDecoder(rec.Body).Decode(&stats); err != nil {
+	if err := json.Unmarshal(body, &stats); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
 	if stats.Flights != 0 || stats.DiversionAirports == nil {
 		t.Fatalf("empty stats = %+v", stats)
+	}
+
+	if stats.CarrierOnTime == nil {
+		t.Fatal("carrier_on_time should be present when carrier is omitted")
+	}
+
+	if !jsonHasKey(t, body, jsonCarrierOnTime) {
+		t.Fatalf("carrier_on_time missing from JSON: %s", body)
+	}
+}
+
+func TestRoutesStatsCarrierOnTime(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+			if filter.Carrier != "" {
+				t.Fatalf("carrier = %q, want empty", filter.Carrier)
+			}
+
+			return &model.RouteStats{
+				Origin:  testOriginORD,
+				Dest:    testDestLAX,
+				Flights: 10,
+				OnTime:  8,
+				Delayed: 2,
+				CarrierOnTime: []model.CarrierOnTime{
+					{Carrier: "UA", OnTimeRate: 0.83, Flights: 6},
+					{Carrier: "AA", OnTimeRate: 0.75, Flights: 4},
+				},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
+	rec := httptest.NewRecorder()
+	h.Stats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var stats model.RouteStats
+	if err := json.NewDecoder(rec.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(stats.CarrierOnTime) != 2 {
+		t.Fatalf("carrier_on_time len = %d, want 2", len(stats.CarrierOnTime))
+	}
+
+	if stats.CarrierOnTime[0].Carrier != "UA" || stats.CarrierOnTime[0].OnTimeRate != 0.83 {
+		t.Errorf("first row = %+v", stats.CarrierOnTime[0])
+	}
+
+	if stats.CarrierOnTime[1].Carrier != "AA" || stats.CarrierOnTime[1].Flights != 4 {
+		t.Errorf("second row = %+v", stats.CarrierOnTime[1])
 	}
 }
 
@@ -155,4 +220,17 @@ func TestRoutesOutlookBadRequest(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
 	}
+}
+
+func jsonHasKey(t *testing.T, body []byte, field string) bool {
+	t.Helper()
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal json: %v", err)
+	}
+
+	_, ok := raw[field]
+
+	return ok
 }

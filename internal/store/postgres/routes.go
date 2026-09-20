@@ -17,7 +17,7 @@ const routeStatsExtraPlaceholder = "/*extra*/"
 func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 	stats := emptyRouteStats(filter)
 
-	query, args := buildRouteStatsQuery(filter)
+	query, args := buildRouteStatsQuery(store.QueryRouteStats, filter)
 
 	var (
 		avgArr            sql.NullFloat64
@@ -105,6 +105,15 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	}
 
 	stats.DiversionAirports = airports
+
+	if filter.Carrier == "" {
+		rows, err := s.listRouteCarrierOnTime(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+
+		stats.CarrierOnTime = rows
+	}
 
 	stats.RoundForResponse()
 
@@ -200,7 +209,40 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	return out, nil
 }
 
-func buildRouteStatsQuery(filter store.RouteStatsFilter) (string, []any) {
+func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTime, error) {
+	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, filter)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]model.CarrierOnTime, 0)
+
+	for rows.Next() {
+		var (
+			carrier string
+			onTime  int
+			flights int
+		)
+		if err := rows.Scan(&carrier, &onTime, &flights); err != nil {
+			return nil, err
+		}
+
+		out = append(out, store.CarrierOnTimeFromCounts(carrier, onTime, flights))
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	store.SortCarrierOnTime(out)
+
+	return out, nil
+}
+
+func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (string, []any) {
 	args := []any{filter.Origin, filter.Dest, filter.StartDate, filter.EndDate}
 	n := 5
 
@@ -226,7 +268,7 @@ func buildRouteStatsQuery(filter store.RouteStatsFilter) (string, []any) {
 		args = append(args, filter.DaysOfWeek)
 	}
 
-	query := strings.Replace(store.QueryRouteStats, routeStatsExtraPlaceholder, extra.String(), 1)
+	query := strings.Replace(template, routeStatsExtraPlaceholder, extra.String(), 1)
 
 	return query, args
 }
