@@ -221,12 +221,16 @@ func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteSt
 	out := make([]model.CarrierOnTime, 0)
 
 	for rows.Next() {
-		var item model.CarrierOnTime
-		if err := rows.Scan(&item.Carrier, &item.OnTime, &item.Flights); err != nil {
+		var (
+			carrier string
+			onTime  int
+			flights int
+		)
+		if err := rows.Scan(&carrier, &onTime, &flights); err != nil {
 			return nil, err
 		}
 
-		out = append(out, item)
+		out = append(out, store.CarrierOnTimeFromCounts(carrier, onTime, flights))
 	}
 
 	if err := rows.Err(); err != nil {

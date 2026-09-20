@@ -123,8 +123,8 @@ func TestRoutesStatsCarrierOnTime(t *testing.T) {
 				OnTime:  8,
 				Delayed: 2,
 				CarrierOnTime: []model.CarrierOnTime{
-					{Carrier: "UA", OnTime: 5, Flights: 6},
-					{Carrier: "AA", OnTime: 3, Flights: 4},
+					{Carrier: "UA", OnTime: 0.83, Flights: 6},
+					{Carrier: "AA", OnTime: 0.75, Flights: 4},
 				},
 			}, nil
 		},
@@ -147,7 +147,7 @@ func TestRoutesStatsCarrierOnTime(t *testing.T) {
 		t.Fatalf("carrier_on_time len = %d, want 2", len(stats.CarrierOnTime))
 	}
 
-	if stats.CarrierOnTime[0].Carrier != "UA" || stats.CarrierOnTime[0].OnTime != 5 {
+	if stats.CarrierOnTime[0].Carrier != "UA" || stats.CarrierOnTime[0].OnTime != 0.83 {
 		t.Errorf("first row = %+v", stats.CarrierOnTime[0])
 	}
 

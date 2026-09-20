@@ -73,24 +73,29 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 		t.Fatalf("aggregate on_time/flights = %d/%d, want 3/6 (not cancelled/diverted, arr_del15 < 1)", agg.onTime, agg.flights)
 	}
 
+	aggRate := rate(agg.onTime, agg.flights)
+
 	var (
-		items                 []model.CarrierOnTime
-		sumFlights, sumOnTime int
+		items      []model.CarrierOnTime
+		sumFlights int
 	)
 
 	for carrier, c := range byCarrier {
-		item := model.CarrierOnTime{Carrier: carrier, OnTime: c.onTime, Flights: c.flights}
+		item := CarrierOnTimeFromCounts(carrier, c.onTime, c.flights)
+		if item.OnTime != rate(c.onTime, c.flights) {
+			t.Errorf("%s on_time = %v, want on_time_count/flights", carrier, item.OnTime)
+		}
+
 		items = append(items, item)
 		sumFlights += item.Flights
-		sumOnTime += item.OnTime
 	}
 
-	if sumFlights != agg.flights || sumOnTime != agg.onTime {
-		t.Fatalf("per-carrier counts do not partition aggregate: summed=%d/%d agg=%+v", sumFlights, sumOnTime, agg)
+	if sumFlights != agg.flights {
+		t.Fatalf("per-carrier flights %d do not partition aggregate %d", sumFlights, agg.flights)
 	}
 
-	if rate(sumOnTime, sumFlights) != rate(agg.onTime, agg.flights) {
-		t.Fatalf("partitioned on_time/flights = %d/%d, want aggregate %d/%d", sumOnTime, sumFlights, agg.onTime, agg.flights)
+	if aggRate != rate(3, 6) {
+		t.Fatalf("aggregate on_time_rate = %v, want 3/6", aggRate)
 	}
 
 	SortCarrierOnTime(items)
@@ -109,9 +114,9 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 
 func TestSortCarrierOnTime(t *testing.T) {
 	items := []model.CarrierOnTime{
-		{Carrier: "UA", OnTime: 1, Flights: 2},
-		{Carrier: "B6", OnTime: 1, Flights: 2},
-		{Carrier: "AA", OnTime: 5, Flights: 10},
+		{Carrier: "UA", OnTime: 0.5, Flights: 2},
+		{Carrier: "B6", OnTime: 0.5, Flights: 2},
+		{Carrier: "AA", OnTime: 0.5, Flights: 10},
 		{Carrier: "DL", OnTime: 1, Flights: 1},
 	}
 

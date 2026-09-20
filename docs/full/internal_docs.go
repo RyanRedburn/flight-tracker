@@ -1002,7 +1002,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time and flight counts for the same filters (same on-time definition as the aggregate). The field is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates (same definition and 0–1 scale as on_time_rate) and flight counts for the same filters. The field is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1544,7 +1544,8 @@ const docTemplateinternal = `{
                     "type": "integer"
                 },
                 "on_time": {
-                    "type": "integer"
+                    "description": "On-time rate (0–1), same definition and rounding as on_time_rate.",
+                    "type": "number"
                 }
             }
         },
@@ -1877,7 +1878,7 @@ const docTemplateinternal = `{
                     "type": "integer"
                 },
                 "carrier_on_time": {
-                    "description": "Present only when the carrier query filter is omitted. Sorted by on_time/flights desc, then flights desc, then carrier asc.",
+                    "description": "Present only when the carrier query filter is omitted. Sorted by on_time desc, then flights desc, then carrier asc.",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/model.CarrierOnTime"
