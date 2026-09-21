@@ -18,7 +18,7 @@
 //	@tag.name					jobs
 //	@tag.description			Inspect background job status
 //	@tag.name					routes
-//	@tag.description			Route performance stats and booking outlook
+//	@tag.description			Route performance stats, booking outlook, and typical-year travel windows
 //	@tag.name					carriers
 //	@tag.description			Carrier performance stats
 //	@tag.name					keys

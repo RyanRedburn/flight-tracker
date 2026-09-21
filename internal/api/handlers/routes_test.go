@@ -17,6 +17,8 @@ const (
 	testDestLAX       = "LAX"
 	testDestJFK       = "JFK"
 	jsonCarrierOnTime = "carrier_on_time"
+	testWindowStart   = "2024-04-30"
+	testWindowEnd     = "2026-04-30"
 )
 
 func TestRoutesStats(t *testing.T) {
@@ -207,6 +209,147 @@ func TestRoutesOutlook(t *testing.T) {
 
 	if out.AnalysisEnd != "2026-04-15" {
 		t.Errorf("analysis_end = %q, want 2026-04-15", out.AnalysisEnd)
+	}
+}
+
+func TestRoutesTravelWindows(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteTravelWindowsFn: func(_ context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
+			if filter.Origin != testOriginORD || filter.Dest != testDestLAX {
+				t.Fatalf("filter = %+v", filter)
+			}
+
+			if filter.Carrier != "" {
+				t.Fatalf("carrier = %q, want empty", filter.Carrier)
+			}
+
+			return &model.RouteTravelWindows{
+				Origin:      testOriginORD,
+				Dest:        testDestLAX,
+				WindowStart: testWindowStart,
+				WindowEnd:   testWindowEnd,
+				ByMonth: []model.TravelWindowMonthBucket{
+					{Month: 1, OnTimeRate: 0.8, Flights: 100},
+				},
+				ByDayOfWeek: []model.TravelWindowDayBucket{},
+				ByHour:      []model.TravelWindowHourBucket{},
+				BestMonths:  []model.TravelWindowMonthBucket{{Month: 1, OnTimeRate: 0.8, Flights: 100}},
+				WorstMonths: []model.TravelWindowMonthBucket{{Month: 1, OnTimeRate: 0.8, Flights: 100}},
+				BestDays:    []model.TravelWindowDayBucket{},
+				WorstDays:   []model.TravelWindowDayBucket{},
+				BestHours:   []model.TravelWindowHourBucket{},
+				WorstHours:  []model.TravelWindowHourBucket{},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ord&dest=lax", nil)
+	rec := httptest.NewRecorder()
+	h.TravelWindows(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.Bytes()
+
+	var out model.RouteTravelWindows
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.Origin != testOriginORD || out.Dest != testDestLAX {
+		t.Fatalf("od = %s-%s", out.Origin, out.Dest)
+	}
+
+	if out.WindowStart != testWindowStart || out.WindowEnd != testWindowEnd {
+		t.Errorf("window = %s..%s", out.WindowStart, out.WindowEnd)
+	}
+
+	if jsonHasKey(t, body, "carrier") {
+		t.Fatalf("carrier should be omitted when not requested: %s", body)
+	}
+
+	if len(out.ByMonth) != 1 || out.ByMonth[0].Month != 1 {
+		t.Errorf("by_month = %+v", out.ByMonth)
+	}
+}
+
+func TestRoutesTravelWindowsCarrier(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteTravelWindowsFn: func(_ context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
+			if filter.Carrier != "UA" {
+				t.Fatalf("carrier = %q, want UA", filter.Carrier)
+			}
+
+			return &model.RouteTravelWindows{
+				Origin:      testOriginORD,
+				Dest:        testDestLAX,
+				Carrier:     "UA",
+				WindowStart: "2025-01-01",
+				WindowEnd:   testWindowEnd,
+				ByMonth:     []model.TravelWindowMonthBucket{},
+				ByDayOfWeek: []model.TravelWindowDayBucket{},
+				ByHour:      []model.TravelWindowHourBucket{},
+				BestMonths:  []model.TravelWindowMonthBucket{},
+				WorstMonths: []model.TravelWindowMonthBucket{},
+				BestDays:    []model.TravelWindowDayBucket{},
+				WorstDays:   []model.TravelWindowDayBucket{},
+				BestHours:   []model.TravelWindowHourBucket{},
+				WorstHours:  []model.TravelWindowHourBucket{},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=ua", nil)
+	rec := httptest.NewRecorder()
+	h.TravelWindows(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.Bytes()
+
+	var out model.RouteTravelWindows
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.Carrier != "UA" {
+		t.Fatalf("carrier = %q, want UA", out.Carrier)
+	}
+
+	if !jsonHasKey(t, body, "carrier") {
+		t.Fatalf("carrier missing from JSON: %s", body)
+	}
+}
+
+func TestRoutesTravelWindowsNotFound(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteTravelWindowsFn: func(context.Context, store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
+			return nil, store.ErrNotFound
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", nil)
+	rec := httptest.NewRecorder()
+	h.TravelWindows(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRoutesTravelWindowsBadRequest(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD", nil)
+	rec := httptest.NewRecorder()
+	h.TravelWindows(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 

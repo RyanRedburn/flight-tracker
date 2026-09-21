@@ -45,6 +45,8 @@ type Stub struct {
 	ReplaceWeatherObservationsByMonthFn   func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
 	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
+	RouteTravelWindowsFn                  func(ctx context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
+	RebuildRouteTravelWindowsFn           func(ctx context.Context) error
 	CarrierStatsFn                        func(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error)
 	PingFn                                func(ctx context.Context) error
 	MigrationVersionFn                    func(ctx context.Context) (store.MigrationVersion, error)
@@ -320,6 +322,22 @@ func (s *Stub) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter
 	}
 
 	return s.RouteOutlookFn(ctx, filter)
+}
+
+func (s *Stub) RouteTravelWindows(ctx context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
+	if s.RouteTravelWindowsFn == nil {
+		panic("unexpected call: RouteTravelWindows")
+	}
+
+	return s.RouteTravelWindowsFn(ctx, filter)
+}
+
+func (s *Stub) RebuildRouteTravelWindows(ctx context.Context) error {
+	if s.RebuildRouteTravelWindowsFn == nil {
+		panic("unexpected call: RebuildRouteTravelWindows")
+	}
+
+	return s.RebuildRouteTravelWindowsFn(ctx)
 }
 
 func (s *Stub) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {

@@ -324,6 +324,96 @@
                     }
                 }
             }
+        },
+        "/api/v1/routes/travel-windows": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Typical-year on-time rates by month, day of week (1=Mon … 7=Sun), and scheduled local departure hour, pooled from the last up to 2 years of flight-performance data for the origin/destination (and marketing carrier when set). Best/worst lists are the top and bottom 3 eligible buckets. The carrier field is omitted when the carrier query param is not set. Returns 404 when the route (or route+carrier) has no flight-performance data.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "routes",
+                    "external"
+                ],
+                "summary": "Route travel windows",
+                "parameters": [
+                    {
+                        "maxLength": 3,
+                        "minLength": 3,
+                        "type": "string",
+                        "description": "Origin airport IATA code",
+                        "name": "origin",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 3,
+                        "minLength": 3,
+                        "type": "string",
+                        "description": "Destination airport IATA code",
+                        "name": "dest",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 2,
+                        "minLength": 2,
+                        "type": "string",
+                        "description": "Marketing carrier code",
+                        "name": "carrier",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.RouteTravelWindows"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -736,6 +826,122 @@
                 },
                 "flight_number": {
                     "type": "string"
+                }
+            }
+        },
+        "model.RouteTravelWindows": {
+            "type": "object",
+            "properties": {
+                "best_days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowDayBucket"
+                    }
+                },
+                "best_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowHourBucket"
+                    }
+                },
+                "best_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowMonthBucket"
+                    }
+                },
+                "by_day_of_week": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowDayBucket"
+                    }
+                },
+                "by_hour": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowHourBucket"
+                    }
+                },
+                "by_month": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowMonthBucket"
+                    }
+                },
+                "carrier": {
+                    "type": "string"
+                },
+                "dest": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "window_end": {
+                    "type": "string"
+                },
+                "window_start": {
+                    "type": "string"
+                },
+                "worst_days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowDayBucket"
+                    }
+                },
+                "worst_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowHourBucket"
+                    }
+                },
+                "worst_months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.TravelWindowMonthBucket"
+                    }
+                }
+            }
+        },
+        "model.TravelWindowDayBucket": {
+            "type": "object",
+            "properties": {
+                "day_of_week": {
+                    "type": "integer"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                }
+            }
+        },
+        "model.TravelWindowHourBucket": {
+            "type": "object",
+            "properties": {
+                "flights": {
+                    "type": "integer"
+                },
+                "hour": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                }
+            }
+        },
+        "model.TravelWindowMonthBucket": {
+            "type": "object",
+            "properties": {
+                "flights": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
                 }
             }
         }

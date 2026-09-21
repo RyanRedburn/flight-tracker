@@ -68,6 +68,9 @@ func routerStub() *storetest.Stub {
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			return &model.RouteOutlook{}, nil
 		},
+		RouteTravelWindowsFn: func(context.Context, store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
+			return emptyTravelWindows(), nil
+		},
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
 				BestRoutes:    []model.CarrierRouteStat{},
@@ -76,6 +79,20 @@ func routerStub() *storetest.Stub {
 				WorstAirports: []model.CarrierAirportStat{},
 			}, nil
 		},
+	}
+}
+
+func emptyTravelWindows() *model.RouteTravelWindows {
+	return &model.RouteTravelWindows{
+		ByMonth:     []model.TravelWindowMonthBucket{},
+		ByDayOfWeek: []model.TravelWindowDayBucket{},
+		ByHour:      []model.TravelWindowHourBucket{},
+		BestMonths:  []model.TravelWindowMonthBucket{},
+		WorstMonths: []model.TravelWindowMonthBucket{},
+		BestDays:    []model.TravelWindowDayBucket{},
+		WorstDays:   []model.TravelWindowDayBucket{},
+		BestHours:   []model.TravelWindowHourBucket{},
+		WorstHours:  []model.TravelWindowHourBucket{},
 	}
 }
 
@@ -98,6 +115,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
+		{http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", http.StatusOK},
 		{http.MethodGet, pathCarrierStatsUA, http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},
@@ -130,6 +148,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec missing /api/v1/routes/outlook")
 	}
 
+	if _, ok := external["/api/v1/routes/travel-windows"]; !ok {
+		t.Fatal("external spec missing /api/v1/routes/travel-windows")
+	}
+
 	if _, ok := external["/api/v1/carriers/stats"]; !ok {
 		t.Fatal("external spec missing /api/v1/carriers/stats")
 	}
@@ -159,6 +181,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		"/api/v1/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
+		"/api/v1/routes/travel-windows",
 		"/api/v1/carriers/stats",
 	} {
 		if _, ok := internal[path]; !ok {

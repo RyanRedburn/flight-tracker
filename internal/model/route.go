@@ -87,6 +87,43 @@ type RouteOutlook struct {
 	LikelyDepartureDelayMinutes   float64 `json:"likely_departure_delay_minutes"`
 }
 
+type TravelWindowMonthBucket struct {
+	Month      int     `json:"month"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+}
+
+type TravelWindowDayBucket struct {
+	DayOfWeek  int     `json:"day_of_week"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+}
+
+type TravelWindowHourBucket struct {
+	Hour       int     `json:"hour"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+}
+
+// RouteTravelWindows is typical-year on-time performance for a route (and
+// optional marketing carrier), pooled across the trailing analysis window.
+type RouteTravelWindows struct {
+	Origin      string                    `json:"origin"`
+	Dest        string                    `json:"dest"`
+	Carrier     string                    `json:"carrier,omitempty"`
+	WindowStart string                    `json:"window_start"`
+	WindowEnd   string                    `json:"window_end"`
+	ByMonth     []TravelWindowMonthBucket `json:"by_month"`
+	ByDayOfWeek []TravelWindowDayBucket   `json:"by_day_of_week"`
+	ByHour      []TravelWindowHourBucket  `json:"by_hour"`
+	BestMonths  []TravelWindowMonthBucket `json:"best_months"`
+	WorstMonths []TravelWindowMonthBucket `json:"worst_months"`
+	BestDays    []TravelWindowDayBucket   `json:"best_days"`
+	WorstDays   []TravelWindowDayBucket   `json:"worst_days"`
+	BestHours   []TravelWindowHourBucket  `json:"best_hours"`
+	WorstHours  []TravelWindowHourBucket  `json:"worst_hours"`
+}
+
 // RoundForResponse rounds rates and probabilities to two decimal places and
 // minute values to the nearest minute.
 func (s *RouteStats) RoundForResponse() {
@@ -124,6 +161,45 @@ func (o *RouteOutlook) RoundForResponse() {
 	o.LikelyArrivalDelayWhenDelayed = math.Round(o.LikelyArrivalDelayWhenDelayed)
 	o.MedianArrivalDelayWhenDelayed = math.Round(o.MedianArrivalDelayWhenDelayed)
 	o.LikelyDepartureDelayMinutes = math.Round(o.LikelyDepartureDelayMinutes)
+}
+
+// RoundForResponse rounds on-time rates to two decimal places.
+func (w *RouteTravelWindows) RoundForResponse() {
+	for i := range w.ByMonth {
+		w.ByMonth[i].OnTimeRate = roundRate(w.ByMonth[i].OnTimeRate)
+	}
+
+	for i := range w.ByDayOfWeek {
+		w.ByDayOfWeek[i].OnTimeRate = roundRate(w.ByDayOfWeek[i].OnTimeRate)
+	}
+
+	for i := range w.ByHour {
+		w.ByHour[i].OnTimeRate = roundRate(w.ByHour[i].OnTimeRate)
+	}
+
+	for i := range w.BestMonths {
+		w.BestMonths[i].OnTimeRate = roundRate(w.BestMonths[i].OnTimeRate)
+	}
+
+	for i := range w.WorstMonths {
+		w.WorstMonths[i].OnTimeRate = roundRate(w.WorstMonths[i].OnTimeRate)
+	}
+
+	for i := range w.BestDays {
+		w.BestDays[i].OnTimeRate = roundRate(w.BestDays[i].OnTimeRate)
+	}
+
+	for i := range w.WorstDays {
+		w.WorstDays[i].OnTimeRate = roundRate(w.WorstDays[i].OnTimeRate)
+	}
+
+	for i := range w.BestHours {
+		w.BestHours[i].OnTimeRate = roundRate(w.BestHours[i].OnTimeRate)
+	}
+
+	for i := range w.WorstHours {
+		w.WorstHours[i].OnTimeRate = roundRate(w.WorstHours[i].OnTimeRate)
+	}
 }
 
 func (s *CarrierOnTime) round() {

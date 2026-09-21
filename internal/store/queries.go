@@ -503,6 +503,165 @@ const (
 			) AS median_arr_delayed,
 			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep
 		FROM classified`
+
+	QueryRouteTravelWindowScope = `
+		SELECT window_start, window_end, flights
+		FROM route_travel_window_scopes
+		WHERE origin = $1
+			AND dest = $2
+			AND carrier = $3`
+
+	QueryRouteTravelWindowBuckets = `
+		SELECT grain, bucket, on_time_count, flights
+		FROM route_travel_window_buckets
+		WHERE origin = $1
+			AND dest = $2
+			AND carrier = $3
+			AND flights >= 1
+		ORDER BY grain, bucket`
+
+	QueryTruncateRouteTravelWindows = `
+		TRUNCATE route_travel_window_buckets, route_travel_window_scopes`
+
+	// Full replace from flight_performance. Window is last up to 2 years
+	// ending at MAX(flight_date) per origin/dest/(optional carrier).
+	// On-time matches QueryRouteStats: not cancelled, not diverted, arr_del15 < 1.
+	QueryInsertRouteTravelWindows = `
+		WITH classified AS (
+			SELECT
+				origin,
+				dest,
+				''::text AS carrier,
+				flight_date,
+				cancelled,
+				diverted,
+				arr_del15,
+				day_of_week,
+				crs_dep_time
+			FROM flight_performance
+			WHERE origin IS NOT NULL AND origin <> ''
+				AND dest IS NOT NULL AND dest <> ''
+				AND flight_date IS NOT NULL
+			UNION ALL
+			SELECT
+				origin,
+				dest,
+				iata_code_marketing_airline,
+				flight_date,
+				cancelled,
+				diverted,
+				arr_del15,
+				day_of_week,
+				crs_dep_time
+			FROM flight_performance
+			WHERE origin IS NOT NULL AND origin <> ''
+				AND dest IS NOT NULL AND dest <> ''
+				AND flight_date IS NOT NULL
+				AND iata_code_marketing_airline IS NOT NULL
+				AND iata_code_marketing_airline <> ''
+		),
+		bounds AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				MIN(flight_date) AS min_date,
+				MAX(flight_date) AS max_date
+			FROM classified
+			GROUP BY origin, dest, carrier
+		),
+		windows AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				GREATEST(min_date, (max_date - INTERVAL '2 years')::date) AS window_start,
+				max_date AS window_end
+			FROM bounds
+			WHERE max_date IS NOT NULL
+		),
+		windowed AS (
+			SELECT
+				c.origin,
+				c.dest,
+				c.carrier,
+				w.window_start,
+				w.window_end,
+				EXTRACT(MONTH FROM c.flight_date)::int AS month,
+				c.day_of_week,
+				c.crs_dep_time,
+				(
+					COALESCE(c.cancelled, 0) < 1
+					AND COALESCE(c.diverted, 0) < 1
+					AND COALESCE(c.arr_del15, 0) < 1
+				) AS is_on_time
+			FROM classified c
+			INNER JOIN windows w
+				ON c.origin = w.origin
+				AND c.dest = w.dest
+				AND c.carrier = w.carrier
+			WHERE c.flight_date >= w.window_start
+				AND c.flight_date <= w.window_end
+		),
+		ins_scopes AS (
+			INSERT INTO route_travel_window_scopes (origin, dest, carrier, window_start, window_end, flights)
+			SELECT origin, dest, carrier, window_start, window_end, COUNT(*)::int
+			FROM windowed
+			GROUP BY origin, dest, carrier, window_start, window_end
+			HAVING COUNT(*) >= 1
+		),
+		month_buckets AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				'month' AS grain,
+				month AS bucket,
+				COUNT(*) FILTER (WHERE is_on_time)::int AS on_time_count,
+				COUNT(*)::int AS flights
+			FROM windowed
+			WHERE month BETWEEN 1 AND 12
+			GROUP BY origin, dest, carrier, month
+			HAVING COUNT(*) >= 1
+		),
+		dow_buckets AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				'day_of_week' AS grain,
+				day_of_week AS bucket,
+				COUNT(*) FILTER (WHERE is_on_time)::int AS on_time_count,
+				COUNT(*)::int AS flights
+			FROM windowed
+			WHERE day_of_week BETWEEN 1 AND 7
+			GROUP BY origin, dest, carrier, day_of_week
+			HAVING COUNT(*) >= 1
+		),
+		hour_buckets AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				'hour' AS grain,
+				(crs_dep_time / 100) AS bucket,
+				COUNT(*) FILTER (WHERE is_on_time)::int AS on_time_count,
+				COUNT(*)::int AS flights
+			FROM windowed
+			WHERE crs_dep_time IS NOT NULL
+				AND crs_dep_time >= 0
+				AND crs_dep_time <= 2359
+				AND (crs_dep_time / 100) BETWEEN 0 AND 23
+				AND (crs_dep_time % 100) BETWEEN 0 AND 59
+			GROUP BY origin, dest, carrier, (crs_dep_time / 100)
+			HAVING COUNT(*) >= 1
+		)
+		INSERT INTO route_travel_window_buckets (origin, dest, carrier, grain, bucket, on_time_count, flights)
+		SELECT origin, dest, carrier, grain, bucket, on_time_count, flights FROM month_buckets
+		UNION ALL
+		SELECT origin, dest, carrier, grain, bucket, on_time_count, flights FROM dow_buckets
+		UNION ALL
+		SELECT origin, dest, carrier, grain, bucket, on_time_count, flights FROM hour_buckets`
 )
 
 const (
