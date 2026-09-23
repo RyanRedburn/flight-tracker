@@ -25,6 +25,26 @@ func TestToPgx5URL(t *testing.T) {
 	}
 }
 
+func TestRouteIdentityQuery(t *testing.T) {
+	query, args := routeIdentityQuery(testAirportORD, testAirportLAX, "")
+	if query != store.QueryRouteIdentity {
+		t.Fatal("omitted carrier should use origin/dest identity")
+	}
+
+	if len(args) != 2 || args[0] != testAirportORD || args[1] != testAirportLAX {
+		t.Fatalf("args = %#v", args)
+	}
+
+	query, args = routeIdentityQuery(testAirportORD, testAirportLAX, "UA")
+	if query != store.QueryRouteCarrierIdentity {
+		t.Fatal("set carrier should use origin/dest/carrier identity")
+	}
+
+	if len(args) != 3 || args[2] != "UA" {
+		t.Fatalf("args = %#v", args)
+	}
+}
+
 func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 	query, args := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
 		Origin:       testAirportORD,

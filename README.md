@@ -252,11 +252,15 @@ curl http://localhost:8080/api/v1/jobs
 # optional: carrier, flight_number [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).
 # Omit carrier to include carrier_on_time (per-marketing-carrier on_time_rate plus flight counts).
 # The field is omitted entirely when carrier is set.
+# 404 when that route (or route+carrier, when carrier is set) has no flight-performance data.
+# A date, weekday, or flight-number filter that matches nothing still returns 200 with zeros.
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&days_of_week=1,2,3,4,5"
 
 # Booking outlook probabilities for a departure slot (required: origin, dest, carrier, day_of_week, dep_time;
-# optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history)
+# optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history).
+# 404 when that route and carrier have no flight-performance data.
+# A day-of-week or departure-time window that matches nothing still returns 200 with a zero sample.
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
 
 # Typical-year travel windows (required: origin, dest; optional: carrier).
@@ -268,7 +272,9 @@ curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=UA"
 
 # Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
-# dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days)
+# dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days).
+# 404 when the carrier has no flight-performance data.
+# A date or state filter that matches nothing still returns 200 with zeros.
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&start_date=2025-01-01&end_date=2025-03-31"
 

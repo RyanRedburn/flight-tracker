@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/query"
@@ -18,7 +19,7 @@ func NewCarriersHandler(s store.Store) *CarriersHandler {
 // Stats returns historical on-time performance for a marketing carrier.
 //
 //	@Summary		Carrier performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). State is a 2-letter code matching origin or dest.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). State is a 2-letter code matching origin or dest. Returns 404 when the carrier has no flight-performance data. Date and state filters that match nothing still return 200.
 //	@Tags			carriers,external
 //	@Produce		json
 //	@Param			carrier		query		string	true	"Marketing carrier code"	minlength(2)	maxlength(2)
@@ -29,6 +30,7 @@ func NewCarriersHandler(s store.Store) *CarriersHandler {
 //	@Failure		400			{object}	ErrorResponse
 //	@Failure		401			{object}	ErrorResponse
 //	@Failure		403			{object}	ErrorResponse
+//	@Failure		404			{object}	ErrorResponse
 //	@Failure		429			{object}	ErrorResponse
 //	@Failure		500			{object}	ErrorResponse
 //	@Security		ApiKeyAuth
@@ -42,7 +44,13 @@ func (h *CarriersHandler) Stats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.store.CarrierStats(r.Context(), filter)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "carrier stats not found"})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute carrier stats"})
+
 		return
 	}
 

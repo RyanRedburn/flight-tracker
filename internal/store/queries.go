@@ -176,6 +176,23 @@ const (
 
 	carrierStatsMinSampleSQL = `30`
 
+	// Any flight_performance row for the OD. Date, flight number, and weekday
+	// are filters, not identity. Carrier is included only when the caller sets it.
+	QueryRouteIdentity = `
+		SELECT 1
+		FROM flight_performance
+		WHERE origin = $1
+			AND dest = $2
+		LIMIT 1`
+
+	QueryRouteCarrierIdentity = `
+		SELECT 1
+		FROM flight_performance
+		WHERE origin = $1
+			AND dest = $2
+			AND iata_code_marketing_airline = $3
+		LIMIT 1`
+
 	QueryRouteStats = `
 		WITH matched AS (
 			SELECT

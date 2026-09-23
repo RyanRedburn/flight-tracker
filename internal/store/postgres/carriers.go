@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -18,18 +19,20 @@ const (
 func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {
 	stats := emptyCarrierStats(filter)
 
+	// MAX(flight_date) is null when the carrier has no rows. Date and state
+	// filters are applied later and may still yield an empty success.
+	var analysisEnd sql.NullString
+
+	err := s.db.QueryRowContext(ctx, store.QueryCarrierStatsMaxDate, filter.Carrier).Scan(&analysisEnd)
+	if err != nil {
+		return nil, err
+	}
+
+	if !analysisEnd.Valid || analysisEnd.String == "" {
+		return nil, fmt.Errorf("carrier stats %s: %w", filter.Carrier, store.ErrNotFound)
+	}
+
 	if filter.StartDate == "" && filter.EndDate == "" {
-		var analysisEnd sql.NullString
-
-		err := s.db.QueryRowContext(ctx, store.QueryCarrierStatsMaxDate, filter.Carrier).Scan(&analysisEnd)
-		if err != nil {
-			return nil, err
-		}
-
-		if !analysisEnd.Valid || analysisEnd.String == "" {
-			return stats, nil
-		}
-
 		start, end, ok := store.CarrierStatsWindow(analysisEnd.String)
 		if !ok {
 			return stats, nil

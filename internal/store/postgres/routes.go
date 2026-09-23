@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,12 @@ import (
 const routeStatsExtraPlaceholder = "/*extra*/"
 
 func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+	// COUNT(*) without GROUP BY is one row of zeros when nothing matches, so a
+	// missing route is not sql.ErrNoRows. Identity ignores date and other filters.
+	if err := s.ensureRouteIdentity(ctx, filter.Origin, filter.Dest, filter.Carrier); err != nil {
+		return nil, err
+	}
+
 	stats := emptyRouteStats(filter)
 
 	query, args := buildRouteStatsQuery(store.QueryRouteStats, filter)
@@ -135,7 +142,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	}
 
 	if !analysisEnd.Valid || analysisEnd.String == "" {
-		return out, nil
+		return nil, fmt.Errorf("route outlook %s-%s %s: %w", filter.Origin, filter.Dest, filter.Carrier, store.ErrNotFound)
 	}
 
 	endTime, err := time.Parse("2006-01-02", analysisEnd.String)
@@ -240,6 +247,27 @@ func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteSt
 	store.SortCarrierOnTime(out)
 
 	return out, nil
+}
+
+func (s *Store) ensureRouteIdentity(ctx context.Context, origin, dest, carrier string) error {
+	query, args := routeIdentityQuery(origin, dest, carrier)
+
+	var one int
+
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("route stats %s-%s: %w", origin, dest, store.ErrNotFound)
+	}
+
+	return err
+}
+
+func routeIdentityQuery(origin, dest, carrier string) (string, []any) {
+	if carrier == "" {
+		return store.QueryRouteIdentity, []any{origin, dest}
+	}
+
+	return store.QueryRouteCarrierIdentity, []any{origin, dest, carrier}
 }
 
 func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (string, []any) {
