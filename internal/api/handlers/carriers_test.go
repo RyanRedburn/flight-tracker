@@ -52,6 +52,20 @@ func TestCarriersStats(t *testing.T) {
 func TestCarriersStatsEmpty(t *testing.T) {
 	h := NewCarriersHandler(&storetest.Stub{
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
+			return nil, store.ErrNotFound
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/carriers/stats?carrier=ZZ", nil)
+	rec := httptest.NewRecorder()
+	h.Stats(rec, req)
+
+	assertNotFound(t, rec, "carrier stats not found")
+}
+
+func TestCarriersStatsEmptyFilters(t *testing.T) {
+	h := NewCarriersHandler(&storetest.Stub{
+		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
 				Carrier:       "UA",
 				BestRoutes:    []model.CarrierRouteStat{},
@@ -62,7 +76,7 @@ func TestCarriersStatsEmpty(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/carriers/stats?carrier=UA", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/carriers/stats?carrier=UA&state=IL", nil)
 	rec := httptest.NewRecorder()
 	h.Stats(rec, req)
 

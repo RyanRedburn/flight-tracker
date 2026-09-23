@@ -19,6 +19,7 @@ const (
 	jsonCarrierOnTime = "carrier_on_time"
 	testWindowStart   = "2024-04-30"
 	testWindowEnd     = "2026-04-30"
+	testAnalysisEnd   = "2026-04-15"
 )
 
 func TestRoutesStats(t *testing.T) {
@@ -74,6 +75,20 @@ func TestRoutesStats(t *testing.T) {
 func TestRoutesStatsEmpty(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return nil, store.ErrNotFound
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
+	rec := httptest.NewRecorder()
+	h.Stats(rec, req)
+
+	assertNotFound(t, rec, "route stats not found")
+}
+
+func TestRoutesStatsEmptyFilters(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
 				Origin:            testOriginORD,
 				Dest:              testDestLAX,
@@ -108,6 +123,22 @@ func TestRoutesStatsEmpty(t *testing.T) {
 
 	if !jsonHasKey(t, body, jsonCarrierOnTime) {
 		t.Fatalf("carrier_on_time missing from JSON: %s", body)
+	}
+}
+
+func TestRoutesStatsStoreError(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return nil, context.DeadlineExceeded
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
+	rec := httptest.NewRecorder()
+	h.Stats(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 }
 
@@ -181,7 +212,7 @@ func TestRoutesOutlook(t *testing.T) {
 				DepTime:            "0700",
 				SampleSize:         3,
 				InsufficientSample: true,
-				AnalysisEnd:        "2026-04-15",
+				AnalysisEnd:        testAnalysisEnd,
 			}, nil
 		},
 	})
@@ -207,8 +238,76 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Fatal("expected insufficient_sample")
 	}
 
-	if out.AnalysisEnd != "2026-04-15" {
-		t.Errorf("analysis_end = %q, want 2026-04-15", out.AnalysisEnd)
+	if out.AnalysisEnd != testAnalysisEnd {
+		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
+	}
+}
+
+func TestRoutesOutlookEmpty(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return nil, store.ErrNotFound
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	assertNotFound(t, rec, "route outlook not found")
+}
+
+func TestRoutesOutlookEmptyFilters(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return &model.RouteOutlook{
+				Origin:        testOriginORD,
+				Dest:          testDestLAX,
+				Carrier:       "UA",
+				DayOfWeek:     3,
+				DepTime:       "0700",
+				SampleSize:    0,
+				AnalysisStart: "2025-04-15",
+				AnalysisEnd:   testAnalysisEnd,
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var out model.RouteOutlook
+	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.SampleSize != 0 {
+		t.Fatalf("sample_size = %d, want 0", out.SampleSize)
+	}
+
+	if out.AnalysisEnd != testAnalysisEnd {
+		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
+	}
+}
+
+func TestRoutesOutlookStoreError(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return nil, context.DeadlineExceeded
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 }
 
@@ -362,6 +461,23 @@ func TestRoutesOutlookBadRequest(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func assertNotFound(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.Error != want {
+		t.Fatalf("error = %q, want %q", resp.Error, want)
 	}
 }
 

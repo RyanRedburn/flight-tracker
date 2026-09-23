@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -33,6 +33,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 //	@Failure		400				{object}	ErrorResponse
 //	@Failure		401				{object}	ErrorResponse
 //	@Failure		403				{object}	ErrorResponse
+//	@Failure		404				{object}	ErrorResponse
 //	@Failure		429				{object}	ErrorResponse
 //	@Failure		500				{object}	ErrorResponse
 //	@Security		ApiKeyAuth
@@ -46,7 +47,13 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.store.RouteStats(r.Context(), filter)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route stats not found"})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route stats"})
+
 		return
 	}
 
@@ -56,7 +63,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // Outlook returns booking-style probabilities for a specific flight pattern.
 //
 //	@Summary		Route booking outlook
-//	@Description	On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120).
+//	@Description	On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin						query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -69,6 +76,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 //	@Failure		400							{object}	ErrorResponse
 //	@Failure		401							{object}	ErrorResponse
 //	@Failure		403							{object}	ErrorResponse
+//	@Failure		404							{object}	ErrorResponse
 //	@Failure		429							{object}	ErrorResponse
 //	@Failure		500							{object}	ErrorResponse
 //	@Security		ApiKeyAuth
@@ -82,7 +90,13 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 
 	outlook, err := h.store.RouteOutlook(r.Context(), filter)
 	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route outlook not found"})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route outlook"})
+
 		return
 	}
 

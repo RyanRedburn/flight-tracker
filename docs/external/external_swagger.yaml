@@ -365,7 +365,8 @@ paths:
         min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code.
         Dates are optional together and default to the trailing 90 days ending at
         the carrier's latest flight date (max span 366 days). State is a 2-letter
-        code matching origin or dest.
+        code matching origin or dest. Returns 404 when the carrier has no flight-performance
+        data. Date and state filters that match nothing still return 200.
       parameters:
       - description: Marketing carrier code
         in: query
@@ -410,6 +411,10 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
@@ -429,7 +434,10 @@ paths:
       description: On-time, delay, cancellation, and diversion probabilities for a
         carrier/route/day/departure-time window, based on the trailing analysis period.
         Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time
-        as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120).
+        as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). Returns
+        404 when the origin, destination, and carrier have no flight-performance data.
+        A day-of-week or departure-time window that matches nothing still returns
+        200.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -489,6 +497,10 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
@@ -509,7 +521,10 @@ paths:
         a route over a date range (max 366 days). Origin and dest are 3-letter airport
         codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted,
         carrier_on_time lists per-marketing-carrier on-time rates and flight counts
-        for the same filters. The field is omitted entirely when carrier is set.
+        for the same filters. The field is omitted entirely when carrier is set. Returns
+        404 when the origin/destination has no flight-performance data, or when carrier
+        is set and that route and carrier have none. Date, weekday, and flight-number
+        filters that match nothing still return 200.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -573,6 +588,10 @@ paths:
             $ref: '#/definitions/handlers.ErrorResponse'
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/handlers.ErrorResponse'
         "429":
