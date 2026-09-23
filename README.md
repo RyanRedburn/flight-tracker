@@ -165,7 +165,7 @@ A process-local burst-shield **429** includes `Retry-After` only. It does not se
 
 ## Docker
 
-Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). Default bring-up (`make docker-run` / `docker compose up`) starts postgres and app only — the app migrates on startup. The migrate sidecar uses the `migrate` profile so it is not started alongside the app (that would double-migrate on first boot). The app image has no shell or extra tools; use the sidecar for manual migrations and database inspection (`make migrate-up`, `make db-shell`).
+Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). The app image is `gcr.io/distroless/static-debian12:nonroot` and runs as UID/GID 65532. It reads `/server` and `/migrations` (startup migrations still run inside the app and write only to Postgres) and listens on 8080. Default bring-up (`make docker-run` / `docker compose up`) starts postgres and app only — the app migrates on startup. The migrate sidecar uses the `migrate` profile so it is not started alongside the app (that would double-migrate on first boot). The app image has no shell or extra tools; use the sidecar for manual migrations and database inspection (`make migrate-up`, `make db-shell`).
 
 Optional local overrides: copy [`.env.example`](.env.example) to `.env` (Compose defaults match the example credentials).
 
