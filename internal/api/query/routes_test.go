@@ -8,6 +8,12 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
+const (
+	testOriginORD = "ORD"
+	testDestLAX   = "LAX"
+	testCarrierUA = "UA"
+)
+
 func TestParseRouteStats(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/stats?origin=ord&dest=lax&start_date=2025-01-01&end_date=2025-01-31&carrier=ua&flight_number=100&days_of_week=1,2,2,3", nil)
 
@@ -16,7 +22,7 @@ func TestParseRouteStats(t *testing.T) {
 		t.Fatalf("ParseRouteStats() error = %v", err)
 	}
 
-	if filter.Origin != "ORD" || filter.Dest != "LAX" || filter.Carrier != "UA" {
+	if filter.Origin != testOriginORD || filter.Dest != testDestLAX || filter.Carrier != testCarrierUA {
 		t.Fatalf("normalized filter = %+v", filter)
 	}
 
@@ -59,7 +65,7 @@ func TestParseRouteOutlook(t *testing.T) {
 		t.Fatalf("ParseRouteOutlook() error = %v", err)
 	}
 
-	if filter.Origin != "ORD" || filter.Carrier != "UA" {
+	if filter.Origin != testOriginORD || filter.Carrier != testCarrierUA {
 		t.Fatalf("normalized filter = %+v", filter)
 	}
 
@@ -93,6 +99,45 @@ func TestParseRouteOutlookWindowAndErrors(t *testing.T) {
 	for _, url := range tests {
 		req := httptest.NewRequest(http.MethodGet, url, nil)
 		if _, err := ParseRouteOutlook(req); err == nil {
+			t.Fatalf("expected error for %s", url)
+		}
+	}
+}
+
+func TestParseRouteTravelWindows(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ord&dest=lax", nil)
+
+	filter, err := ParseRouteTravelWindows(req)
+	if err != nil {
+		t.Fatalf("ParseRouteTravelWindows() error = %v", err)
+	}
+
+	if filter.Origin != testOriginORD || filter.Dest != testDestLAX || filter.Carrier != "" {
+		t.Fatalf("normalized filter = %+v", filter)
+	}
+
+	withCarrier := httptest.NewRequest(http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=ua", nil)
+
+	filter, err = ParseRouteTravelWindows(withCarrier)
+	if err != nil {
+		t.Fatalf("ParseRouteTravelWindows() carrier error = %v", err)
+	}
+
+	if filter.Carrier != testCarrierUA {
+		t.Fatalf("carrier = %q, want UA", filter.Carrier)
+	}
+}
+
+func TestParseRouteTravelWindowsValidation(t *testing.T) {
+	tests := []string{
+		"/api/v1/routes/travel-windows?dest=LAX",
+		"/api/v1/routes/travel-windows?origin=ORD",
+		"/api/v1/routes/travel-windows?origin=OR&dest=LAX",
+		"/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=U",
+	}
+	for _, url := range tests {
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		if _, err := ParseRouteTravelWindows(req); err == nil {
 			t.Fatalf("expected error for %s", url)
 		}
 	}

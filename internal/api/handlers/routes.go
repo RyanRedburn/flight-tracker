@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/query"
@@ -86,4 +87,44 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, outlook)
+}
+
+// TravelWindows returns typical-year on-time patterns for a route.
+//
+//	@Summary		Route travel windows
+//	@Description	Typical-year on-time rates by month, day of week (1=Mon … 7=Sun), and scheduled local departure hour, pooled from the last up to 2 years of flight-performance data for the origin/destination (and marketing carrier when set). Best/worst lists are the top and bottom 3 eligible buckets. The carrier field is omitted when the carrier query param is not set. Returns 404 when the route (or route+carrier) has no flight-performance data.
+//	@Tags			routes,external
+//	@Produce		json
+//	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			dest	query		string	true	"Destination airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			carrier	query		string	false	"Marketing carrier code"	minlength(2)	maxlength(2)
+//	@Success		200		{object}	model.RouteTravelWindows
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
+//	@Failure		404		{object}	ErrorResponse
+//	@Failure		429		{object}	ErrorResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
+//	@Router			/api/v1/routes/travel-windows [get]
+func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
+	filter, err := query.ParseRouteTravelWindows(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	windows, err := h.store.RouteTravelWindows(r.Context(), filter)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route travel windows not found"})
+			return
+		}
+
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route travel windows"})
+
+		return
+	}
+
+	writeJSON(w, http.StatusOK, windows)
 }

@@ -90,6 +90,7 @@ func newRouter(
 			r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceExternal))
 			r.Get("/routes/stats", routes.Stats)
 			r.Get("/routes/outlook", routes.Outlook)
+			r.Get("/routes/travel-windows", routes.TravelWindows)
 			r.Get("/carriers/stats", carriers.Stats)
 		})
 	})

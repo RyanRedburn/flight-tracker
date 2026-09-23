@@ -13,7 +13,7 @@ Go service with a REST API and an in-process background worker for importing fli
 - `POST /api/v1/ingest/weather-stations` to queue IEM ASOS catalog and BTS airport mapping import
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
 - Poll-based background workers that download, parse, and load data into Postgres
-- REST API for route performance stats, carrier performance stats, booking outlook probabilities, and job status
+- REST API for route performance stats, typical-year travel windows, carrier performance stats, booking outlook probabilities, and job status
 - Hashed API keys in Postgres (`consumer`, `subscriber`, `admin`) with shared, multi-replica rate limits
 - SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker Compose with Postgres and a migrate sidecar
@@ -72,7 +72,7 @@ make swagger
 
 Visibility is controlled by swag tags on each handler:
 
-- `external` — included in the user-facing `/swagger/` docs (currently route stats, route outlook, and carrier stats)
+- `external` — included in the user-facing `/swagger/` docs (currently route stats, route travel windows, route outlook, and carrier stats)
 - `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
 
 When authentication is enabled, `/swagger/` requires a `consumer`, `subscriber`, or `admin` key, and `/swagger/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
@@ -259,6 +259,14 @@ curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2
 # optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history)
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
 
+# Typical-year travel windows (required: origin, dest; optional: carrier).
+# Pools the last up to 2 years of flight-performance data (shorter if that is all
+# that exists) into month-of-year, day-of-week, and scheduled local departure hour.
+# Rollups are rebuilt after each successful flight-performance ingest.
+# Omit carrier for route-level stats; set carrier for route+carrier. 404 if no data.
+curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
+curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=UA"
+
 # Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
 # dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days)
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
@@ -286,6 +294,7 @@ curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
 - Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
 - `start_year` must be >= 2018 (earliest flight performance data supported by this service).
 - Workers poll the database, download the source zip for each month, and load `flight_performance`.
+- After a successful month load, the worker rebuilds `route_travel_window_scopes` and `route_travel_window_buckets` from `flight_performance` (advisory lock, full replace) so `GET /api/v1/routes/travel-windows` can read rollups only.
 - Returns **409** if a pending/running ingest job already exists for a requested month.
 - Returns **409** if flight data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.

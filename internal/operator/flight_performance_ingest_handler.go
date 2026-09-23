@@ -34,5 +34,12 @@ func (h *FlightPerformanceIngestHandler) Process(ctx context.Context, job *model
 		return nil, err
 	}
 
+	// Rebuild typical-year rollups from flight_performance after a successful
+	// month replace. RebuildRouteTravelWindows is multi-replica safe (advisory
+	// lock) and idempotent (full replace from source).
+	if err := h.store.RebuildRouteTravelWindows(ctx); err != nil {
+		return nil, fmt.Errorf("rebuild route travel windows: %w", err)
+	}
+
 	return json.Marshal(result)
 }

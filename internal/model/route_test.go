@@ -139,6 +139,52 @@ func TestRouteOutlookRoundForResponse(t *testing.T) {
 	}
 }
 
+func TestRouteTravelWindowsRoundAndJSON(t *testing.T) {
+	windows := RouteTravelWindows{
+		Origin: "SEA",
+		Dest:   "MIA",
+		ByHour: []TravelWindowHourBucket{
+			{Hour: 0, OnTimeRate: 1.0 / 3.0, Flights: 40},
+		},
+		BestHours: []TravelWindowHourBucket{
+			{Hour: 0, OnTimeRate: 1.0 / 3.0, Flights: 40},
+		},
+	}
+
+	windows.RoundForResponse()
+	assertFloat(t, "by_hour[0].on_time_rate", windows.ByHour[0].OnTimeRate, 0.33)
+	assertFloat(t, "best_hours[0].on_time_rate", windows.BestHours[0].OnTimeRate, 0.33)
+
+	omitted, err := json.Marshal(windows)
+	if err != nil {
+		t.Fatalf("marshal omitted carrier: %v", err)
+	}
+
+	if jsonHasField(t, omitted, "carrier") {
+		t.Fatalf("carrier should be omitted when empty: %s", omitted)
+	}
+
+	hourRaw := jsonField(t, omitted, "by_hour")
+
+	var hours []TravelWindowHourBucket
+	if err := json.Unmarshal(hourRaw, &hours); err != nil {
+		t.Fatalf("decode by_hour: %v", err)
+	}
+
+	if len(hours) != 1 || hours[0].Hour != 0 {
+		t.Fatalf("by_hour = %+v, want hour 0 present", hours)
+	}
+
+	withCarrier, err := json.Marshal(RouteTravelWindows{Origin: "SEA", Dest: "MIA", Carrier: "AS"})
+	if err != nil {
+		t.Fatalf("marshal carrier: %v", err)
+	}
+
+	if !jsonHasField(t, withCarrier, "carrier") {
+		t.Fatalf("carrier missing: %s", withCarrier)
+	}
+}
+
 func assertFloat(t *testing.T, name string, got, want float64) {
 	t.Helper()
 

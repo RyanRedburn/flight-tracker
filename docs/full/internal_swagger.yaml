@@ -493,6 +493,82 @@ definitions:
       flight_number:
         type: string
     type: object
+  model.RouteTravelWindows:
+    properties:
+      best_days:
+        items:
+          $ref: '#/definitions/model.TravelWindowDayBucket'
+        type: array
+      best_hours:
+        items:
+          $ref: '#/definitions/model.TravelWindowHourBucket'
+        type: array
+      best_months:
+        items:
+          $ref: '#/definitions/model.TravelWindowMonthBucket'
+        type: array
+      by_day_of_week:
+        items:
+          $ref: '#/definitions/model.TravelWindowDayBucket'
+        type: array
+      by_hour:
+        items:
+          $ref: '#/definitions/model.TravelWindowHourBucket'
+        type: array
+      by_month:
+        items:
+          $ref: '#/definitions/model.TravelWindowMonthBucket'
+        type: array
+      carrier:
+        type: string
+      dest:
+        type: string
+      origin:
+        type: string
+      window_end:
+        type: string
+      window_start:
+        type: string
+      worst_days:
+        items:
+          $ref: '#/definitions/model.TravelWindowDayBucket'
+        type: array
+      worst_hours:
+        items:
+          $ref: '#/definitions/model.TravelWindowHourBucket'
+        type: array
+      worst_months:
+        items:
+          $ref: '#/definitions/model.TravelWindowMonthBucket'
+        type: array
+    type: object
+  model.TravelWindowDayBucket:
+    properties:
+      day_of_week:
+        type: integer
+      flights:
+        type: integer
+      on_time_rate:
+        type: number
+    type: object
+  model.TravelWindowHourBucket:
+    properties:
+      flights:
+        type: integer
+      hour:
+        type: integer
+      on_time_rate:
+        type: number
+    type: object
+  model.TravelWindowMonthBucket:
+    properties:
+      flights:
+        type: integer
+      month:
+        type: integer
+      on_time_rate:
+        type: number
+    type: object
   model.WeatherIngestRequest:
     properties:
       end_month:
@@ -1289,6 +1365,72 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Route performance stats
+      tags:
+      - routes
+      - external
+  /api/v1/routes/travel-windows:
+    get:
+      description: Typical-year on-time rates by month, day of week (1=Mon … 7=Sun),
+        and scheduled local departure hour, pooled from the last up to 2 years of
+        flight-performance data for the origin/destination (and marketing carrier
+        when set). Best/worst lists are the top and bottom 3 eligible buckets. The
+        carrier field is omitted when the carrier query param is not set. Returns
+        404 when the route (or route+carrier) has no flight-performance data.
+      parameters:
+      - description: Origin airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: origin
+        required: true
+        type: string
+      - description: Destination airport IATA code
+        in: query
+        maxLength: 3
+        minLength: 3
+        name: dest
+        required: true
+        type: string
+      - description: Marketing carrier code
+        in: query
+        maxLength: 2
+        minLength: 2
+        name: carrier
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.RouteTravelWindows'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Route travel windows
       tags:
       - routes
       - external

@@ -52,6 +52,9 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 
 			return nil
 		},
+		RebuildRouteTravelWindowsFn: func(context.Context) error {
+			return nil
+		},
 	}
 
 	path := btsFixtureCSVPath(t)
@@ -79,4 +82,88 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 	if result["rows_imported"] == nil || result["rows_imported"].(float64) != float64(replaceRows) {
 		t.Fatalf("result = %v, want rows_imported = %d", result, replaceRows)
 	}
+}
+
+func TestFlightPerformanceIngestHandlerRebuildsTravelWindows(t *testing.T) {
+	ctx := context.Background()
+
+	rebuilds := 0
+	st := flightPerformanceIngestStub(t, func(context.Context) error {
+		rebuilds++
+
+		return nil
+	})
+
+	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+
+	if _, err := h.Process(ctx, job); err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	if _, err := h.Process(ctx, job); err != nil {
+		t.Fatalf("second Process() error = %v", err)
+	}
+
+	if rebuilds != 2 {
+		t.Fatalf("rebuilds = %d, want 2 (idempotent full replace per ingest)", rebuilds)
+	}
+}
+
+func TestFlightPerformanceIngestHandlerRebuildError(t *testing.T) {
+	ctx := context.Background()
+	st := flightPerformanceIngestStub(t, func(context.Context) error {
+		return errRebuildFailed
+	})
+
+	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+
+	if _, err := h.Process(ctx, job); err == nil {
+		t.Fatal("expected rebuild error")
+	}
+}
+
+func TestFlightPerformanceIngestHandlerSkipsRebuildOnImportError(t *testing.T) {
+	ctx := context.Background()
+	st := &storetest.Stub{
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		},
+	}
+
+	svc := bts.NewService(st, nil).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
+		return "", func() {}, errImportFailed
+	})
+
+	h := NewFlightPerformanceIngestHandler(st, svc)
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+
+	if _, err := h.Process(ctx, job); err == nil {
+		t.Fatal("expected import error")
+	}
+}
+
+func flightPerformanceIngestStub(t *testing.T, rebuild func(context.Context) error) *storetest.Stub {
+	t.Helper()
+
+	return &storetest.Stub{
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		},
+		ReplaceFlightPerformanceByMonthFn: func(context.Context, int, int, []string, [][]string) error {
+			return nil
+		},
+		RebuildRouteTravelWindowsFn: rebuild,
+	}
+}
+
+func btsFixtureService(t *testing.T, st *storetest.Stub) *bts.Service {
+	t.Helper()
+
+	path := btsFixtureCSVPath(t)
+
+	return bts.NewService(st, nil).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
+		return path, func() {}, nil
+	})
 }

@@ -30,6 +30,12 @@ type routeOutlookQuery struct {
 	DepTimeWindowMinutes *int   `query:"dep_time_window_minutes" validate:"omitempty,gte=1,lte=120"`
 }
 
+type routeTravelWindowsQuery struct {
+	Origin  string `query:"origin" validate:"required,len=3"`
+	Dest    string `query:"dest" validate:"required,len=3"`
+	Carrier string `query:"carrier" validate:"omitempty,len=2"`
+}
+
 func init() {
 	_ = validate.RegisterValidation("hhmm", validateHHMM)
 	validate.RegisterStructValidation(validateRouteStatsSpan, routeStatsQuery{})
@@ -82,6 +88,25 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		DayOfWeek:            q.DayOfWeek,
 		DepTime:              padHHMM(q.DepTime),
 		DepTimeWindowMinutes: window,
+	}, nil
+}
+
+func ParseRouteTravelWindows(r *http.Request) (store.RouteTravelWindowsFilter, error) {
+	var q routeTravelWindowsQuery
+	if err := BindQuery(r, &q); err != nil {
+		return store.RouteTravelWindowsFilter{}, err
+	}
+
+	normalizeQueryStrings(&q)
+
+	if err := Validate(q); err != nil {
+		return store.RouteTravelWindowsFilter{}, err
+	}
+
+	return store.RouteTravelWindowsFilter{
+		Origin:  q.Origin,
+		Dest:    q.Dest,
+		Carrier: q.Carrier,
 	}, nil
 }
 
