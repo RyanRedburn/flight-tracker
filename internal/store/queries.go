@@ -756,4 +756,59 @@ const (
 	QueryDeleteStaleRateLimitBuckets = `
 		DELETE FROM rate_limit_buckets
 		WHERE last_refill_at < $1`
+
+	// Single-statement read of completed-job watermarks and covered periods.
+	// $1 = completed status. $2..$7 = job types, in dataset order:
+	// flight performance, weather observations, weather stations, countries, regions, airports.
+	// Month periods are the max (year, month) stored in the data tables, which can differ
+	// from the month of the most recently completed job (partial backfill).
+	QueryDataFreshness = `
+		WITH last_job AS (
+			SELECT DISTINCT ON (type)
+				type,
+				id,
+				ended_at
+			FROM jobs
+			WHERE status = $1
+			  AND type IN ($2, $3, $4, $5, $6, $7)
+			ORDER BY type, ended_at DESC NULLS LAST, id DESC
+		),
+		flight_month AS (
+			SELECT year, month
+			FROM flight_performance
+			WHERE year > 0
+			  AND month BETWEEN 1 AND 12
+			ORDER BY year DESC, month DESC
+			LIMIT 1
+		),
+		weather_month AS (
+			SELECT year, month
+			FROM weather_observations
+			WHERE year > 0
+			  AND month BETWEEN 1 AND 12
+			ORDER BY year DESC, month DESC
+			LIMIT 1
+		)
+		SELECT
+			(SELECT id FROM last_job WHERE type = $2),
+			(SELECT ended_at FROM last_job WHERE type = $2),
+			(SELECT year FROM flight_month),
+			(SELECT month FROM flight_month),
+			(SELECT id FROM last_job WHERE type = $3),
+			(SELECT ended_at FROM last_job WHERE type = $3),
+			(SELECT year FROM weather_month),
+			(SELECT month FROM weather_month),
+			(SELECT id FROM last_job WHERE type = $4),
+			(SELECT ended_at FROM last_job WHERE type = $4),
+			(SELECT COUNT(*) FROM weather_stations),
+			(SELECT COUNT(*) FROM airport_weather_stations),
+			(SELECT id FROM last_job WHERE type = $5),
+			(SELECT ended_at FROM last_job WHERE type = $5),
+			(SELECT COUNT(*) FROM countries),
+			(SELECT id FROM last_job WHERE type = $6),
+			(SELECT ended_at FROM last_job WHERE type = $6),
+			(SELECT COUNT(*) FROM regions),
+			(SELECT id FROM last_job WHERE type = $7),
+			(SELECT ended_at FROM last_job WHERE type = $7),
+			(SELECT COUNT(*) FROM airports)`
 )

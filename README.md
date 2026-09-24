@@ -129,7 +129,7 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 | --- | --- |
 | `consumer` | External API (`/api/v1/routes/*`, `/api/v1/carriers/*`) and `/swagger/` |
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
-| `admin` | Everything: ingest, jobs, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
+| `admin` | Everything: ingest, jobs, data freshness, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
 
 `/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid/revoked key → **401**, or **429** if the auth-fail IP bucket is exhausted; wrong role → **403**).
 
@@ -247,6 +247,10 @@ curl http://localhost:8080/api/v1/jobs/<job-id>
 
 # List recent jobs
 curl http://localhost:8080/api/v1/jobs
+
+# Dataset freshness (admin): last successful ingest and latest covered period per dataset.
+# Ingest timestamps and periods are null when that dataset has never been loaded.
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
 
 # Route performance stats for a date range (required: origin, dest, start_date, end_date;
 # optional: carrier, flight_number [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).

@@ -17,6 +17,8 @@
 //	@tag.description			Queue flight performance, weather, and reference data import jobs
 //	@tag.name					jobs
 //	@tag.description			Inspect background job status
+//	@tag.name					freshness
+//	@tag.description			Admin dataset freshness (last successful ingest and latest covered period)
 //	@tag.name					routes
 //	@tag.description			Route performance stats, booking outlook, and typical-year travel windows
 //	@tag.name					carriers
