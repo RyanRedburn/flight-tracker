@@ -2,11 +2,11 @@ package bts
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/csvparse"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -32,19 +32,7 @@ func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
 	return s
 }
 
-type ImportResult struct {
-	Year         int `json:"year"`
-	Month        int `json:"month"`
-	RowsImported int `json:"rows_imported"`
-}
-
-func (r ImportResult) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{
-		colYear:      r.Year,
-		jsonKeyMonth: r.Month,
-		jsonKeyRows:  r.RowsImported,
-	})
-}
+type ImportResult = ingest.MonthImportResult
 
 func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResult, error) {
 	csvPath, cleanup, err := s.openCSVFile(ctx, year, month)

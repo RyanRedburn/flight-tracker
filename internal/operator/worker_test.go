@@ -3,6 +3,7 @@ package operator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"sync"
@@ -24,7 +25,26 @@ type blockingHandler struct {
 	started chan struct{}
 }
 
-func (h blockingHandler) Type() string { return testJobType }
+func (h blockingHandler) Type() model.JobType { return testJobType }
+
+type causeHandler struct {
+	started chan struct{}
+	cause   chan error
+}
+
+func (h causeHandler) Type() model.JobType { return testJobType }
+
+func (h causeHandler) Process(ctx context.Context, _ *model.Job) (json.RawMessage, error) {
+	close(h.started)
+	<-ctx.Done()
+
+	select {
+	case h.cause <- context.Cause(ctx):
+	default:
+	}
+
+	return nil, ctx.Err()
+}
 
 func (h blockingHandler) Process(ctx context.Context, _ *model.Job) (json.RawMessage, error) {
 	close(h.started)
@@ -35,7 +55,7 @@ func (h blockingHandler) Process(ctx context.Context, _ *model.Job) (json.RawMes
 
 func TestNewWorkerMinimumConcurrency(t *testing.T) {
 	st := &storetest.Stub{}
-	processor := NewProcessor(st)
+	processor := mustNewProcessor(t, st)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	worker := NewWorker(st, processor, WorkerConfig{Concurrency: 0, PollInterval: time.Second}, logger)
@@ -46,7 +66,7 @@ func TestNewWorkerMinimumConcurrency(t *testing.T) {
 
 func TestNewWorkerDerivedLeaseIntervals(t *testing.T) {
 	st := &storetest.Stub{}
-	processor := NewProcessor(st)
+	processor := mustNewProcessor(t, st)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	worker := NewWorker(st, processor, WorkerConfig{LeaseTTL: 90 * time.Second}, logger)
@@ -86,7 +106,7 @@ func TestWorkerStopFailsInFlightJobWithLiveContext(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, blockingHandler{started: started})
+	processor := mustNewProcessor(t, st, blockingHandler{started: started})
 	worker := NewWorker(st, processor, WorkerConfig{
 		Concurrency:       1,
 		PollInterval:      time.Hour,
@@ -137,7 +157,7 @@ func TestWorkerStopIdleExits(t *testing.T) {
 		},
 	}
 
-	worker := NewWorker(st, NewProcessor(st), WorkerConfig{
+	worker := NewWorker(st, mustNewProcessor(t, st), WorkerConfig{
 		Concurrency:     1,
 		PollInterval:    time.Hour,
 		ReclaimInterval: 0,
@@ -165,7 +185,7 @@ func TestWorkerShutdownStopsClaiming(t *testing.T) {
 		},
 	}
 
-	worker := NewWorker(st, NewProcessor(st), WorkerConfig{
+	worker := NewWorker(st, mustNewProcessor(t, st), WorkerConfig{
 		Concurrency:     1,
 		PollInterval:    15 * time.Millisecond,
 		ReclaimInterval: 0,
@@ -216,7 +236,7 @@ func TestWorkerHeartbeatWhileProcessInFlight(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, blockingHandler{started: started})
+	processor := mustNewProcessor(t, st, blockingHandler{started: started})
 	worker := NewWorker(st, processor, WorkerConfig{
 		Concurrency:       1,
 		PollInterval:      time.Hour,
@@ -268,7 +288,7 @@ func TestWorkerClaimPassesLeaseUntil(t *testing.T) {
 	ttl := 90 * time.Second
 	before := time.Now().UTC()
 
-	worker := NewWorker(st, NewProcessor(st), WorkerConfig{
+	worker := NewWorker(st, mustNewProcessor(t, st), WorkerConfig{
 		Concurrency:       1,
 		PollInterval:      time.Hour,
 		LeaseTTL:          ttl,
@@ -316,9 +336,12 @@ func TestWorkerReclaimLoopCallsReset(t *testing.T) {
 
 			return 0, nil
 		},
+		DeleteStaleRateLimitBucketsFn: func(context.Context) error {
+			return nil
+		},
 	}
 
-	worker := NewWorker(st, NewProcessor(st), WorkerConfig{
+	worker := NewWorker(st, mustNewProcessor(t, st), WorkerConfig{
 		Concurrency:     1,
 		PollInterval:    time.Hour,
 		LeaseTTL:        time.Minute,
@@ -331,6 +354,141 @@ func TestWorkerReclaimLoopCallsReset(t *testing.T) {
 	case <-called:
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for periodic reclaim")
+	}
+
+	worker.Stop(2 * time.Second)
+}
+
+func TestWorkerHeartbeatExpiredLeaseCancels(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	started := make(chan struct{})
+	gotCause := make(chan error, 1)
+
+	st := &storetest.Stub{
+		ClaimNextPendingJobFn: func(_ context.Context, _ time.Time) (*model.Job, error) {
+			return &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}, nil
+		},
+		HeartbeatJobFn: func(context.Context, string, time.Time) error {
+			return errors.New("heartbeat db down")
+		},
+		FailJobFn: func(context.Context, string, string) error {
+			return nil
+		},
+	}
+
+	processor := mustNewProcessor(t, st, causeHandler{started: started, cause: gotCause})
+	worker := NewWorker(st, processor, WorkerConfig{
+		Concurrency:       1,
+		PollInterval:      time.Hour,
+		LeaseTTL:          20 * time.Millisecond,
+		HeartbeatInterval: 15 * time.Millisecond,
+		ReclaimInterval:   time.Hour,
+	}, logger)
+
+	worker.Start(context.Background())
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Process to start")
+	}
+
+	select {
+	case cause := <-gotCause:
+		if !errors.Is(cause, ErrJobLeaseLost) {
+			t.Fatalf("cause = %v, want ErrJobLeaseLost", cause)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for lease-loss cancel")
+	}
+
+	worker.Stop(2 * time.Second)
+}
+
+func TestWorkerHeartbeatErrorBeforeExpiryContinues(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	started := make(chan struct{})
+	gotCause := make(chan error, 1)
+
+	st := &storetest.Stub{
+		ClaimNextPendingJobFn: func(_ context.Context, _ time.Time) (*model.Job, error) {
+			return &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}, nil
+		},
+		HeartbeatJobFn: func(context.Context, string, time.Time) error {
+			return errors.New("heartbeat db down")
+		},
+		FailJobFn: func(context.Context, string, string) error {
+			return nil
+		},
+	}
+
+	processor := mustNewProcessor(t, st, causeHandler{started: started, cause: gotCause})
+	worker := NewWorker(st, processor, WorkerConfig{
+		Concurrency:       1,
+		PollInterval:      time.Hour,
+		LeaseTTL:          time.Hour,
+		HeartbeatInterval: 15 * time.Millisecond,
+		ReclaimInterval:   time.Hour,
+	}, logger)
+
+	worker.Start(context.Background())
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Process to start")
+	}
+
+	select {
+	case cause := <-gotCause:
+		t.Fatalf("canceled before lease expiry: %v", cause)
+	case <-time.After(80 * time.Millisecond):
+	}
+
+	worker.Stop(2 * time.Second)
+}
+
+func TestWorkerHeartbeatStatusConflictCancels(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	started := make(chan struct{})
+	gotCause := make(chan error, 1)
+
+	st := &storetest.Stub{
+		ClaimNextPendingJobFn: func(_ context.Context, _ time.Time) (*model.Job, error) {
+			return &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}, nil
+		},
+		HeartbeatJobFn: func(context.Context, string, time.Time) error {
+			return store.ErrJobStatusConflict
+		},
+		FailJobFn: func(context.Context, string, string) error {
+			return nil
+		},
+	}
+
+	processor := mustNewProcessor(t, st, causeHandler{started: started, cause: gotCause})
+	worker := NewWorker(st, processor, WorkerConfig{
+		Concurrency:       1,
+		PollInterval:      time.Hour,
+		LeaseTTL:          time.Hour,
+		HeartbeatInterval: 15 * time.Millisecond,
+		ReclaimInterval:   time.Hour,
+	}, logger)
+
+	worker.Start(context.Background())
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Process to start")
+	}
+
+	select {
+	case cause := <-gotCause:
+		if !errors.Is(cause, store.ErrJobStatusConflict) {
+			t.Fatalf("cause = %v, want ErrJobStatusConflict", cause)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for status-conflict cancel")
 	}
 
 	worker.Stop(2 * time.Second)

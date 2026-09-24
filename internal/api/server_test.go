@@ -47,7 +47,7 @@ func routerStub() *storetest.Stub {
 		DataFreshnessFn: func(context.Context) (model.DataFreshness, error) {
 			return store.AssembleDataFreshness(nil), nil
 		},
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
@@ -56,7 +56,7 @@ func routerStub() *storetest.Stub {
 		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
 			return false, nil
 		},
-		CreateReferenceIngestJobFn: func(_ context.Context, jobType string) (*model.Job, error) {
+		CreateReferenceIngestJobFn: func(_ context.Context, jobType model.JobType) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-oa",
 				Type:      jobType,

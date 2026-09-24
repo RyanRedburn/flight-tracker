@@ -218,7 +218,7 @@ const docTemplateinternal = `{
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/handlers.FlightPerformanceIngestConflictResponse"
+                            "$ref": "#/definitions/handlers.MonthIngestConflictResponse"
                         }
                     },
                     "429": {
@@ -519,7 +519,7 @@ const docTemplateinternal = `{
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/handlers.WeatherIngestConflictResponse"
+                            "$ref": "#/definitions/handlers.MonthIngestConflictResponse"
                         }
                     },
                     "429": {
@@ -1518,26 +1518,6 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "handlers.FlightPerformanceIngestConflictResponse": {
-            "type": "object",
-            "properties": {
-                "active_ingest_months": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.YearMonth"
-                    }
-                },
-                "error": {
-                    "type": "string"
-                },
-                "existing_data_months": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.YearMonth"
-                    }
-                }
-            }
-        },
         "handlers.FreshnessPeriodResponse": {
             "type": "object",
             "properties": {
@@ -1631,7 +1611,7 @@ const docTemplateinternal = `{
                     "$ref": "#/definitions/model.JobStatus"
                 },
                 "type": {
-                    "type": "string"
+                    "$ref": "#/definitions/model.JobType"
                 },
                 "updated_at": {
                     "type": "string"
@@ -1641,84 +1621,7 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "handlers.RebuildTravelWindowsConflictResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                },
-                "job_type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.RebuildTravelWindowsJobResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "status": {
-                    "$ref": "#/definitions/model.JobStatus"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.RebuildTravelWindowsResponse": {
-            "type": "object",
-            "properties": {
-                "job": {
-                    "$ref": "#/definitions/handlers.RebuildTravelWindowsJobResponse"
-                }
-            }
-        },
-        "handlers.ReferenceIngestConflictResponse": {
-            "type": "object",
-            "properties": {
-                "dataset": {
-                    "type": "string"
-                },
-                "error": {
-                    "type": "string"
-                },
-                "job_type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.ReferenceIngestJobResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "status": {
-                    "$ref": "#/definitions/model.JobStatus"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.ReferenceIngestResponse": {
-            "type": "object",
-            "properties": {
-                "job": {
-                    "$ref": "#/definitions/handlers.ReferenceIngestJobResponse"
-                }
-            }
-        },
-        "handlers.StatusResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.WeatherIngestConflictResponse": {
+        "handlers.MonthIngestConflictResponse": {
             "type": "object",
             "properties": {
                 "active_ingest_months": {
@@ -1735,6 +1638,69 @@ const docTemplateinternal = `{
                     "items": {
                         "$ref": "#/definitions/model.YearMonth"
                     }
+                }
+            }
+        },
+        "handlers.QueuedJobResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "type": {
+                    "$ref": "#/definitions/model.JobType"
+                }
+            }
+        },
+        "handlers.RebuildTravelWindowsConflictResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "job_type": {
+                    "$ref": "#/definitions/model.JobType"
+                }
+            }
+        },
+        "handlers.RebuildTravelWindowsResponse": {
+            "type": "object",
+            "properties": {
+                "job": {
+                    "$ref": "#/definitions/handlers.QueuedJobResponse"
+                }
+            }
+        },
+        "handlers.ReferenceIngestConflictResponse": {
+            "type": "object",
+            "properties": {
+                "dataset": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "job_type": {
+                    "$ref": "#/definitions/model.JobType"
+                }
+            }
+        },
+        "handlers.ReferenceIngestResponse": {
+            "type": "object",
+            "properties": {
+                "job": {
+                    "$ref": "#/definitions/handlers.QueuedJobResponse"
+                }
+            }
+        },
+        "handlers.StatusResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
                 }
             }
         },
@@ -2097,6 +2063,27 @@ const docTemplateinternal = `{
                 "JobStatusRunning",
                 "JobStatusCompleted",
                 "JobStatusFailed"
+            ]
+        },
+        "model.JobType": {
+            "type": "string",
+            "enum": [
+                "import_flight_performance",
+                "import_weather_observations",
+                "import_countries",
+                "import_regions",
+                "import_airports",
+                "import_weather_stations",
+                "rebuild_route_travel_windows"
+            ],
+            "x-enum-varnames": [
+                "JobTypeImportFlightPerformance",
+                "JobTypeImportWeatherObservations",
+                "JobTypeImportCountries",
+                "JobTypeImportRegions",
+                "JobTypeImportAirports",
+                "JobTypeImportWeatherStations",
+                "JobTypeRebuildRouteTravelWindows"
             ]
         },
         "model.RouteOutlook": {

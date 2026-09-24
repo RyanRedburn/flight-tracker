@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -14,6 +15,7 @@ const (
 	carrierStatsExtraPlaceholder         = "/*extra*/"
 	carrierStatsOriginAirportPlaceholder = "/*origin_airport*/"
 	carrierStatsDestAirportPlaceholder   = "/*dest_airport*/"
+	carrierStatsMinSamplePlaceholder     = "/*min_sample*/"
 )
 
 func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {
@@ -35,7 +37,7 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 	if filter.StartDate == "" && filter.EndDate == "" {
 		start, end, ok := store.CarrierStatsWindow(analysisEnd.String)
 		if !ok {
-			return stats, nil
+			return nil, fmt.Errorf("parse carrier stats max flight date %q", analysisEnd.String)
 		}
 
 		filter.StartDate = start
@@ -82,83 +84,13 @@ func emptyCarrierStats(filter store.CarrierStatsFilter) *model.CarrierStats {
 func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStatsFilter, stats *model.CarrierStats) error {
 	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, filter)
 
-	var (
-		avgArr            sql.NullFloat64
-		medianArr         sql.NullFloat64
-		avgArrDelayed     sql.NullFloat64
-		medianArrDelayed  sql.NullFloat64
-		avgDep            sql.NullFloat64
-		avgDepDelayed     sql.NullFloat64
-		causeCarrier      sql.NullFloat64
-		causeWeather      sql.NullFloat64
-		causeNAS          sql.NullFloat64
-		causeSecurity     sql.NullFloat64
-		causeLate         sql.NullFloat64
-		shareCarrier      int
-		shareWeather      int
-		shareNAS          int
-		shareSecurity     int
-		shareLate         int
-		shareUnattributed int
-	)
+	var scanned delayStatsScan
 
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(
-		&stats.Flights,
-		&stats.OnTime,
-		&stats.Delayed,
-		&stats.Cancelled,
-		&stats.Diverted,
-		&avgArr,
-		&medianArr,
-		&avgArrDelayed,
-		&medianArrDelayed,
-		&avgDep,
-		&avgDepDelayed,
-		&causeCarrier,
-		&causeWeather,
-		&causeNAS,
-		&causeSecurity,
-		&causeLate,
-		&shareCarrier,
-		&shareWeather,
-		&shareNAS,
-		&shareSecurity,
-		&shareLate,
-		&shareUnattributed,
-	)
-	if err != nil {
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(scanned.args()...); err != nil {
 		return err
 	}
 
-	stats.OnTimeRate = ratio(stats.OnTime, stats.Flights)
-	stats.DelayRate = ratio(stats.Delayed, stats.Flights)
-	stats.CancellationRate = ratio(stats.Cancelled, stats.Flights)
-	stats.DiversionRate = ratio(stats.Diverted, stats.Flights)
-	stats.AvgArrivalDelayMinutes = nullFloat(avgArr)
-	stats.MedianArrivalDelayMinutes = nullFloat(medianArr)
-	stats.AvgArrivalDelayWhenDelayed = nullFloat(avgArrDelayed)
-	stats.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
-	stats.AvgDepartureDelayMinutes = nullFloat(avgDep)
-	stats.AvgDepartureDelayWhenDelayed = nullFloat(avgDepDelayed)
-
-	if stats.Delayed > 0 {
-		stats.DelayCausesAvgMinutes = model.DelayCausesAvgMinutes{
-			Carrier:      nullFloat(causeCarrier),
-			Weather:      nullFloat(causeWeather),
-			NAS:          nullFloat(causeNAS),
-			Security:     nullFloat(causeSecurity),
-			LateAircraft: nullFloat(causeLate),
-		}
-		stats.DelayCausesShare = store.DelayCausesShareFromCounts(
-			stats.Delayed,
-			shareCarrier,
-			shareWeather,
-			shareNAS,
-			shareSecurity,
-			shareLate,
-			shareUnattributed,
-		)
-	}
+	applyDelayStats(scanned, carrierDelayFields(stats))
 
 	return nil
 }
@@ -258,6 +190,7 @@ func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (s
 	query := strings.Replace(template, carrierStatsExtraPlaceholder, extra, 1)
 	query = strings.Replace(query, carrierStatsOriginAirportPlaceholder, originAirport, 1)
 	query = strings.Replace(query, carrierStatsDestAirportPlaceholder, destAirport, 1)
+	query = strings.ReplaceAll(query, carrierStatsMinSamplePlaceholder, strconv.Itoa(store.CarrierStatsMinSampleSize))
 
 	return query, args
 }

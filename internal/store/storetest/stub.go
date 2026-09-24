@@ -13,14 +13,12 @@ import (
 // Set Fn fields to hard-coded returns for the scenario under test.
 // Unset Fns panic so missing setup fails loudly.
 type Stub struct {
-	CreateJobFn                           func(ctx context.Context, job *model.Job) error
 	CreateFlightPerformanceIngestJobFn    func(ctx context.Context, year, month int) (*model.Job, error)
 	CreateWeatherIngestJobFn              func(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJobFn                              func(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJobFn       func(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJobFn                 func(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
 	ListJobsFn                            func(ctx context.Context, limit int) ([]*model.Job, error)
-	UpdateJobFn                           func(ctx context.Context, job *model.Job) error
 	ClaimNextPendingJobFn                 func(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJobFn                         func(ctx context.Context, id string, result json.RawMessage) error
 	FailJobFn                             func(ctx context.Context, id, errMsg string) error
@@ -28,8 +26,8 @@ type Stub struct {
 	ResetStaleRunningJobsFn               func(ctx context.Context, expiredBefore time.Time) (int64, error)
 	ActiveFlightPerformanceIngestMonthsFn func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonthsFn           func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
-	ActiveIngestJobFn                     func(ctx context.Context, jobType string) (bool, error)
-	CreateReferenceIngestJobFn            func(ctx context.Context, jobType string) (*model.Job, error)
+	ActiveIngestJobFn                     func(ctx context.Context, jobType model.JobType) (bool, error)
+	CreateReferenceIngestJobFn            func(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJobFn  func(ctx context.Context) (*model.Job, error)
 	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
@@ -59,18 +57,11 @@ type Stub struct {
 	RevokeAPIKeyFn                        func(ctx context.Context, id string, revokedAt time.Time) error
 	CountAPIKeysFn                        func(ctx context.Context) (int64, error)
 	ConsumeRateLimitFn                    func(ctx context.Context, bucketKey string, requestsPerMinute int) (store.RateLimitResult, error)
+	DeleteStaleRateLimitBucketsFn         func(ctx context.Context) error
 	CloseFn                               func() error
 }
 
 var _ store.Store = (*Stub)(nil)
-
-func (s *Stub) CreateJob(ctx context.Context, job *model.Job) error {
-	if s.CreateJobFn == nil {
-		panic("unexpected call: CreateJob")
-	}
-
-	return s.CreateJobFn(ctx, job)
-}
 
 func (s *Stub) CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
 	if s.CreateFlightPerformanceIngestJobFn == nil {
@@ -118,14 +109,6 @@ func (s *Stub) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 	}
 
 	return s.ListJobsFn(ctx, limit)
-}
-
-func (s *Stub) UpdateJob(ctx context.Context, job *model.Job) error {
-	if s.UpdateJobFn == nil {
-		panic("unexpected call: UpdateJob")
-	}
-
-	return s.UpdateJobFn(ctx, job)
 }
 
 func (s *Stub) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error) {
@@ -184,7 +167,7 @@ func (s *Stub) ActiveWeatherIngestMonths(ctx context.Context, months []model.Yea
 	return s.ActiveWeatherIngestMonthsFn(ctx, months)
 }
 
-func (s *Stub) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
+func (s *Stub) ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
 	if s.ActiveIngestJobFn == nil {
 		panic("unexpected call: ActiveIngestJob")
 	}
@@ -192,7 +175,7 @@ func (s *Stub) ActiveIngestJob(ctx context.Context, jobType string) (bool, error
 	return s.ActiveIngestJobFn(ctx, jobType)
 }
 
-func (s *Stub) CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
+func (s *Stub) CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error) {
 	if s.CreateReferenceIngestJobFn == nil {
 		panic("unexpected call: CreateReferenceIngestJob")
 	}
@@ -436,6 +419,14 @@ func (s *Stub) ConsumeRateLimit(ctx context.Context, bucketKey string, requestsP
 	}
 
 	return s.ConsumeRateLimitFn(ctx, bucketKey, requestsPerMinute)
+}
+
+func (s *Stub) DeleteStaleRateLimitBuckets(ctx context.Context) error {
+	if s.DeleteStaleRateLimitBucketsFn == nil {
+		panic("unexpected call: DeleteStaleRateLimitBuckets")
+	}
+
+	return s.DeleteStaleRateLimitBucketsFn(ctx)
 }
 
 func (s *Stub) Close() error {

@@ -18,7 +18,7 @@ func referenceSuccessStub() *storetest.Stub {
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 
 	return &storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
@@ -27,7 +27,7 @@ func referenceSuccessStub() *storetest.Stub {
 		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
 			return false, nil
 		},
-		CreateReferenceIngestJobFn: func(_ context.Context, jt string) (*model.Job, error) {
+		CreateReferenceIngestJobFn: func(_ context.Context, jt model.JobType) (*model.Job, error) {
 			return &model.Job{
 				ID:        "job-oa-1",
 				Type:      jt,
@@ -105,7 +105,7 @@ func TestReferenceIngestCreateCountries(t *testing.T) {
 func TestReferenceIngestCreateRegionsAndAirports(t *testing.T) {
 	tests := []struct {
 		path    string
-		jobType string
+		jobType model.JobType
 	}{
 		{"/api/v1/ingest/regions", model.JobTypeImportRegions},
 		{"/api/v1/ingest/airports", model.JobTypeImportAirports},
@@ -134,7 +134,7 @@ func TestReferenceIngestCreateRegionsAndAirports(t *testing.T) {
 
 func TestReferenceIngestActiveJobConflict(t *testing.T) {
 	h := NewReferenceIngestHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return true, nil
 		},
 	})
@@ -150,14 +150,14 @@ func TestReferenceIngestActiveJobConflict(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 
-	if body["job_type"] != model.JobTypeImportCountries {
+	if body["job_type"] != string(model.JobTypeImportCountries) {
 		t.Errorf("job_type = %v, want %q", body["job_type"], model.JobTypeImportCountries)
 	}
 }
 
 func TestReferenceIngestExistingDataConflict(t *testing.T) {
 	h := NewReferenceIngestHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
@@ -251,7 +251,7 @@ func TestWeatherStationsIngestCreate(t *testing.T) {
 
 func TestWeatherStationsIngestActiveJobConflict(t *testing.T) {
 	h := NewReferenceIngestHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return true, nil
 		},
 	})
@@ -267,14 +267,14 @@ func TestWeatherStationsIngestActiveJobConflict(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 
-	if body["job_type"] != model.JobTypeImportWeatherStations {
+	if body["job_type"] != string(model.JobTypeImportWeatherStations) {
 		t.Errorf("job_type = %v, want %q", body["job_type"], model.JobTypeImportWeatherStations)
 	}
 }
 
 func TestWeatherStationsIngestExistingDataConflict(t *testing.T) {
 	h := NewReferenceIngestHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
@@ -303,7 +303,7 @@ func TestWeatherStationsIngestExistingDataConflict(t *testing.T) {
 func TestReferenceIngestCreateJobActiveConflict(t *testing.T) {
 	st := referenceSuccessStub()
 
-	st.CreateReferenceIngestJobFn = func(context.Context, string) (*model.Job, error) {
+	st.CreateReferenceIngestJobFn = func(context.Context, model.JobType) (*model.Job, error) {
 		return nil, store.ErrActiveIngestConflict
 	}
 

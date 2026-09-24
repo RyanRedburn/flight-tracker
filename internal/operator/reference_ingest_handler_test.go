@@ -14,7 +14,7 @@ func TestReferenceHandlerTypes(t *testing.T) {
 	tests := []struct {
 		name    string
 		handler JobHandler
-		want    string
+		want    model.JobType
 	}{
 		{"countries", NewCountriesHandler(svc), model.JobTypeImportCountries},
 		{"regions", NewRegionsHandler(svc), model.JobTypeImportRegions},

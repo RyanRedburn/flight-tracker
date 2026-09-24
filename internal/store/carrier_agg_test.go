@@ -2,7 +2,6 @@ package store
 
 import (
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -135,16 +134,5 @@ func TestRankCarrierEmpty(t *testing.T) {
 
 	if bestR == nil || worstR == nil || bestA == nil || worstA == nil {
 		t.Fatal("ranked lists must be empty slices, not nil")
-	}
-}
-
-func TestCarrierStatsMinSampleSQLMatchesConstant(t *testing.T) {
-	want := strconv.Itoa(CarrierStatsMinSampleSize)
-	if !strings.Contains(QueryCarrierStatsRoutes, "HAVING COUNT(*) >= "+want) {
-		t.Errorf("QueryCarrierStatsRoutes missing HAVING >= %s", want)
-	}
-
-	if !strings.Contains(QueryCarrierStatsAirports, "HAVING COUNT(*) >= "+want) {
-		t.Errorf("QueryCarrierStatsAirports missing HAVING >= %s", want)
 	}
 }

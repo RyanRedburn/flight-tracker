@@ -78,28 +78,22 @@ func Load() (Config, error) {
 		}
 	}
 
-	if cfg.RateLimitAnonRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_ANON_RPM must be >= 1")
+	rpmLimits := []struct {
+		name  string
+		value int
+	}{
+		{name: "RATE_LIMIT_ANON_RPM", value: cfg.RateLimitAnonRPM},
+		{name: "RATE_LIMIT_CONSUMER_RPM", value: cfg.RateLimitConsumerRPM},
+		{name: "RATE_LIMIT_SUBSCRIBER_RPM", value: cfg.RateLimitSubscriberRPM},
+		{name: "RATE_LIMIT_ADMIN_RPM", value: cfg.RateLimitAdminRPM},
+		{name: "RATE_LIMIT_ADMIN_INGEST_RPM", value: cfg.RateLimitAdminIngestRPM},
+		{name: "RATE_LIMIT_AUTH_FAIL_RPM", value: cfg.RateLimitAuthFailRPM},
 	}
 
-	if cfg.RateLimitConsumerRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_CONSUMER_RPM must be >= 1")
-	}
-
-	if cfg.RateLimitSubscriberRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_SUBSCRIBER_RPM must be >= 1")
-	}
-
-	if cfg.RateLimitAdminRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_ADMIN_RPM must be >= 1")
-	}
-
-	if cfg.RateLimitAdminIngestRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_ADMIN_INGEST_RPM must be >= 1")
-	}
-
-	if cfg.RateLimitAuthFailRPM < 1 {
-		return Config{}, errors.New("RATE_LIMIT_AUTH_FAIL_RPM must be >= 1")
+	for _, limit := range rpmLimits {
+		if limit.value < 1 {
+			return Config{}, fmt.Errorf("%s must be >= 1", limit.name)
+		}
 	}
 
 	return cfg, nil

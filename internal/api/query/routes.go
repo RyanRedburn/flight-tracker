@@ -112,13 +112,17 @@ func ParseRouteTravelWindows(r *http.Request) (store.RouteTravelWindowsFilter, e
 
 func validateRouteStatsSpan(sl validator.StructLevel) {
 	q := sl.Current().Interface().(routeStatsQuery)
-	if q.StartDate.IsZero() || q.EndDate.IsZero() || q.EndDate.Before(q.StartDate) {
+	reportDateSpan(sl, q.StartDate, q.EndDate)
+}
+
+func reportDateSpan(sl validator.StructLevel, start, end time.Time) {
+	if start.IsZero() || end.IsZero() || end.Before(start) {
 		return
 	}
 
-	spanDays := int(q.EndDate.Sub(q.StartDate).Hours()/24) + 1
+	spanDays := int(end.Sub(start).Hours()/24) + 1
 	if spanDays > store.MaxStatsSpanDays {
-		sl.ReportError(q.EndDate, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
+		sl.ReportError(end, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
 	}
 }
 

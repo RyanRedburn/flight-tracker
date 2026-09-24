@@ -8,6 +8,6 @@ import (
 )
 
 type JobHandler interface {
-	Type() string
+	Type() model.JobType
 	Process(ctx context.Context, job *model.Job) (json.RawMessage, error)
 }

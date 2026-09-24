@@ -17,7 +17,7 @@ func NewRebuildRouteTravelWindowsHandler(s store.Store) *RebuildRouteTravelWindo
 	return &RebuildRouteTravelWindowsHandler{store: s}
 }
 
-func (h *RebuildRouteTravelWindowsHandler) Type() string {
+func (h *RebuildRouteTravelWindowsHandler) Type() model.JobType {
 	return model.JobTypeRebuildRouteTravelWindows
 }
 

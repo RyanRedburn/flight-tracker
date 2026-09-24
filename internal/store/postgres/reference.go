@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error) {
+func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error) {
 	if !isReferenceJobType(jobType) {
 		return nil, fmt.Errorf("unsupported reference job type %q", jobType)
 	}
 
-	return s.insertPendingTypeJob(ctx, jobType, jobType)
+	return s.insertPendingTypeJob(ctx, jobType, string(jobType))
 }
 
 func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error) {
@@ -31,7 +31,7 @@ func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.
 
 // insertPendingTypeJob inserts one pending jobs row for a parameterless job.
 // lockKey is the advisory-lock namespace (hashtext); key 0 matches other type-only jobs.
-func (s *Store) insertPendingTypeJob(ctx context.Context, jobType, lockKey string) (*model.Job, error) {
+func (s *Store) insertPendingTypeJob(ctx context.Context, jobType model.JobType, lockKey string) (*model.Job, error) {
 	now := time.Now().UTC()
 	job := &model.Job{
 		ID:        uuid.NewString(),
@@ -67,6 +67,71 @@ func (s *Store) insertPendingTypeJob(ctx context.Context, jobType, lockKey strin
 	}
 
 	if err := execCreateJob(ctx, tx, job); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+
+	return job, nil
+}
+
+// insertPendingMonthJob inserts one pending month ingest job.
+// The advisory lock key matches month replace: job type plus year*100+month.
+// Each call commits its own transaction.
+func (s *Store) insertPendingMonthJob(
+	ctx context.Context,
+	jobType model.JobType,
+	year, month int,
+	activeQuery string,
+	insertDetail func(ctx context.Context, exec sqlExecContext, jobID string) error,
+) (*model.Job, error) {
+	now := time.Now().UTC()
+	job := &model.Job{
+		ID:        uuid.NewString(),
+		Type:      jobType,
+		Status:    model.JobStatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, string(jobType), year*100+month); err != nil {
+		return nil, fmt.Errorf("advisory lock: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, activeQuery,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	active, scanErr := collectRequestedActiveMonths(rows, []model.YearMonth{{Year: year, Month: month}})
+	if closeErr := rows.Close(); closeErr != nil && scanErr == nil {
+		scanErr = closeErr
+	}
+
+	if scanErr != nil {
+		return nil, scanErr
+	}
+
+	if len(active) > 0 {
+		return nil, store.ErrActiveIngestConflict
+	}
+
+	if err := execCreateJob(ctx, tx, job); err != nil {
+		return nil, err
+	}
+
+	if err := insertDetail(ctx, tx, job.ID); err != nil {
 		return nil, err
 	}
 
@@ -121,10 +186,15 @@ func (s *Store) replaceReferenceTable(
 		return err
 	}
 
-	return s.replaceTable(ctx, deleteQuery, nil, table, columns, rows)
+	return s.replaceTables(ctx, tableReplace{
+		deleteQuery: deleteQuery,
+		table:       table,
+		columns:     columns,
+		rows:        rows,
+	})
 }
 
-func isReferenceJobType(jobType string) bool {
+func isReferenceJobType(jobType model.JobType) bool {
 	switch jobType {
 	case model.JobTypeImportCountries,
 		model.JobTypeImportRegions,

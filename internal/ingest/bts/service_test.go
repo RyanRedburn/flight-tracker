@@ -68,7 +68,7 @@ func TestServiceImportMonthWithoutDownloader(t *testing.T) {
 }
 
 func TestImportResultJSON(t *testing.T) {
-	payload, err := ImportResult{Year: 2026, Month: 4, RowsImported: 42}.MarshalJSON()
+	payload, err := json.Marshal(ImportResult{Year: 2026, Month: 4, RowsImported: 42})
 	if err != nil {
 		t.Fatalf("MarshalJSON() error = %v", err)
 	}

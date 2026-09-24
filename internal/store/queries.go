@@ -16,11 +16,6 @@ const (
 		ORDER BY created_at DESC
 		LIMIT $1`
 
-	QueryUpdateJob = `
-		UPDATE jobs
-		SET type = $1, status = $2, result = $3, error = $4, updated_at = $5, started_at = $6, ended_at = $7
-		WHERE id = $8`
-
 	QueryClaimNextPendingJobSelect = `
 		SELECT id, type, status, result, error, created_at, updated_at, started_at, ended_at
 		FROM jobs
@@ -79,11 +74,11 @@ const (
 		WHERE type = $1 AND status IN ($2, $3)
 		LIMIT 1`
 
+	// /*months*/ is replaced with ($1, $2), ($3, $4), ... for the requested pairs.
 	QueryMonthsWithFlightPerformanceData = `
-		SELECT 1
+		SELECT DISTINCT year, month
 		FROM flight_performance
-		WHERE year = $1 AND month = $2
-		LIMIT 1`
+		WHERE (year, month) IN /*months*/`
 
 	QueryDeleteFlightPerformanceByMonth = `
 		DELETE FROM flight_performance
@@ -105,10 +100,9 @@ const (
 		WHERE j.status IN ($1, $2)`
 
 	QueryMonthsWithWeatherData = `
-		SELECT 1
+		SELECT DISTINCT year, month
 		FROM weather_observations
-		WHERE year = $1 AND month = $2
-		LIMIT 1`
+		WHERE (year, month) IN /*months*/`
 
 	QueryDeleteWeatherObservationsByMonth = `
 		DELETE FROM weather_observations
@@ -174,7 +168,21 @@ const (
 					ELSE 'security'
 				END`
 
-	carrierStatsMinSampleSQL = `30`
+	// A flight is on time when it is not cancelled, then not diverted, and
+	// arr_del15 < 1. Cancelled takes priority over diverted; diverted takes
+	// priority over delayed.
+	sqlNotCancelled = `COALESCE(cancelled, 0) < 1`
+	sqlNotDiverted  = `COALESCE(diverted, 0) < 1`
+	sqlCancelledGE  = `COALESCE(cancelled, 0) >= 1`
+	sqlDivertedGE   = `COALESCE(diverted, 0) >= 1`
+	sqlArrDel15GE   = `COALESCE(arr_del15, 0) >= 1`
+	sqlArrDel15LT   = `COALESCE(arr_del15, 0) < 1`
+
+	sqlFlightOutcomeFlags = `(` + sqlCancelledGE + `) AS is_cancelled,
+				(` + sqlNotCancelled + ` AND ` + sqlDivertedGE + `) AS is_diverted,
+				(` + sqlNotCancelled + ` AND ` + sqlNotDiverted + ` AND ` + sqlArrDel15GE + `) AS is_delayed`
+
+	sqlIsOnTime = `(` + sqlNotCancelled + ` AND ` + sqlNotDiverted + ` AND ` + sqlArrDel15LT + `)`
 
 	// Any flight_performance row for the OD. Date, flight number, and weekday
 	// are filters, not identity. Carrier is included only when the caller sets it.
@@ -221,9 +229,7 @@ const (
 		classified AS (
 			SELECT
 				*,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		),
 		with_cause AS (
@@ -295,9 +301,7 @@ const (
 		classified AS (
 			SELECT
 				iata_code_marketing_airline,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		)
 		SELECT
@@ -334,9 +338,7 @@ const (
 		classified AS (
 			SELECT
 				*,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		),
 		with_cause AS (
@@ -396,9 +398,7 @@ const (
 			SELECT
 				origin,
 				dest,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		)
 		SELECT
@@ -411,7 +411,7 @@ const (
 			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted
 		FROM classified
 		GROUP BY origin, dest
-		HAVING COUNT(*) >= ` + carrierStatsMinSampleSQL
+		HAVING COUNT(*) >= /*min_sample*/`
 
 	QueryCarrierStatsAirports = `
 		WITH matched AS (
@@ -435,9 +435,7 @@ const (
 				dest,
 				origin_state,
 				dest_state,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		),
 		airport_flights AS (
@@ -458,7 +456,7 @@ const (
 			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted
 		FROM airport_flights
 		GROUP BY airport
-		HAVING COUNT(*) >= ` + carrierStatsMinSampleSQL
+		HAVING COUNT(*) >= /*min_sample*/`
 
 	QueryRouteOutlookMaxDate = `
 		SELECT MAX(flight_date)::text
@@ -495,9 +493,7 @@ const (
 		classified AS (
 			SELECT
 				*,
-				(COALESCE(cancelled, 0) >= 1) AS is_cancelled,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) >= 1) AS is_diverted,
-				(COALESCE(cancelled, 0) < 1 AND COALESCE(diverted, 0) < 1 AND COALESCE(arr_del15, 0) >= 1) AS is_delayed
+				` + sqlFlightOutcomeFlags + `
 			FROM matched
 		)
 		SELECT
@@ -542,9 +538,9 @@ const (
 
 	// Full replace from flight_performance. Window is last up to 2 years
 	// ending at MAX(flight_date) per origin/dest/(optional carrier).
-	// On-time matches QueryRouteStats: not cancelled, not diverted, arr_del15 < 1.
+	// On time is not cancelled, then not diverted, then arr_del15 < 1.
 	QueryInsertRouteTravelWindows = `
-		WITH classified AS (
+		WITH flights AS (
 			SELECT
 				origin,
 				dest,
@@ -577,6 +573,17 @@ const (
 				AND iata_code_marketing_airline IS NOT NULL
 				AND iata_code_marketing_airline <> ''
 		),
+		classified AS (
+			SELECT
+				origin,
+				dest,
+				carrier,
+				flight_date,
+				day_of_week,
+				crs_dep_time,
+				` + sqlIsOnTime + ` AS is_on_time
+			FROM flights
+		),
 		bounds AS (
 			SELECT
 				origin,
@@ -607,11 +614,7 @@ const (
 				EXTRACT(MONTH FROM c.flight_date)::int AS month,
 				c.day_of_week,
 				c.crs_dep_time,
-				(
-					COALESCE(c.cancelled, 0) < 1
-					AND COALESCE(c.diverted, 0) < 1
-					AND COALESCE(c.arr_del15, 0) < 1
-				) AS is_on_time
+				c.is_on_time
 			FROM classified c
 			INNER JOIN windows w
 				ON c.origin = w.origin

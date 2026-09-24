@@ -19,7 +19,7 @@ func NewWeatherIngestHandler(s store.Store, ingest *iem.Service) *WeatherIngestH
 	return &WeatherIngestHandler{store: s, ingest: ingest}
 }
 
-func (h *WeatherIngestHandler) Type() string {
+func (h *WeatherIngestHandler) Type() model.JobType {
 	return model.JobTypeImportWeatherObservations
 }
 

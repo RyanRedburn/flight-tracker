@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -71,5 +72,8 @@ func (h *HealthHandler) DatabaseVersion(w http.ResponseWriter, r *http.Request) 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		slog.Error("encode json response", "error", err, "status", status)
+	}
 }

@@ -27,84 +27,16 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	query, args := buildRouteStatsQuery(store.QueryRouteStats, filter)
 
 	var (
-		avgArr            sql.NullFloat64
-		medianArr         sql.NullFloat64
-		avgArrDelayed     sql.NullFloat64
-		medianArrDelayed  sql.NullFloat64
-		avgDep            sql.NullFloat64
-		avgDepDelayed     sql.NullFloat64
-		causeCarrier      sql.NullFloat64
-		causeWeather      sql.NullFloat64
-		causeNAS          sql.NullFloat64
-		causeSecurity     sql.NullFloat64
-		causeLate         sql.NullFloat64
-		shareCarrier      int
-		shareWeather      int
-		shareNAS          int
-		shareSecurity     int
-		shareLate         int
-		shareUnattributed int
-		diversionJSON     []byte
+		scanned       delayStatsScan
+		diversionJSON []byte
 	)
 
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(
-		&stats.Flights,
-		&stats.OnTime,
-		&stats.Delayed,
-		&stats.Cancelled,
-		&stats.Diverted,
-		&avgArr,
-		&medianArr,
-		&avgArrDelayed,
-		&medianArrDelayed,
-		&avgDep,
-		&avgDepDelayed,
-		&causeCarrier,
-		&causeWeather,
-		&causeNAS,
-		&causeSecurity,
-		&causeLate,
-		&shareCarrier,
-		&shareWeather,
-		&shareNAS,
-		&shareSecurity,
-		&shareLate,
-		&shareUnattributed,
-		&diversionJSON,
-	)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(append(scanned.args(), &diversionJSON)...)
 	if err != nil {
 		return nil, err
 	}
 
-	stats.OnTimeRate = ratio(stats.OnTime, stats.Flights)
-	stats.DelayRate = ratio(stats.Delayed, stats.Flights)
-	stats.CancellationRate = ratio(stats.Cancelled, stats.Flights)
-	stats.DiversionRate = ratio(stats.Diverted, stats.Flights)
-	stats.AvgArrivalDelayMinutes = nullFloat(avgArr)
-	stats.MedianArrivalDelayMinutes = nullFloat(medianArr)
-	stats.AvgArrivalDelayWhenDelayed = nullFloat(avgArrDelayed)
-	stats.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
-	stats.AvgDepartureDelayMinutes = nullFloat(avgDep)
-	stats.AvgDepartureDelayWhenDelayed = nullFloat(avgDepDelayed)
-
-	if stats.Delayed > 0 {
-		stats.DelayCausesAvgMinutes = model.DelayCausesAvgMinutes{
-			Carrier:      nullFloat(causeCarrier),
-			Weather:      nullFloat(causeWeather),
-			NAS:          nullFloat(causeNAS),
-			Security:     nullFloat(causeSecurity),
-			LateAircraft: nullFloat(causeLate),
-		}
-		stats.DelayCausesShare = store.DelayCausesShareFromCounts(
-			stats.Delayed,
-			shareCarrier,
-			shareWeather,
-			shareNAS,
-			shareSecurity,
-			shareLate,
-			shareUnattributed,
-		)
-	}
+	applyDelayStats(scanned, routeDelayFields(stats))
 
 	airports, err := unmarshalAirportCounts(diversionJSON)
 	if err != nil {
@@ -147,7 +79,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 
 	endTime, err := time.Parse("2006-01-02", analysisEnd.String)
 	if err != nil {
-		return out, nil
+		return nil, fmt.Errorf("parse route outlook max flight date %q: %w", analysisEnd.String, err)
 	}
 
 	analysisStart := endTime.AddDate(0, 0, -store.OutlookLookbackDays).Format("2006-01-02")

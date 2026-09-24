@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/jackc/pgx/v5"
@@ -22,36 +23,39 @@ type tableReplace struct {
 	table       string
 	columns     []string
 	rows        [][]string
+	// lockKey and lockID match queueing: job type plus year*100+month.
+	// Empty lockKey skips the lock. Held only for this delete+COPY transaction.
+	lockKey string
+	lockID  int
 }
 
 func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
-	return s.replaceTable(ctx, store.QueryDeleteFlightPerformanceByMonth, []any{
-		strconv.Itoa(year),
-		strconv.Itoa(month),
-	}, "flight_performance", columns, rows)
+	return s.replaceTables(ctx, tableReplace{
+		deleteQuery: store.QueryDeleteFlightPerformanceByMonth,
+		deleteArgs: []any{
+			strconv.Itoa(year),
+			strconv.Itoa(month),
+		},
+		table:   "flight_performance",
+		columns: columns,
+		rows:    rows,
+		lockKey: string(model.JobTypeImportFlightPerformance),
+		lockID:  year*100 + month,
+	})
 }
 
 func (s *Store) ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
-	return s.replaceTable(ctx, store.QueryDeleteWeatherObservationsByMonth, []any{
-		strconv.Itoa(year),
-		strconv.Itoa(month),
-	}, "weather_observations", columns, rows)
-}
-
-func (s *Store) replaceTable(
-	ctx context.Context,
-	deleteQuery string,
-	deleteArgs []any,
-	table string,
-	columns []string,
-	rows [][]string,
-) error {
 	return s.replaceTables(ctx, tableReplace{
-		deleteQuery: deleteQuery,
-		deleteArgs:  deleteArgs,
-		table:       table,
-		columns:     columns,
-		rows:        rows,
+		deleteQuery: store.QueryDeleteWeatherObservationsByMonth,
+		deleteArgs: []any{
+			strconv.Itoa(year),
+			strconv.Itoa(month),
+		},
+		table:   "weather_observations",
+		columns: columns,
+		rows:    rows,
+		lockKey: string(model.JobTypeImportWeatherObservations),
+		lockID:  year*100 + month,
 	})
 }
 
@@ -77,6 +81,16 @@ func (s *Store) replaceTables(ctx context.Context, ops ...tableReplace) error {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+
+	for _, op := range ops {
+		if op.lockKey == "" {
+			continue
+		}
+
+		if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, op.lockKey, op.lockID); err != nil {
+			return fmt.Errorf("advisory lock: %w", err)
+		}
+	}
 
 	for _, op := range ops {
 		if _, err := tx.ExecContext(ctx, op.deleteQuery, op.deleteArgs...); err != nil {

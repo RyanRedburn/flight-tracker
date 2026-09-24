@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -15,22 +13,15 @@ type RebuildTravelWindowsHandler struct {
 	store store.Store
 }
 
-// RebuildTravelWindowsJobResponse is the queued rebuild job.
-type RebuildTravelWindowsJobResponse struct {
-	ID     string          `json:"id"`
-	Type   string          `json:"type"`
-	Status model.JobStatus `json:"status"`
-}
-
 // RebuildTravelWindowsResponse is returned after queueing a travel-window rebuild.
 type RebuildTravelWindowsResponse struct {
-	Job RebuildTravelWindowsJobResponse `json:"job"`
+	Job QueuedJobResponse `json:"job"`
 }
 
 // RebuildTravelWindowsConflictResponse is returned when a rebuild job is already pending or running.
 type RebuildTravelWindowsConflictResponse struct {
-	Error   string `json:"error"`
-	JobType string `json:"job_type,omitempty"`
+	Error   string        `json:"error"`
+	JobType model.JobType `json:"job_type,omitempty"`
 }
 
 func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler {
@@ -53,7 +44,7 @@ func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler 
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/rebuild/travel-windows [post]
 func (h *RebuildTravelWindowsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if err := decodeEmptyBody(r.Body); err != nil {
+	if err := decodeJSONBody(r.Body, &struct{}{}, jsonBodyOptions{disallowUnknown: true, rejectTrailing: true}); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
@@ -86,7 +77,7 @@ func (h *RebuildTravelWindowsHandler) Create(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusCreated, RebuildTravelWindowsResponse{
-		Job: RebuildTravelWindowsJobResponse{
+		Job: QueuedJobResponse{
 			ID:     job.ID,
 			Type:   job.Type,
 			Status: job.Status,
@@ -99,28 +90,4 @@ func rebuildTravelWindowsConflict() RebuildTravelWindowsConflictResponse {
 		Error:   errActiveRebuildJob,
 		JobType: model.JobTypeRebuildRouteTravelWindows,
 	}
-}
-
-func decodeEmptyBody(body io.Reader) error {
-	decoder := json.NewDecoder(body)
-	decoder.DisallowUnknownFields()
-
-	var req struct{}
-	if err := decoder.Decode(&req); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-
-		return err
-	}
-
-	if err := decoder.Decode(&struct{}{}); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-
-		return err
-	}
-
-	return errors.New("unexpected trailing json")
 }

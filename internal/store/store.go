@@ -22,14 +22,12 @@ type MigrationVersion struct {
 }
 
 type Store interface {
-	CreateJob(ctx context.Context, job *model.Job) error
 	CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error)
 	CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJob(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
 	ListJobs(ctx context.Context, limit int) ([]*model.Job, error)
-	UpdateJob(ctx context.Context, job *model.Job) error
 	ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJob(ctx context.Context, id string, result json.RawMessage) error
 	FailJob(ctx context.Context, id, errMsg string) error
@@ -37,8 +35,8 @@ type Store interface {
 	ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Time) (int64, error)
 	ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
-	ActiveIngestJob(ctx context.Context, jobType string) (bool, error)
-	CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error)
+	ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
+	CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
 	HasReferenceData(ctx context.Context, dataset ReferenceDataset) (bool, error)
 	ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error
@@ -68,5 +66,6 @@ type Store interface {
 	RevokeAPIKey(ctx context.Context, id string, revokedAt time.Time) error
 	CountAPIKeys(ctx context.Context) (int64, error)
 	ConsumeRateLimit(ctx context.Context, bucketKey string, requestsPerMinute int) (RateLimitResult, error)
+	DeleteStaleRateLimitBuckets(ctx context.Context) error
 	Close() error
 }

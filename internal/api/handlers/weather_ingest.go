@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -71,7 +70,7 @@ type WeatherIngestResponse struct {
 //	@Failure		400		{object}	ErrorResponse
 //	@Failure		401		{object}	ErrorResponse
 //	@Failure		403		{object}	ErrorResponse
-//	@Failure		409		{object}	WeatherIngestConflictResponse
+//	@Failure		409		{object}	MonthIngestConflictResponse
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
@@ -85,17 +84,6 @@ func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if err := req.Validate(); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	months, err := ingest.ExpandMonths(ingest.RangeInput{
-		StartYear:  req.StartYear,
-		StartMonth: req.StartMonth,
-		EndYear:    req.EndYear,
-		EndMonth:   req.EndMonth,
-	}, h.maxIngestMonths)
-	if err != nil {
-		writeIngestRangeError(w, err)
 		return
 	}
 
@@ -116,61 +104,35 @@ func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		unmatched = unresolved
 	}
 
-	active, err := h.store.ActiveWeatherIngestMonths(ctx, months)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
+	queued, ok := queueMonthIngestJobs(
+		w,
+		r,
+		h.maxIngestMonths,
+		monthIngestInput{
+			startYear:  req.StartYear,
+			startMonth: req.StartMonth,
+			endYear:    req.EndYear,
+			endMonth:   req.EndMonth,
+			force:      req.Force,
+		},
+		h.store.ActiveWeatherIngestMonths,
+		h.store.MonthsWithWeatherData,
+		errFailedCheckExistingWeather,
+		"weather data already exists for one or more requested months; set force=true to re-import",
+		func(ctx context.Context, year, month int) (*model.Job, error) {
+			return h.store.CreateWeatherIngestJob(ctx, year, month, stations)
+		},
+	)
+	if !ok {
 		return
 	}
 
-	if len(active) > 0 {
-		writeJSON(w, http.StatusConflict, WeatherIngestConflictResponse{
-			Error:              errActiveIngestMonths,
-			ActiveIngestMonths: active,
-		})
-
-		return
-	}
-
-	if !req.Force {
-		existing, err := h.store.MonthsWithWeatherData(ctx, months)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckExistingWeather})
-			return
-		}
-
-		if len(existing) > 0 {
-			writeJSON(w, http.StatusConflict, WeatherIngestConflictResponse{
-				Error:              "weather data already exists for one or more requested months; set force=true to re-import",
-				ExistingDataMonths: existing,
-			})
-
-			return
-		}
-	}
-
-	jobs := make([]WeatherIngestJobResponse, 0, len(months))
-
-	for _, ym := range months {
-		job, err := h.store.CreateWeatherIngestJob(ctx, ym.Year, ym.Month, stations)
-		if err != nil {
-			if errors.Is(err, store.ErrActiveIngestConflict) {
-				writeJSON(w, http.StatusConflict, WeatherIngestConflictResponse{
-					Error:              errActiveIngestMonths,
-					ActiveIngestMonths: []model.YearMonth{ym},
-				})
-
-				return
-			}
-
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
-
-			return
-		}
-
+	jobs := make([]WeatherIngestJobResponse, 0, len(queued))
+	for _, job := range queued {
 		jobs = append(jobs, WeatherIngestJobResponse{
 			ID:       job.ID,
-			Year:     ym.Year,
-			Month:    ym.Month,
+			Year:     job.Year,
+			Month:    job.Month,
 			Stations: append([]string(nil), stations...),
 			Status:   job.Status,
 		})
@@ -178,7 +140,7 @@ func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, WeatherIngestResponse{
 		Jobs:               jobs,
-		MonthsRequested:    len(months),
+		MonthsRequested:    len(jobs),
 		UnresolvedAirports: unmatched,
 	})
 }

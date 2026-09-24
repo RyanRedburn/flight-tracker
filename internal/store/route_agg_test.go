@@ -130,9 +130,9 @@ func TestSortCarrierOnTime(t *testing.T) {
 	}
 }
 
-// classifyRouteStatsOnTime mirrors the SQL in QueryRouteStats and
-// QueryRouteStatsCarrierOnTime: cancelled takes priority, then diverted,
-// then delayed when arr_del15 >= 1. On-time is the remaining operated flights.
+// classifyRouteStatsOnTime reports 1 when the flight is on time: not cancelled,
+// then not diverted, then arr_del15 < 1. Cancelled takes priority over diverted,
+// and diverted takes priority over delayed.
 func classifyRouteStatsOnTime(cancelled, diverted, arrDel15 float64) int {
 	switch {
 	case cancelled >= 1:

@@ -2,7 +2,6 @@ package query
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -48,12 +47,5 @@ func ParseCarrierStats(r *http.Request) (store.CarrierStatsFilter, error) {
 
 func validateCarrierStatsSpan(sl validator.StructLevel) {
 	q := sl.Current().Interface().(carrierStatsQuery)
-	if q.StartDate.IsZero() || q.EndDate.IsZero() || q.EndDate.Before(q.StartDate) {
-		return
-	}
-
-	spanDays := int(q.EndDate.Sub(q.StartDate).Hours()/24) + 1
-	if spanDays > store.MaxStatsSpanDays {
-		sl.ReportError(q.EndDate, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
-	}
+	reportDateSpan(sl, q.StartDate, q.EndDate)
 }

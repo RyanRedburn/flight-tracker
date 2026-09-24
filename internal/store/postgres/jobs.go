@@ -6,66 +6,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
-
-	"github.com/google/uuid"
 )
 
 func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
-	now := time.Now().UTC()
-	job := &model.Job{
-		ID:        uuid.NewString(),
-		Type:      model.JobTypeImportFlightPerformance,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
+	return s.insertPendingMonthJob(ctx, model.JobTypeImportFlightPerformance, year, month, store.QueryActiveFlightPerformanceIngestMonths,
+		func(ctx context.Context, exec sqlExecContext, jobID string) error {
+			if _, err := exec.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, jobID, year, month); err != nil {
+				return fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
+			}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, model.JobTypeImportFlightPerformance, year*100+month); err != nil {
-		return nil, fmt.Errorf("advisory lock: %w", err)
-	}
-
-	rows, err := tx.QueryContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
+			return nil
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	active, err := collectRequestedActiveMonths(rows, []model.YearMonth{{Year: year, Month: month}})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(active) > 0 {
-		return nil, store.ErrActiveIngestConflict
-	}
-
-	if err := execCreateJob(ctx, tx, job); err != nil {
-		return nil, err
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, job.ID, year, month); err != nil {
-		return nil, fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
-	}
-
-	return job, nil
 }
 
 func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
@@ -97,56 +54,15 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 		return nil, fmt.Errorf("marshal stations: %w", err)
 	}
 
-	now := time.Now().UTC()
-	job := &model.Job{
-		ID:        uuid.NewString(),
-		Type:      model.JobTypeImportWeatherObservations,
-		Status:    model.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
+	return s.insertPendingMonthJob(ctx, model.JobTypeImportWeatherObservations, year, month, store.QueryActiveWeatherIngestMonths,
+		func(ctx context.Context, exec sqlExecContext, jobID string) error {
+			if _, err := exec.ExecContext(ctx, store.QueryCreateWeatherIngestJob, jobID, year, month, stationsJSON); err != nil {
+				return fmt.Errorf("insert weather_ingest_jobs: %w", err)
+			}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, model.JobTypeImportWeatherObservations, year*100+month); err != nil {
-		return nil, fmt.Errorf("advisory lock: %w", err)
-	}
-
-	rows, err := tx.QueryContext(ctx, store.QueryActiveWeatherIngestMonths,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
+			return nil
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	active, err := collectRequestedActiveMonths(rows, []model.YearMonth{{Year: year, Month: month}})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(active) > 0 {
-		return nil, store.ErrActiveIngestConflict
-	}
-
-	if err := execCreateJob(ctx, tx, job); err != nil {
-		return nil, err
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryCreateWeatherIngestJob, job.ID, year, month, stationsJSON); err != nil {
-		return nil, fmt.Errorf("insert weather_ingest_jobs: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
-	}
-
-	return job, nil
 }
 
 func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error) {
@@ -302,11 +218,19 @@ func (s *Store) ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Ti
 }
 
 func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	return s.activeIngestMonths(ctx, store.QueryActiveFlightPerformanceIngestMonths, months)
+}
+
+func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	return s.activeIngestMonths(ctx, store.QueryActiveWeatherIngestMonths, months)
+}
+
+func (s *Store) activeIngestMonths(ctx context.Context, query string, months []model.YearMonth) ([]model.YearMonth, error) {
 	if len(months) == 0 {
 		return nil, nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, store.QueryActiveFlightPerformanceIngestMonths,
+	rows, err := s.db.QueryContext(ctx, query,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
 	)
@@ -318,20 +242,7 @@ func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months 
 	return collectRequestedActiveMonths(rows, months)
 }
 
-func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryActiveWeatherIngestMonths,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return collectRequestedActiveMonths(rows, months)
-}
-
-func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, error) {
+func (s *Store) ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
 	var exists int
 
 	err := s.db.QueryRowContext(ctx, store.QueryActiveIngestJob,
@@ -351,51 +262,74 @@ func (s *Store) ActiveIngestJob(ctx context.Context, jobType string) (bool, erro
 }
 
 func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	var withData []model.YearMonth
+	return s.monthsWithData(ctx, store.QueryMonthsWithFlightPerformanceData, months)
+}
 
-	for _, ym := range months {
-		var exists int
+func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
+	return s.monthsWithData(ctx, store.QueryMonthsWithWeatherData, months)
+}
 
-		err := s.db.QueryRowContext(ctx, store.QueryMonthsWithFlightPerformanceData,
-			strconv.Itoa(ym.Year),
-			strconv.Itoa(ym.Month),
-		).Scan(&exists)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
+const monthsInPlaceholder = "/*months*/"
 
-		if err != nil {
+func (s *Store) monthsWithData(ctx context.Context, query string, months []model.YearMonth) ([]model.YearMonth, error) {
+	if len(months) == 0 {
+		return nil, nil
+	}
+
+	sqlQuery, args := expandMonthsIn(query, months)
+
+	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	found := make(map[model.YearMonth]struct{}, len(months))
+
+	for rows.Next() {
+		var ym model.YearMonth
+		if err := rows.Scan(&ym.Year, &ym.Month); err != nil {
 			return nil, err
 		}
 
-		withData = append(withData, ym)
+		found[ym] = struct{}{}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var withData []model.YearMonth
+
+	for _, ym := range months {
+		if _, ok := found[ym]; ok {
+			withData = append(withData, ym)
+		}
 	}
 
 	return withData, nil
 }
 
-func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	var withData []model.YearMonth
+func expandMonthsIn(query string, months []model.YearMonth) (string, []any) {
+	var b strings.Builder
 
-	for _, ym := range months {
-		var exists int
+	args := make([]any, 0, len(months)*2)
 
-		err := s.db.QueryRowContext(ctx, store.QueryMonthsWithWeatherData,
-			strconv.Itoa(ym.Year),
-			strconv.Itoa(ym.Month),
-		).Scan(&exists)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
+	b.WriteByte('(')
+
+	for i, ym := range months {
+		if i > 0 {
+			b.WriteString(", ")
 		}
 
-		if err != nil {
-			return nil, err
-		}
+		fmt.Fprintf(&b, "($%d, $%d)", i*2+1, i*2+2)
 
-		withData = append(withData, ym)
+		args = append(args, ym.Year, ym.Month)
 	}
 
-	return withData, nil
+	b.WriteByte(')')
+
+	return strings.Replace(query, monthsInPlaceholder, b.String(), 1), args
 }
 
 func collectRequestedActiveMonths(rows *sql.Rows, months []model.YearMonth) ([]model.YearMonth, error) {

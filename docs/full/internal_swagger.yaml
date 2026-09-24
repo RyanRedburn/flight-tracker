@@ -55,19 +55,6 @@ definitions:
       error:
         type: string
     type: object
-  handlers.FlightPerformanceIngestConflictResponse:
-    properties:
-      active_ingest_months:
-        items:
-          $ref: '#/definitions/model.YearMonth'
-        type: array
-      error:
-        type: string
-      existing_data_months:
-        items:
-          $ref: '#/definitions/model.YearMonth'
-        type: array
-    type: object
   handlers.FreshnessPeriodResponse:
     properties:
       as_of:
@@ -134,62 +121,13 @@ definitions:
       status:
         $ref: '#/definitions/model.JobStatus'
       type:
-        type: string
+        $ref: '#/definitions/model.JobType'
       updated_at:
         type: string
       year:
         type: integer
     type: object
-  handlers.RebuildTravelWindowsConflictResponse:
-    properties:
-      error:
-        type: string
-      job_type:
-        type: string
-    type: object
-  handlers.RebuildTravelWindowsJobResponse:
-    properties:
-      id:
-        type: string
-      status:
-        $ref: '#/definitions/model.JobStatus'
-      type:
-        type: string
-    type: object
-  handlers.RebuildTravelWindowsResponse:
-    properties:
-      job:
-        $ref: '#/definitions/handlers.RebuildTravelWindowsJobResponse'
-    type: object
-  handlers.ReferenceIngestConflictResponse:
-    properties:
-      dataset:
-        type: string
-      error:
-        type: string
-      job_type:
-        type: string
-    type: object
-  handlers.ReferenceIngestJobResponse:
-    properties:
-      id:
-        type: string
-      status:
-        $ref: '#/definitions/model.JobStatus'
-      type:
-        type: string
-    type: object
-  handlers.ReferenceIngestResponse:
-    properties:
-      job:
-        $ref: '#/definitions/handlers.ReferenceIngestJobResponse'
-    type: object
-  handlers.StatusResponse:
-    properties:
-      status:
-        type: string
-    type: object
-  handlers.WeatherIngestConflictResponse:
+  handlers.MonthIngestConflictResponse:
     properties:
       active_ingest_months:
         items:
@@ -201,6 +139,46 @@ definitions:
         items:
           $ref: '#/definitions/model.YearMonth'
         type: array
+    type: object
+  handlers.QueuedJobResponse:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        $ref: '#/definitions/model.JobType'
+    type: object
+  handlers.RebuildTravelWindowsConflictResponse:
+    properties:
+      error:
+        type: string
+      job_type:
+        $ref: '#/definitions/model.JobType'
+    type: object
+  handlers.RebuildTravelWindowsResponse:
+    properties:
+      job:
+        $ref: '#/definitions/handlers.QueuedJobResponse'
+    type: object
+  handlers.ReferenceIngestConflictResponse:
+    properties:
+      dataset:
+        type: string
+      error:
+        type: string
+      job_type:
+        $ref: '#/definitions/model.JobType'
+    type: object
+  handlers.ReferenceIngestResponse:
+    properties:
+      job:
+        $ref: '#/definitions/handlers.QueuedJobResponse'
+    type: object
+  handlers.StatusResponse:
+    properties:
+      status:
+        type: string
     type: object
   handlers.WeatherIngestJobResponse:
     properties:
@@ -444,6 +422,24 @@ definitions:
     - JobStatusRunning
     - JobStatusCompleted
     - JobStatusFailed
+  model.JobType:
+    enum:
+    - import_flight_performance
+    - import_weather_observations
+    - import_countries
+    - import_regions
+    - import_airports
+    - import_weather_stations
+    - rebuild_route_travel_windows
+    type: string
+    x-enum-varnames:
+    - JobTypeImportFlightPerformance
+    - JobTypeImportWeatherObservations
+    - JobTypeImportCountries
+    - JobTypeImportRegions
+    - JobTypeImportAirports
+    - JobTypeImportWeatherStations
+    - JobTypeRebuildRouteTravelWindows
   model.RouteOutlook:
     properties:
       analysis_end:
@@ -825,7 +821,7 @@ paths:
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/handlers.FlightPerformanceIngestConflictResponse'
+            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
         "429":
           description: Too Many Requests
           schema:
@@ -1024,7 +1020,7 @@ paths:
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/handlers.WeatherIngestConflictResponse'
+            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
         "429":
           description: Too Many Requests
           schema:
