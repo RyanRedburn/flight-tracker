@@ -140,6 +140,27 @@ definitions:
       year:
         type: integer
     type: object
+  handlers.RebuildTravelWindowsConflictResponse:
+    properties:
+      error:
+        type: string
+      job_type:
+        type: string
+    type: object
+  handlers.RebuildTravelWindowsJobResponse:
+    properties:
+      id:
+        type: string
+      status:
+        $ref: '#/definitions/model.JobStatus'
+      type:
+        type: string
+    type: object
+  handlers.RebuildTravelWindowsResponse:
+    properties:
+      job:
+        $ref: '#/definitions/handlers.RebuildTravelWindowsJobResponse'
+    type: object
   handlers.ReferenceIngestConflictResponse:
     properties:
       dataset:
@@ -1285,6 +1306,48 @@ paths:
       summary: Revoke API key
       tags:
       - keys
+      - internal
+  /api/v1/rebuild/travel-windows:
+    post:
+      description: Queues a full replace of route_travel_window_scopes and route_travel_window_buckets
+        from flight_performance. The body must be empty. Returns 409 when a rebuild
+        job is already pending or running.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.RebuildTravelWindowsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.RebuildTravelWindowsConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue travel-window rollup rebuild
+      tags:
+      - rebuild
       - internal
   /api/v1/routes/outlook:
     get:

@@ -19,12 +19,13 @@ import (
 )
 
 const (
-	pathHealth              = "/health"
-	pathDBVersion           = "/db/version"
-	pathIngestCountries     = "/api/v1/ingest/countries"
-	pathCarrierStatsUA      = "/api/v1/carriers/stats?carrier=UA"
-	pathSwaggerInternalHTML = "/swagger/internal/index.html"
-	pathDataFreshness       = "/api/v1/data-freshness"
+	pathHealth               = "/health"
+	pathDBVersion            = "/db/version"
+	pathIngestCountries      = "/api/v1/ingest/countries"
+	pathCarrierStatsUA       = "/api/v1/carriers/stats?carrier=UA"
+	pathSwaggerInternalHTML  = "/swagger/internal/index.html"
+	pathDataFreshness        = "/api/v1/data-freshness"
+	pathRebuildTravelWindows = "/api/v1/rebuild/travel-windows"
 )
 
 func testLogger() *slog.Logger {
@@ -59,6 +60,15 @@ func routerStub() *storetest.Stub {
 			return &model.Job{
 				ID:        "job-oa",
 				Type:      jobType,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+		CreateRebuildRouteTravelWindowsJobFn: func(context.Context) (*model.Job, error) {
+			return &model.Job{
+				ID:        "job-rebuild",
+				Type:      model.JobTypeRebuildRouteTravelWindows,
 				Status:    model.JobStatusPending,
 				CreatedAt: now,
 				UpdatedAt: now,
@@ -113,6 +123,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, pathDBVersion, http.StatusOK},
 		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
 		{http.MethodGet, pathDataFreshness, http.StatusOK},
+		{http.MethodPost, pathRebuildTravelWindows, http.StatusCreated},
 		{http.MethodPost, pathIngestCountries, http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
@@ -181,6 +192,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec must not include /api/v1/data-freshness")
 	}
 
+	if _, ok := external[pathRebuildTravelWindows]; ok {
+		t.Fatal("external spec must not include /api/v1/rebuild/travel-windows")
+	}
+
 	internal := fetchSwaggerPaths(t, handler, "/swagger/internal/doc.json")
 	for _, path := range []string{
 		pathHealth,
@@ -188,6 +203,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		"/api/v1/ingest/weather-stations",
 		"/api/v1/jobs",
 		pathDataFreshness,
+		pathRebuildTravelWindows,
 		"/api/v1/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
@@ -300,6 +316,9 @@ func TestNewRouterAuthEnabled(t *testing.T) {
 		{name: "db version admin", stub: adminStub, method: http.MethodGet, path: pathDBVersion, key: adminPlain, wantStatus: http.StatusOK},
 		{name: "freshness consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathDataFreshness, key: consumerPlain, wantStatus: http.StatusForbidden},
 		{name: "freshness admin", stub: adminStub, method: http.MethodGet, path: pathDataFreshness, key: adminPlain, wantStatus: http.StatusOK},
+		{name: "rebuild consumer forbidden", stub: consumerStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "rebuild subscriber forbidden", stub: subscriberStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: subscriberPlain, wantStatus: http.StatusForbidden},
+		{name: "rebuild admin", stub: adminStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: adminPlain, wantStatus: http.StatusCreated},
 		{name: "external swagger consumer", stub: consumerStub, method: http.MethodGet, path: "/swagger/index.html", key: consumerPlain, wantStatus: http.StatusOK},
 		{name: "internal swagger consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: consumerPlain, wantStatus: http.StatusForbidden},
 		{name: "internal swagger admin", stub: adminStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: adminPlain, wantStatus: http.StatusOK},

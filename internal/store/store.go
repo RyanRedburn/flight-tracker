@@ -39,6 +39,7 @@ type Store interface {
 	ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJob(ctx context.Context, jobType string) (bool, error)
 	CreateReferenceIngestJob(ctx context.Context, jobType string) (*model.Job, error)
+	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
 	HasReferenceData(ctx context.Context, dataset ReferenceDataset) (bool, error)
 	ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error

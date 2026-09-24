@@ -18,6 +18,20 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*
 		return nil, fmt.Errorf("unsupported reference job type %q", jobType)
 	}
 
+	return s.insertPendingTypeJob(ctx, jobType, jobType)
+}
+
+func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error) {
+	return s.insertPendingTypeJob(
+		ctx,
+		model.JobTypeRebuildRouteTravelWindows,
+		store.TravelWindowRebuildJobLockKey,
+	)
+}
+
+// insertPendingTypeJob inserts one pending jobs row for a parameterless job.
+// lockKey is the advisory-lock namespace (hashtext); key 0 matches other type-only jobs.
+func (s *Store) insertPendingTypeJob(ctx context.Context, jobType, lockKey string) (*model.Job, error) {
 	now := time.Now().UTC()
 	job := &model.Job{
 		ID:        uuid.NewString(),
@@ -33,7 +47,7 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType string) (*
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, jobType, 0); err != nil {
+	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, lockKey, 0); err != nil {
 		return nil, fmt.Errorf("advisory lock: %w", err)
 	}
 

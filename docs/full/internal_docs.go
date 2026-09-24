@@ -942,6 +942,68 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "/api/v1/rebuild/travel-windows": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild job is already pending or running.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rebuild",
+                    "internal"
+                ],
+                "summary": "Queue travel-window rollup rebuild",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RebuildTravelWindowsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RebuildTravelWindowsConflictResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/routes/outlook": {
             "get": {
                 "security": [
@@ -1576,6 +1638,39 @@ const docTemplateinternal = `{
                 },
                 "year": {
                     "type": "integer"
+                }
+            }
+        },
+        "handlers.RebuildTravelWindowsConflictResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "job_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RebuildTravelWindowsJobResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.JobStatus"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RebuildTravelWindowsResponse": {
+            "type": "object",
+            "properties": {
+                "job": {
+                    "$ref": "#/definitions/handlers.RebuildTravelWindowsJobResponse"
                 }
             }
         },

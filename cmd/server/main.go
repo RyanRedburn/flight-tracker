@@ -19,6 +19,8 @@
 //	@tag.description			Inspect background job status
 //	@tag.name					freshness
 //	@tag.description			Admin dataset freshness (last successful ingest and latest covered period)
+//	@tag.name					rebuild
+//	@tag.description			Queue a full rebuild of travel-window rollups
 //	@tag.name					routes
 //	@tag.description			Route performance stats, booking outlook, and typical-year travel windows
 //	@tag.name					carriers
@@ -114,6 +116,7 @@ func run() int {
 
 	processor := operator.NewProcessor(st,
 		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
+		operator.NewRebuildRouteTravelWindowsHandler(st),
 		operator.NewWeatherIngestHandler(st, weatherIngest),
 		operator.NewWeatherStationsHandler(weatherIngest),
 		operator.NewCountriesHandler(oaIngest),
