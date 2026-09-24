@@ -110,6 +110,56 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "/api/v1/data-freshness": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, and airports. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "freshness",
+                    "internal"
+                ],
+                "summary": "Dataset freshness",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DataFreshnessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ingest": {
             "post": {
                 "security": [
@@ -1370,6 +1420,34 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "handlers.DataFreshnessResponse": {
+            "type": "object",
+            "properties": {
+                "datasets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.DatasetFreshnessResponse"
+                    }
+                }
+            }
+        },
+        "handlers.DatasetFreshnessResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "last_successful_ingest_at": {
+                    "type": "string"
+                },
+                "last_successful_job_id": {
+                    "type": "string"
+                },
+                "latest_period": {
+                    "$ref": "#/definitions/handlers.FreshnessPeriodResponse"
+                }
+            }
+        },
         "handlers.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1395,6 +1473,31 @@ const docTemplateinternal = `{
                     "items": {
                         "$ref": "#/definitions/model.YearMonth"
                     }
+                }
+            }
+        },
+        "handlers.FreshnessPeriodResponse": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "description": "AsOf is the snapshot timestamp of the last completed replace. Omitted when no completed job exists.",
+                    "type": "string"
+                },
+                "month": {
+                    "description": "Month is set when Type is \"month\" (1-12).",
+                    "type": "integer"
+                },
+                "row_count": {
+                    "description": "RowCount is the replaced table size for a snapshot. For weather_stations this is the station catalog; the snapshot is also present when airport_weather_stations has rows.",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "Type is \"month\" or \"snapshot\".",
+                    "type": "string"
+                },
+                "year": {
+                    "description": "Year is set when Type is \"month\".",
+                    "type": "integer"
                 }
             }
         },

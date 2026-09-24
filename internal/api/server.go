@@ -35,6 +35,7 @@ func newRouter(
 	ingestHandler := handlers.NewIngestHandler(s, maxIngestMonths)
 	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths, weatherStations, logger)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
+	freshness := handlers.NewFreshnessHandler(s)
 	keys := handlers.NewKeysHandler(s)
 	protect := middleware.NewProtector(s, middleware.ProtectorConfig{
 		Disabled:          sec.Disabled,
@@ -81,6 +82,7 @@ func newRouter(
 			r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceInternal))
 			r.Get("/jobs", jobs.List)
 			r.Get("/jobs/{id}", jobs.Get)
+			r.Get("/data-freshness", freshness.Get)
 			r.Get("/keys", keys.List)
 			r.Post("/keys", keys.Create)
 			r.Post("/keys/{id}/revoke", keys.Revoke)

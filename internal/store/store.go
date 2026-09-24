@@ -57,6 +57,7 @@ type Store interface {
 	RouteTravelWindows(ctx context.Context, filter RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindows(ctx context.Context) error
 	CarrierStats(ctx context.Context, filter CarrierStatsFilter) (*model.CarrierStats, error)
+	DataFreshness(ctx context.Context) (model.DataFreshness, error)
 	Ping(ctx context.Context) error
 	MigrationVersion(ctx context.Context) (MigrationVersion, error)
 	CreateAPIKey(ctx context.Context, key *model.APIKey) error

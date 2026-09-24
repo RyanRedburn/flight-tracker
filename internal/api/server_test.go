@@ -24,6 +24,7 @@ const (
 	pathIngestCountries     = "/api/v1/ingest/countries"
 	pathCarrierStatsUA      = "/api/v1/carriers/stats?carrier=UA"
 	pathSwaggerInternalHTML = "/swagger/internal/index.html"
+	pathDataFreshness       = "/api/v1/data-freshness"
 )
 
 func testLogger() *slog.Logger {
@@ -41,6 +42,9 @@ func routerStub() *storetest.Stub {
 		},
 		ListJobsFn: func(context.Context, int) ([]*model.Job, error) {
 			return []*model.Job{}, nil
+		},
+		DataFreshnessFn: func(context.Context) (model.DataFreshness, error) {
+			return store.AssembleDataFreshness(nil), nil
 		},
 		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
 			return false, nil
@@ -108,6 +112,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, "/ready", http.StatusOK},
 		{http.MethodGet, pathDBVersion, http.StatusOK},
 		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
+		{http.MethodGet, pathDataFreshness, http.StatusOK},
 		{http.MethodPost, pathIngestCountries, http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
@@ -172,12 +177,17 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec must not include /api/v1/keys")
 	}
 
+	if _, ok := external[pathDataFreshness]; ok {
+		t.Fatal("external spec must not include /api/v1/data-freshness")
+	}
+
 	internal := fetchSwaggerPaths(t, handler, "/swagger/internal/doc.json")
 	for _, path := range []string{
 		pathHealth,
 		"/api/v1/ingest",
 		"/api/v1/ingest/weather-stations",
 		"/api/v1/jobs",
+		pathDataFreshness,
 		"/api/v1/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
@@ -288,6 +298,8 @@ func TestNewRouterAuthEnabled(t *testing.T) {
 		{name: "ingest admin", stub: adminStub, method: http.MethodPost, path: pathIngestCountries, key: adminPlain, wantStatus: http.StatusCreated},
 		{name: "db version consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathDBVersion, key: consumerPlain, wantStatus: http.StatusForbidden},
 		{name: "db version admin", stub: adminStub, method: http.MethodGet, path: pathDBVersion, key: adminPlain, wantStatus: http.StatusOK},
+		{name: "freshness consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathDataFreshness, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "freshness admin", stub: adminStub, method: http.MethodGet, path: pathDataFreshness, key: adminPlain, wantStatus: http.StatusOK},
 		{name: "external swagger consumer", stub: consumerStub, method: http.MethodGet, path: "/swagger/index.html", key: consumerPlain, wantStatus: http.StatusOK},
 		{name: "internal swagger consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: consumerPlain, wantStatus: http.StatusForbidden},
 		{name: "internal swagger admin", stub: adminStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: adminPlain, wantStatus: http.StatusOK},

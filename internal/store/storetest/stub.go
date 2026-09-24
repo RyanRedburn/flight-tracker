@@ -48,6 +48,7 @@ type Stub struct {
 	RouteTravelWindowsFn                  func(ctx context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindowsFn           func(ctx context.Context) error
 	CarrierStatsFn                        func(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error)
+	DataFreshnessFn                       func(ctx context.Context) (model.DataFreshness, error)
 	PingFn                                func(ctx context.Context) error
 	MigrationVersionFn                    func(ctx context.Context) (store.MigrationVersion, error)
 	CreateAPIKeyFn                        func(ctx context.Context, key *model.APIKey) error
@@ -346,6 +347,14 @@ func (s *Stub) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter
 	}
 
 	return s.CarrierStatsFn(ctx, filter)
+}
+
+func (s *Stub) DataFreshness(ctx context.Context) (model.DataFreshness, error) {
+	if s.DataFreshnessFn == nil {
+		panic("unexpected call: DataFreshness")
+	}
+
+	return s.DataFreshnessFn(ctx)
 }
 
 func (s *Stub) Ping(ctx context.Context) error {
