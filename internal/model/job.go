@@ -19,10 +19,11 @@ const JobTypeImportFlightPerformance = "import_flight_performance"
 const JobTypeImportWeatherObservations = "import_weather_observations"
 
 const (
-	JobTypeImportCountries       = "import_countries"
-	JobTypeImportRegions         = "import_regions"
-	JobTypeImportAirports        = "import_airports"
-	JobTypeImportWeatherStations = "import_weather_stations"
+	JobTypeImportCountries           = "import_countries"
+	JobTypeImportRegions             = "import_regions"
+	JobTypeImportAirports            = "import_airports"
+	JobTypeImportWeatherStations     = "import_weather_stations"
+	JobTypeRebuildRouteTravelWindows = "rebuild_route_travel_windows"
 )
 
 type Job struct {

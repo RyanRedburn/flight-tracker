@@ -30,6 +30,7 @@ type Stub struct {
 	ActiveWeatherIngestMonthsFn           func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJobFn                     func(ctx context.Context, jobType string) (bool, error)
 	CreateReferenceIngestJobFn            func(ctx context.Context, jobType string) (*model.Job, error)
+	CreateRebuildRouteTravelWindowsJobFn  func(ctx context.Context) (*model.Job, error)
 	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
@@ -197,6 +198,14 @@ func (s *Stub) CreateReferenceIngestJob(ctx context.Context, jobType string) (*m
 	}
 
 	return s.CreateReferenceIngestJobFn(ctx, jobType)
+}
+
+func (s *Stub) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error) {
+	if s.CreateRebuildRouteTravelWindowsJobFn == nil {
+		panic("unexpected call: CreateRebuildRouteTravelWindowsJob")
+	}
+
+	return s.CreateRebuildRouteTravelWindowsJobFn(ctx)
 }
 
 func (s *Stub) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {

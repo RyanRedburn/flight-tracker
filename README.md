@@ -275,6 +275,11 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=UA"
 
+# Queue a full rebuild of those rollups from flight_performance (admin, empty body).
+# 409 when a rebuild_route_travel_windows job is already pending or running.
+curl -X POST http://localhost:8080/api/v1/rebuild/travel-windows \
+  -H "Authorization: Bearer $API_KEY"
+
 # Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
 # dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days).
 # 404 when the carrier has no flight-performance data.
@@ -305,6 +310,7 @@ curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
 - `start_year` must be >= 2018 (earliest flight performance data supported by this service).
 - Workers poll the database, download the source zip for each month, and load `flight_performance`.
 - After a successful month load, the worker rebuilds `route_travel_window_scopes` and `route_travel_window_buckets` from `flight_performance` (advisory lock, full replace) so `GET /api/v1/routes/travel-windows` can read rollups only.
+- Admins can queue that same full rebuild without re-importing a month: `POST /api/v1/rebuild/travel-windows` with an empty body. Returns **409** if a `rebuild_route_travel_windows` job is already pending or running.
 - Returns **409** if a pending/running ingest job already exists for a requested month.
 - Returns **409** if flight data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.
