@@ -153,6 +153,13 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 
 	switch job.Type {
 	case model.JobTypeImportFlightPerformance:
+		if job.ListIngest != nil {
+			resp.Year = job.ListIngest.Year
+			resp.Month = job.ListIngest.Month
+
+			return resp, nil
+		}
+
 		detail, err := h.store.GetFlightPerformanceIngestJob(ctx, job.ID)
 		if err != nil {
 			return JobResponse{}, err
@@ -165,6 +172,14 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 
 		return resp, nil
 	case model.JobTypeImportWeatherObservations:
+		if job.ListIngest != nil {
+			resp.Year = job.ListIngest.Year
+			resp.Month = job.ListIngest.Month
+			resp.Stations = job.ListIngest.Stations
+
+			return resp, nil
+		}
+
 		detail, err := h.store.GetWeatherIngestJob(ctx, job.ID)
 		if err != nil {
 			return JobResponse{}, err

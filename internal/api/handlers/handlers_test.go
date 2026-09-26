@@ -238,10 +238,17 @@ func TestJobsGetUnknownType(t *testing.T) {
 
 func TestJobsList(t *testing.T) {
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	flightYear, flightMonth := 2026, 4
+	weatherYear, weatherMonth := 2024, 1
+
+	var flightDetailGets, weatherDetailGets int
 
 	h := NewJobsHandler(&storetest.Stub{
-		ListJobsFn: func(context.Context, int) ([]*model.Job, error) {
-			// Scenario: store already returns the limited page.
+		ListJobsFn: func(_ context.Context, limit int) ([]*model.Job, error) {
+			if limit != 2 {
+				t.Errorf("limit = %d, want 2", limit)
+			}
+
 			return []*model.Job{
 				{
 					ID:        testJobID,
@@ -249,17 +256,44 @@ func TestJobsList(t *testing.T) {
 					Status:    model.JobStatusPending,
 					CreatedAt: now,
 					UpdatedAt: now,
+					ListIngest: &model.JobListIngest{
+						Year:  &flightYear,
+						Month: &flightMonth,
+					},
+				},
+				{
+					ID:        "job-weather-1",
+					Type:      model.JobTypeImportWeatherObservations,
+					Status:    model.JobStatusPending,
+					CreatedAt: now,
+					UpdatedAt: now,
+					ListIngest: &model.JobListIngest{
+						Year:     &weatherYear,
+						Month:    &weatherMonth,
+						Stations: []string{testOriginORD, testDestJFK},
+					},
 				},
 			}, nil
 		},
-		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
-			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		GetFlightPerformanceIngestJobFn: func(context.Context, string) (*model.FlightPerformanceIngestJob, error) {
+			flightDetailGets++
+
+			return nil, errors.New("unexpected flight detail lookup")
+		},
+		GetWeatherIngestJobFn: func(context.Context, string) (*model.WeatherIngestJob, error) {
+			weatherDetailGets++
+
+			return nil, errors.New("unexpected weather detail lookup")
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
+
+	if flightDetailGets != 0 || weatherDetailGets != 0 {
+		t.Errorf("detail getters flight=%d weather=%d, want 0", flightDetailGets, weatherDetailGets)
+	}
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
@@ -270,8 +304,24 @@ func TestJobsList(t *testing.T) {
 		t.Fatalf("decode list: %v", err)
 	}
 
-	if len(jobs) != 1 {
-		t.Fatalf("len(jobs) = %d, want 1", len(jobs))
+	if len(jobs) != 2 {
+		t.Fatalf("len(jobs) = %d, want 2", len(jobs))
+	}
+
+	if jobs[0].Year == nil || *jobs[0].Year != flightYear || jobs[0].Month == nil || *jobs[0].Month != flightMonth {
+		t.Errorf("flight year/month = %v/%v, want %d/%d", jobs[0].Year, jobs[0].Month, flightYear, flightMonth)
+	}
+
+	if len(jobs[0].Stations) != 0 {
+		t.Errorf("flight stations = %v, want none", jobs[0].Stations)
+	}
+
+	if jobs[1].Year == nil || *jobs[1].Year != weatherYear || jobs[1].Month == nil || *jobs[1].Month != weatherMonth {
+		t.Errorf("weather year/month = %v/%v, want %d/%d", jobs[1].Year, jobs[1].Month, weatherYear, weatherMonth)
+	}
+
+	if len(jobs[1].Stations) != 2 || jobs[1].Stations[0] != testOriginORD || jobs[1].Stations[1] != testDestJFK {
+		t.Errorf("weather stations = %v, want [%s %s]", jobs[1].Stations, testOriginORD, testDestJFK)
 	}
 }
 

@@ -36,6 +36,17 @@ type Job struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 	StartedAt *time.Time      `json:"started_at,omitempty"`
 	EndedAt   *time.Time      `json:"ended_at,omitempty"`
+
+	// ListIngest is set by ListJobs. Nil when the job was loaded without that join.
+	ListIngest *JobListIngest `json:"-"`
+}
+
+// JobListIngest is year, month, and weather stations joined onto a jobs list row.
+// Year and month are nil when the job has no ingest detail row.
+type JobListIngest struct {
+	Year     *int
+	Month    *int
+	Stations []string
 }
 
 type YearMonth struct {

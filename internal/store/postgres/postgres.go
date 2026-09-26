@@ -96,7 +96,7 @@ func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 	var jobs []*model.Job
 
 	for rows.Next() {
-		job, err := scanJob(rows)
+		job, err := scanListedJob(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -111,55 +111,100 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanJob(row rowScanner) (*model.Job, error) {
-	var (
-		job       model.Job
-		status    string
-		result    []byte
-		errMsg    sql.NullString
-		createdAt time.Time
-		updatedAt time.Time
-		startedAt sql.NullTime
-		endedAt   sql.NullTime
-	)
+type scannedJob struct {
+	job       model.Job
+	status    string
+	result    []byte
+	errMsg    sql.NullString
+	createdAt time.Time
+	updatedAt time.Time
+	startedAt sql.NullTime
+	endedAt   sql.NullTime
+}
 
-	if err := row.Scan(
-		&job.ID,
-		&job.Type,
-		&status,
-		&result,
-		&errMsg,
-		&createdAt,
-		&updatedAt,
-		&startedAt,
-		&endedAt,
-	); err != nil {
+func (s *scannedJob) dest() []any {
+	return []any{
+		&s.job.ID,
+		&s.job.Type,
+		&s.status,
+		&s.result,
+		&s.errMsg,
+		&s.createdAt,
+		&s.updatedAt,
+		&s.startedAt,
+		&s.endedAt,
+	}
+}
+
+func (s *scannedJob) model() *model.Job {
+	s.job.Status = model.JobStatus(s.status)
+	s.job.CreatedAt = s.createdAt.UTC()
+	s.job.UpdatedAt = s.updatedAt.UTC()
+
+	if len(s.result) > 0 {
+		s.job.Result = json.RawMessage(s.result)
+	}
+
+	if s.errMsg.Valid {
+		s.job.Error = s.errMsg.String
+	}
+
+	if s.startedAt.Valid {
+		t := s.startedAt.Time.UTC()
+		s.job.StartedAt = &t
+	}
+
+	if s.endedAt.Valid {
+		t := s.endedAt.Time.UTC()
+		s.job.EndedAt = &t
+	}
+
+	return &s.job
+}
+
+func scanJob(row rowScanner) (*model.Job, error) {
+	var scanned scannedJob
+	if err := row.Scan(scanned.dest()...); err != nil {
 		return nil, err
 	}
 
-	job.Status = model.JobStatus(status)
-	job.CreatedAt = createdAt.UTC()
-	job.UpdatedAt = updatedAt.UTC()
+	return scanned.model(), nil
+}
 
-	if len(result) > 0 {
-		job.Result = json.RawMessage(result)
+func scanListedJob(row rowScanner) (*model.Job, error) {
+	var (
+		scanned  scannedJob
+		year     sql.NullInt64
+		month    sql.NullInt64
+		stations []byte
+	)
+
+	if err := row.Scan(append(scanned.dest(), &year, &month, &stations)...); err != nil {
+		return nil, err
 	}
 
-	if errMsg.Valid {
-		job.Error = errMsg.String
+	job := scanned.model()
+	ingest := &model.JobListIngest{}
+
+	if year.Valid {
+		y := int(year.Int64)
+		ingest.Year = &y
 	}
 
-	if startedAt.Valid {
-		t := startedAt.Time.UTC()
-		job.StartedAt = &t
+	if month.Valid {
+		m := int(month.Int64)
+		ingest.Month = &m
 	}
 
-	if endedAt.Valid {
-		t := endedAt.Time.UTC()
-		job.EndedAt = &t
+	if len(stations) > 0 {
+		if err := json.Unmarshal(stations, &ingest.Stations); err != nil {
+			return nil, fmt.Errorf("unmarshal stations: %w", err)
+		}
 	}
 
-	return &job, nil
+	job.ListIngest = ingest
+
+	return job, nil
 }
 
 func nullJSON(b json.RawMessage) any {
