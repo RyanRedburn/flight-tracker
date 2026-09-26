@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -45,6 +46,12 @@ func (f fakeScanner) Scan(dest ...any) error {
 func TestScanListedJob(t *testing.T) {
 	now := time.Date(2024, 6, 1, 15, 0, 0, 0, time.UTC)
 	started := now.Add(time.Minute)
+	stations := []string{testAirportORD, "JFK"}
+
+	stationsJSON, err := json.Marshal(stations)
+	if err != nil {
+		t.Fatalf("marshal stations: %v", err)
+	}
 
 	job, err := scanListedJob(fakeScanner{values: []any{
 		"job-weather",
@@ -58,7 +65,7 @@ func TestScanListedJob(t *testing.T) {
 		sql.NullTime{},
 		sql.NullInt64{Int64: 2024, Valid: true},
 		sql.NullInt64{Int64: 6, Valid: true},
-		[]byte(`["ORD","JFK"]`),
+		stationsJSON,
 	}})
 	if err != nil {
 		t.Fatalf("scanListedJob() error = %v", err)
@@ -72,8 +79,8 @@ func TestScanListedJob(t *testing.T) {
 		t.Errorf("month = %v, want 6", job.ListIngest.Month)
 	}
 
-	if len(job.ListIngest.Stations) != 2 || job.ListIngest.Stations[0] != "ORD" || job.ListIngest.Stations[1] != "JFK" {
-		t.Errorf("stations = %v, want [ORD JFK]", job.ListIngest.Stations)
+	if !reflect.DeepEqual(job.ListIngest.Stations, stations) {
+		t.Errorf("stations = %v, want %v", job.ListIngest.Stations, stations)
 	}
 
 	if job.StartedAt == nil || !job.StartedAt.Equal(started) {
