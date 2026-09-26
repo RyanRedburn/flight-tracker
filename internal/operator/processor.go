@@ -4,10 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"unicode/utf8"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
+)
+
+const (
+	// jobErrorMaxLen caps text stored in jobs.error. The column is unbounded;
+	// longer messages keep their head and tail so the operation label and the
+	// causal suffix both remain visible.
+	jobErrorMaxLen = 512
+
+	jobErrorOmit = "..."
 )
 
 type Processor struct {
@@ -72,14 +81,39 @@ func persistedJobError(ctx context.Context, err error) string {
 
 func shortJobError(err error) string {
 	msg := err.Error()
-	if i := strings.Index(msg, ": "); i > 0 {
-		msg = msg[:i]
+	if len(msg) <= jobErrorMaxLen {
+		return msg
 	}
 
-	const maxLen = 160
-	if len(msg) > maxLen {
-		return msg[:maxLen]
+	budget := jobErrorMaxLen - len(jobErrorOmit)
+	headLen := budget / 2
+	tailLen := budget - headLen
+
+	return trimRightToRune(msg[:headLen]) + jobErrorOmit + trimLeftToRune(msg[len(msg)-tailLen:])
+}
+
+// trimRightToRune drops a trailing partial rune left by a byte cut.
+func trimRightToRune(s string) string {
+	for range utf8.UTFMax - 1 {
+		if s == "" || utf8.ValidString(s) {
+			return s
+		}
+
+		s = s[:len(s)-1]
 	}
 
-	return msg
+	return s
+}
+
+// trimLeftToRune drops a leading partial rune left by a byte cut.
+func trimLeftToRune(s string) string {
+	for range utf8.UTFMax - 1 {
+		if s == "" || utf8.ValidString(s) {
+			return s
+		}
+
+		s = s[1:]
+	}
+
+	return s
 }
