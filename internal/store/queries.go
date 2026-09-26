@@ -10,10 +10,15 @@ const (
 		FROM jobs
 		WHERE id = $1`
 
+	// Detail tables are 1:1 with jobs. The joins load year, month, and stations with the page.
 	QueryListJobs = `
-		SELECT id, type, status, result, error, created_at, updated_at, started_at, ended_at
-		FROM jobs
-		ORDER BY created_at DESC
+		SELECT j.id, j.type, j.status, j.result, j.error,
+			j.created_at, j.updated_at, j.started_at, j.ended_at,
+			COALESCE(fp.year, w.year), COALESCE(fp.month, w.month), w.stations
+		FROM jobs j
+		LEFT JOIN flight_performance_ingest_jobs fp ON fp.job_id = j.id
+		LEFT JOIN weather_ingest_jobs w ON w.job_id = j.id
+		ORDER BY j.created_at DESC
 		LIMIT $1`
 
 	QueryClaimNextPendingJobSelect = `
