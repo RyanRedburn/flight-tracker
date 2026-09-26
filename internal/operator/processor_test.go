@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -187,15 +189,16 @@ func TestProcessorProcessUnknownJobType(t *testing.T) {
 	}
 }
 
-func TestProcessorPersistsShortJobError(t *testing.T) {
+func TestProcessorPersistsWrappedJobError(t *testing.T) {
 	ctx := context.Background()
-	handlerErr := fmt.Errorf("load flights: %w", errors.New("copy flight_performance: secret driver detail"))
+	handlerErr := fmt.Errorf("download iem csv: %w", errors.New("unexpected status 502 Bad Gateway"))
 
 	var failedMsg string
 
 	st := &storetest.Stub{
 		FailJobFn: func(_ context.Context, _, errMsg string) error {
 			failedMsg = errMsg
+
 			return nil
 		},
 	}
@@ -207,8 +210,90 @@ func TestProcessorPersistsShortJobError(t *testing.T) {
 		t.Fatal("Process() expected error")
 	}
 
-	if failedMsg != "load flights" {
-		t.Errorf("FailJob msg = %q, want %q", failedMsg, "load flights")
+	if failedMsg != handlerErr.Error() {
+		t.Errorf("FailJob msg = %q, want %q", failedMsg, handlerErr.Error())
+	}
+}
+
+func TestShortJobError(t *testing.T) {
+	longHead := `download iem csv: Get "https://mesonet.example/asos?`
+	longTail := "connection reset by peer"
+	longMsg := longHead + strings.Repeat("x", jobErrorMaxLen) + ": " + longTail
+
+	// Place a multibyte rune across the head cut so truncation stays valid UTF-8.
+	headCut := (jobErrorMaxLen - len(jobErrorOmit)) / 2
+	utf8Msg := strings.Repeat("a", headCut-1) + "é" + strings.Repeat("b", jobErrorMaxLen) + longTail
+
+	tests := []struct {
+		name       string
+		err        error
+		want       string
+		wantPrefix string
+		wantSuffix string
+	}{
+		{
+			name: "plain",
+			err:  errors.New("handler failed"),
+			want: "handler failed",
+		},
+		{
+			name: "wrapped http status",
+			err:  fmt.Errorf("download iem csv: %w", errors.New("unexpected status 502 Bad Gateway")),
+			want: "download iem csv: unexpected status 502 Bad Gateway",
+		},
+		{
+			name: "wrapped service status",
+			err:  errors.New("download iem csv: status 503 Service Unavailable"),
+			want: "download iem csv: status 503 Service Unavailable",
+		},
+		{
+			name: "multi segment chain",
+			err: fmt.Errorf("download iem csv: %w", fmt.Errorf("Get %q: %w",
+				"https://mesonet.example/asos", errors.New("connection reset by peer"))),
+			want: `download iem csv: Get "https://mesonet.example/asos": connection reset by peer`,
+		},
+		{
+			name:       "long message keeps head and tail",
+			err:        errors.New(longMsg),
+			wantPrefix: longHead,
+			wantSuffix: longTail,
+		},
+		{
+			name:       "long message stays valid utf8",
+			err:        errors.New(utf8Msg),
+			wantPrefix: strings.Repeat("a", headCut-1),
+			wantSuffix: longTail,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := shortJobError(tt.err)
+
+			if len(got) > jobErrorMaxLen {
+				t.Errorf("len = %d, want <= %d", len(got), jobErrorMaxLen)
+			}
+
+			if !utf8.ValidString(got) {
+				t.Fatalf("invalid UTF-8: %q", got)
+			}
+
+			if tt.want != "" && got != tt.want {
+				t.Errorf("shortJobError() = %q, want %q", got, tt.want)
+			}
+
+			if tt.wantPrefix != "" && !strings.HasPrefix(got, tt.wantPrefix) {
+				t.Errorf("shortJobError() = %q, want prefix %q", got, tt.wantPrefix)
+			}
+
+			if tt.wantSuffix != "" && !strings.HasSuffix(got, tt.wantSuffix) {
+				t.Errorf("shortJobError() = %q, want suffix %q", got, tt.wantSuffix)
+			}
+
+			if tt.wantPrefix != "" && !strings.Contains(got, jobErrorOmit) {
+				t.Errorf("shortJobError() = %q, want %q", got, jobErrorOmit)
+			}
+		})
 	}
 }
 
