@@ -7,7 +7,10 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-const testJobID = "job-1"
+const (
+	testJobID      = "job-1"
+	testStationORD = "ORD"
+)
 
 func mustNewProcessor(t *testing.T, s store.Store, handlers ...JobHandler) *Processor {
 	t.Helper()

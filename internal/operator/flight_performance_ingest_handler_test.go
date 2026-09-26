@@ -55,6 +55,9 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 		RebuildRouteTravelWindowsFn: func(context.Context) error {
 			return nil
 		},
+		RebuildRouteWeatherStatsFn: func(context.Context) error {
+			return nil
+		},
 	}
 
 	path := btsFixtureCSVPath(t)
@@ -155,6 +158,62 @@ func flightPerformanceIngestStub(t *testing.T, rebuild func(context.Context) err
 			return nil
 		},
 		RebuildRouteTravelWindowsFn: rebuild,
+		RebuildRouteWeatherStatsFn: func(context.Context) error {
+			return nil
+		},
+	}
+}
+
+func TestFlightPerformanceIngestHandlerRebuildsWeatherStats(t *testing.T) {
+	ctx := context.Background()
+
+	var order []string
+
+	st := &storetest.Stub{
+		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
+			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
+		},
+		ReplaceFlightPerformanceByMonthFn: func(context.Context, int, int, []string, [][]string) error {
+			return nil
+		},
+		RebuildRouteTravelWindowsFn: func(context.Context) error {
+			order = append(order, "travel")
+
+			return nil
+		},
+		RebuildRouteWeatherStatsFn: func(context.Context) error {
+			order = append(order, "weather")
+
+			return nil
+		},
+	}
+
+	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+
+	if _, err := h.Process(ctx, job); err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	if len(order) != 2 || order[0] != "travel" || order[1] != "weather" {
+		t.Fatalf("rebuild order = %v, want travel then weather", order)
+	}
+}
+
+func TestFlightPerformanceIngestHandlerWeatherRebuildError(t *testing.T) {
+	ctx := context.Background()
+	st := flightPerformanceIngestStub(t, func(context.Context) error {
+		return nil
+	})
+	st.RebuildRouteWeatherStatsFn = func(context.Context) error {
+		return errRebuildFailed
+	}
+
+	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
+	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
+
+	if _, err := h.Process(ctx, job); err == nil {
+		t.Fatal("expected weather rebuild error")
 	}
 }
 

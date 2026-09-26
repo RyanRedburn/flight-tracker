@@ -24,6 +24,7 @@ const (
 	JobTypeImportAirports            JobType = "import_airports"
 	JobTypeImportWeatherStations     JobType = "import_weather_stations"
 	JobTypeRebuildRouteTravelWindows JobType = "rebuild_route_travel_windows"
+	JobTypeRebuildRouteWeatherStats  JobType = "rebuild_route_weather_stats"
 )
 
 type Job struct {

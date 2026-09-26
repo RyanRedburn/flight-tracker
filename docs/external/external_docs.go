@@ -438,6 +438,130 @@ const docTemplateexternal = `{
                     }
                 }
             }
+        },
+        "/api/v1/routes/weather-stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "On-time performance by observed METAR category at the origin and at the destination. Origin and dest are 3-letter airport codes. Date range, carrier, flight number, and days of week follow route stats (max 366 days; flight_number requires carrier; days of week 1=Monday through 7=Sunday). Each flight is matched to the nearest observation within ±30 minutes. Origin time is crs_dep_time on flight_date in the origin station timezone. Destination time is that departure instant plus crs_elapsed_time minutes (CRS block); crs_arr_time is not used. A side with no station mapping, no usable clock, or no observation in the window is flights_unmatched and is never treated as VFR_FAIR. One category per observation, first match: THUNDER (wxcodes contain TS, including VCTS and TSRA at any intensity), LIFR (ceiling \u003c 500 ft or visibility \u003c 1 SM), IFR (ceiling \u003c 1000 ft or visibility \u003c 3 SM), MVFR (ceiling ≤ 3000 ft or visibility ≤ 5 SM), WINDY (greater of gust and sknt ≥ 25 kt), PRECIP (RA/DZ/SN/UP/PL/FZ and related precip codes; not BR-only mist), else VFR_FAIR. UNKNOWN when visibility, ceiling, and wind are all missing and thunder/precip did not match. Ceiling is the lowest BKN, OVC, or VV height across skyc1–skyc3. on_time_rate matches route stats: not cancelled, then not diverted, then arr_del15 \u003c 1. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. A date, weekday, or flight-number filter that matches nothing returns 200 with zero flights. Reads precomputed rollups.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "routes",
+                    "external"
+                ],
+                "summary": "Route weather category stats",
+                "parameters": [
+                    {
+                        "maxLength": 3,
+                        "minLength": 3,
+                        "type": "string",
+                        "description": "Origin airport IATA code",
+                        "name": "origin",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 3,
+                        "minLength": 3,
+                        "type": "string",
+                        "description": "Destination airport IATA code",
+                        "name": "dest",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Range start (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Range end (YYYY-MM-DD), on or after start_date",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 2,
+                        "minLength": 2,
+                        "type": "string",
+                        "description": "Marketing carrier code (required if flight_number is set)",
+                        "name": "carrier",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Flight number (requires carrier)",
+                        "name": "flight_number",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 7,
+                        "minimum": 1,
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Filter to these weekdays (1=Mon … 7=Sun)",
+                        "name": "days_of_week",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.RouteWeatherStats"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -927,6 +1051,35 @@ const docTemplateexternal = `{
                 }
             }
         },
+        "model.RouteWeatherStats": {
+            "type": "object",
+            "properties": {
+                "dest": {
+                    "type": "string"
+                },
+                "dest_weather": {
+                    "$ref": "#/definitions/model.WeatherSideStats"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "filters": {
+                    "$ref": "#/definitions/model.RouteStatsFilters"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "origin_weather": {
+                    "$ref": "#/definitions/model.WeatherSideStats"
+                },
+                "start_date": {
+                    "type": "string"
+                }
+            }
+        },
         "model.TravelWindowDayBucket": {
             "type": "object",
             "properties": {
@@ -966,6 +1119,37 @@ const docTemplateexternal = `{
                 },
                 "on_time_rate": {
                     "type": "number"
+                }
+            }
+        },
+        "model.WeatherCategoryStat": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "on_time_rate": {
+                    "type": "number"
+                }
+            }
+        },
+        "model.WeatherSideStats": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.WeatherCategoryStat"
+                    }
+                },
+                "flights": {
+                    "type": "integer"
+                },
+                "flights_unmatched": {
+                    "type": "integer"
                 }
             }
         }
