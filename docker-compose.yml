@@ -18,6 +18,7 @@ services:
   app:
     build: .
     image: flight-tracker:latest
+    pull_policy: never
     stop_grace_period: 30s
     ports:
       - "8080:8080"
@@ -39,6 +40,7 @@ services:
       context: .
       dockerfile: docker/migrate/Dockerfile
     image: flight-tracker-migrate:latest
+    pull_policy: never
     profiles: ["migrate"]
     depends_on:
       postgres:
