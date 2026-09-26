@@ -12,7 +12,10 @@ import (
 
 const jobStatusWriteTimeout = 5 * time.Second
 
-var ErrInterruptedByShutdown = errors.New("interrupted by shutdown")
+var (
+	ErrInterruptedByShutdown = errors.New("interrupted by shutdown")
+	ErrJobLeaseLost          = errors.New("job lease lost")
+)
 
 type WorkerConfig struct {
 	Concurrency       int
@@ -159,7 +162,7 @@ func (w *Worker) poll(ctx context.Context, logger *slog.Logger, workerID int) {
 		go func() {
 			defer close(doneHB)
 
-			w.runHeartbeat(stopHB, job.ID, logger, cancel)
+			w.runHeartbeat(stopHB, job.ID, leaseUntil, logger, cancel)
 		}()
 	} else {
 		close(doneHB)
@@ -171,7 +174,7 @@ func (w *Worker) poll(ctx context.Context, logger *slog.Logger, workerID int) {
 	<-doneHB
 
 	if err != nil {
-		logger.Error("job failed", "job_id", job.ID, "error", err)
+		logger.Error("job failed", "job_id", job.ID, "error", err, "cause", context.Cause(processCtx))
 
 		return
 	}
@@ -179,7 +182,7 @@ func (w *Worker) poll(ctx context.Context, logger *slog.Logger, workerID int) {
 	logger.Info("job completed", "job_id", job.ID)
 }
 
-func (w *Worker) runHeartbeat(stop <-chan struct{}, jobID string, logger *slog.Logger, abort context.CancelCauseFunc) {
+func (w *Worker) runHeartbeat(stop <-chan struct{}, jobID string, leaseExpires time.Time, logger *slog.Logger, abort context.CancelCauseFunc) {
 	ticker := time.NewTicker(w.heartbeatInterval)
 	defer ticker.Stop()
 
@@ -196,6 +199,7 @@ func (w *Worker) runHeartbeat(stop <-chan struct{}, jobID string, logger *slog.L
 			cancel()
 
 			if err == nil {
+				leaseExpires = leaseUntil
 				continue
 			}
 
@@ -203,6 +207,12 @@ func (w *Worker) runHeartbeat(stop <-chan struct{}, jobID string, logger *slog.L
 
 			if errors.Is(err, store.ErrJobStatusConflict) {
 				abort(err)
+
+				return
+			}
+
+			if !leaseExpires.IsZero() && time.Now().After(leaseExpires) {
+				abort(ErrJobLeaseLost)
 
 				return
 			}
@@ -227,6 +237,14 @@ func (w *Worker) reclaimLoop(ctx context.Context) {
 				}
 
 				w.logger.Error("reclaim expired job leases", "error", err)
+			}
+
+			if err := w.store.DeleteStaleRateLimitBuckets(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+
+				w.logger.Error("delete stale rate limit buckets", "error", err)
 			}
 		}
 	}

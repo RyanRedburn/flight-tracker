@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -25,7 +26,7 @@ func NewJobsHandler(s store.Store) *JobsHandler {
 // JobResponse is a background job as returned by the jobs API.
 type JobResponse struct {
 	ID        string          `json:"id"`
-	Type      string          `json:"type"`
+	Type      model.JobType   `json:"type"`
 	Status    model.JobStatus `json:"status"`
 	Result    json.RawMessage `json:"result,omitempty"`
 	Error     string          `json:"error,omitempty"`
@@ -161,6 +162,8 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 		month := detail.Month
 		resp.Year = &year
 		resp.Month = &month
+
+		return resp, nil
 	case model.JobTypeImportWeatherObservations:
 		detail, err := h.store.GetWeatherIngestJob(ctx, job.ID)
 		if err != nil {
@@ -172,7 +175,15 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 		resp.Year = &year
 		resp.Month = &month
 		resp.Stations = detail.Stations
-	}
 
-	return resp, nil
+		return resp, nil
+	case model.JobTypeImportCountries,
+		model.JobTypeImportRegions,
+		model.JobTypeImportAirports,
+		model.JobTypeImportWeatherStations,
+		model.JobTypeRebuildRouteTravelWindows:
+		return resp, nil
+	default:
+		return JobResponse{}, fmt.Errorf("unknown job type %q", job.Type)
+	}
 }

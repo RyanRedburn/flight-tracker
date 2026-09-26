@@ -45,7 +45,7 @@ type IngestResponse struct {
 //	@Failure		400		{object}	ErrorResponse
 //	@Failure		401		{object}	ErrorResponse
 //	@Failure		403		{object}	ErrorResponse
-//	@Failure		409		{object}	FlightPerformanceIngestConflictResponse
+//	@Failure		409		{object}	MonthIngestConflictResponse
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
@@ -62,81 +62,35 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	months, err := ingest.ExpandMonths(ingest.RangeInput{
-		StartYear:  req.StartYear,
-		StartMonth: req.StartMonth,
-		EndYear:    req.EndYear,
-		EndMonth:   req.EndMonth,
-	}, h.maxIngestMonths)
-	if err != nil {
-		writeIngestRangeError(w, err)
+	queued, ok := queueMonthIngestJobs(
+		w,
+		r,
+		h.maxIngestMonths,
+		monthIngestInput{
+			startYear:  req.StartYear,
+			startMonth: req.StartMonth,
+			endYear:    req.EndYear,
+			endMonth:   req.EndMonth,
+			force:      req.Force,
+		},
+		h.store.ActiveFlightPerformanceIngestMonths,
+		h.store.MonthsWithFlightPerformanceData,
+		errFailedCheckExistingFlight,
+		"flight data already exists for one or more requested months; set force=true to re-import",
+		h.store.CreateFlightPerformanceIngestJob,
+	)
+	if !ok {
 		return
 	}
 
-	ctx := r.Context()
-
-	active, err := h.store.ActiveFlightPerformanceIngestMonths(ctx, months)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
-		return
-	}
-
-	if len(active) > 0 {
-		writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
-			Error:              errActiveIngestMonths,
-			ActiveIngestMonths: active,
-		})
-
-		return
-	}
-
-	if !req.Force {
-		existing, err := h.store.MonthsWithFlightPerformanceData(ctx, months)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckExistingFlight})
-			return
-		}
-
-		if len(existing) > 0 {
-			writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
-				Error:              "flight data already exists for one or more requested months; set force=true to re-import",
-				ExistingDataMonths: existing,
-			})
-
-			return
-		}
-	}
-
-	jobs := make([]IngestJobResponse, 0, len(months))
-
-	for _, ym := range months {
-		job, err := h.store.CreateFlightPerformanceIngestJob(ctx, ym.Year, ym.Month)
-		if err != nil {
-			if errors.Is(err, store.ErrActiveIngestConflict) {
-				writeJSON(w, http.StatusConflict, FlightPerformanceIngestConflictResponse{
-					Error:              errActiveIngestMonths,
-					ActiveIngestMonths: []model.YearMonth{ym},
-				})
-
-				return
-			}
-
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
-
-			return
-		}
-
-		jobs = append(jobs, IngestJobResponse{
-			ID:     job.ID,
-			Year:   ym.Year,
-			Month:  ym.Month,
-			Status: job.Status,
-		})
+	jobs := make([]IngestJobResponse, 0, len(queued))
+	for _, job := range queued {
+		jobs = append(jobs, IngestJobResponse(job))
 	}
 
 	writeJSON(w, http.StatusCreated, IngestResponse{
 		Jobs:            jobs,
-		MonthsRequested: len(months),
+		MonthsRequested: len(jobs),
 	})
 }
 

@@ -289,7 +289,7 @@ func TestWeatherIngestCreateJobActiveConflict(t *testing.T) {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var body WeatherIngestConflictResponse
+	var body MonthIngestConflictResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}

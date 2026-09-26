@@ -4,21 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-const testJobType = "test_job"
+const testJobType model.JobType = "test_job"
 
 type testHandler struct {
-	jobType string
+	jobType model.JobType
 	result  json.RawMessage
 	err     error
 }
 
-func (h testHandler) Type() string { return h.jobType }
+func (h testHandler) Type() model.JobType { return h.jobType }
 
 func (h testHandler) Process(ctx context.Context, job *model.Job) (json.RawMessage, error) {
 	if h.err != nil {
@@ -46,7 +47,7 @@ func TestProcessorProcessSuccess(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, testHandler{jobType: testJobType, result: result})
+	processor := mustNewProcessor(t, st, testHandler{jobType: testJobType, result: result})
 	job := &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err != nil {
@@ -77,7 +78,7 @@ func TestProcessorProcessHandlerFailure(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, testHandler{jobType: testJobType, err: handlerErr})
+	processor := mustNewProcessor(t, st, testHandler{jobType: testJobType, err: handlerErr})
 	job := &model.Job{ID: "job-2", Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err == nil {
@@ -110,7 +111,7 @@ func TestProcessorProcessFailJobIgnoresCanceledContext(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, testHandler{jobType: testJobType, err: context.Canceled})
+	processor := mustNewProcessor(t, st, testHandler{jobType: testJobType, err: context.Canceled})
 	job := &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err == nil {
@@ -144,7 +145,7 @@ func TestProcessorProcessShutdownCauseMessage(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st, testHandler{jobType: testJobType, err: context.Canceled})
+	processor := mustNewProcessor(t, st, testHandler{jobType: testJobType, err: context.Canceled})
 	job := &model.Job{ID: "job-3", Type: testJobType, Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err == nil {
@@ -170,8 +171,8 @@ func TestProcessorProcessUnknownJobType(t *testing.T) {
 		},
 	}
 
-	processor := NewProcessor(st)
-	job := &model.Job{ID: "job-unknown", Type: "unknown_type", Status: model.JobStatusRunning}
+	processor := mustNewProcessor(t, st)
+	job := &model.Job{ID: "job-unknown", Type: model.JobType("unknown_type"), Status: model.JobStatusRunning}
 
 	if err := processor.Process(ctx, job); err == nil {
 		t.Fatal("Process() expected error")
@@ -183,5 +184,39 @@ func TestProcessorProcessUnknownJobType(t *testing.T) {
 
 	if failedMsg == "" {
 		t.Error("expected FailJob error message")
+	}
+}
+
+func TestProcessorPersistsShortJobError(t *testing.T) {
+	ctx := context.Background()
+	handlerErr := fmt.Errorf("load flights: %w", errors.New("copy flight_performance: secret driver detail"))
+
+	var failedMsg string
+
+	st := &storetest.Stub{
+		FailJobFn: func(_ context.Context, _, errMsg string) error {
+			failedMsg = errMsg
+			return nil
+		},
+	}
+
+	processor := mustNewProcessor(t, st, testHandler{jobType: testJobType, err: handlerErr})
+	job := &model.Job{ID: testJobID, Type: testJobType, Status: model.JobStatusRunning}
+
+	if err := processor.Process(ctx, job); err == nil {
+		t.Fatal("Process() expected error")
+	}
+
+	if failedMsg != "load flights" {
+		t.Errorf("FailJob msg = %q, want %q", failedMsg, "load flights")
+	}
+}
+
+func TestNewProcessorDuplicateType(t *testing.T) {
+	st := &storetest.Stub{}
+
+	_, err := NewProcessor(st, testHandler{jobType: testJobType}, testHandler{jobType: testJobType})
+	if err == nil {
+		t.Fatal("NewProcessor() expected duplicate type error")
 	}
 }

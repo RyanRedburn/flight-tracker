@@ -68,15 +68,6 @@ func (d *Downloader) DownloadCSV(ctx context.Context, year, month int) (csvPath 
 		return "", nil, fmt.Errorf("download bts zip: unexpected status %s", resp.Status)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", nil, fmt.Errorf("read bts zip: %w", err)
-	}
-
-	if len(body) < 4 || !bytes.HasPrefix(body, []byte("PK\x03\x04")) {
-		return "", nil, ErrInvalidZip
-	}
-
 	tmpDir, err := os.MkdirTemp("", "bts-ingest-*")
 	if err != nil {
 		return "", nil, fmt.Errorf("create temp dir: %w", err)
@@ -85,10 +76,26 @@ func (d *Downloader) DownloadCSV(ctx context.Context, year, month int) (csvPath 
 	cleanup = func() { _ = os.RemoveAll(tmpDir) }
 
 	zipPath := filepath.Join(tmpDir, "data.zip")
-	if err := os.WriteFile(zipPath, body, 0o600); err != nil {
+
+	out, err := os.OpenFile(zipPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
 		cleanup()
 
-		return "", nil, fmt.Errorf("write zip: %w", err)
+		return "", nil, fmt.Errorf("create zip file: %w", err)
+	}
+
+	if err := writeZipBody(out, resp.Body); err != nil {
+		_ = out.Close()
+
+		cleanup()
+
+		return "", nil, err
+	}
+
+	if err := out.Close(); err != nil {
+		cleanup()
+
+		return "", nil, fmt.Errorf("close zip file: %w", err)
 	}
 
 	csvPath, err = extractCSV(zipPath, tmpDir)
@@ -99,6 +106,31 @@ func (d *Downloader) DownloadCSV(ctx context.Context, year, month int) (csvPath 
 	}
 
 	return csvPath, cleanup, nil
+}
+
+func writeZipBody(out *os.File, body io.Reader) error {
+	magic := make([]byte, 4)
+	if _, err := io.ReadFull(body, magic); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return ErrInvalidZip
+		}
+
+		return fmt.Errorf("read bts zip: %w", err)
+	}
+
+	if !bytes.Equal(magic, []byte("PK\x03\x04")) {
+		return ErrInvalidZip
+	}
+
+	if _, err := out.Write(magic); err != nil {
+		return fmt.Errorf("write zip: %w", err)
+	}
+
+	if _, err := io.Copy(out, body); err != nil {
+		return fmt.Errorf("write zip: %w", err)
+	}
+
+	return nil
 }
 
 func extractCSV(zipPath, destDir string) (string, error) {

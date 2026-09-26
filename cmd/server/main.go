@@ -114,7 +114,7 @@ func run() int {
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)
 
-	processor := operator.NewProcessor(st,
+	processor, err := operator.NewProcessor(st,
 		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
 		operator.NewRebuildRouteTravelWindowsHandler(st),
 		operator.NewWeatherIngestHandler(st, weatherIngest),
@@ -123,6 +123,11 @@ func run() int {
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),
 	)
+	if err != nil {
+		logger.Error("build job processor", "error", err)
+		return 1
+	}
+
 	worker := operator.NewWorker(st, processor, operator.WorkerConfig{
 		Concurrency:  cfg.WorkerConcurrency,
 		PollInterval: cfg.WorkerPollInterval,

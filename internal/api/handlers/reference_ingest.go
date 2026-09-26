@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
@@ -22,16 +20,9 @@ func NewReferenceIngestHandler(s store.Store) *ReferenceIngestHandler {
 	return &ReferenceIngestHandler{store: s}
 }
 
-// ReferenceIngestJobResponse is the queued reference-data ingest job.
-type ReferenceIngestJobResponse struct {
-	ID     string          `json:"id"`
-	Type   string          `json:"type"`
-	Status model.JobStatus `json:"status"`
-}
-
 // ReferenceIngestResponse is returned after successfully queueing a reference-data ingest job.
 type ReferenceIngestResponse struct {
-	Job ReferenceIngestJobResponse `json:"job"`
+	Job QueuedJobResponse `json:"job"`
 }
 
 // CreateCountries queues a countries reference data ingest job.
@@ -133,12 +124,12 @@ func (h *ReferenceIngestHandler) createReference(w http.ResponseWriter, r *http.
 func (h *ReferenceIngestHandler) create(
 	w http.ResponseWriter,
 	r *http.Request,
-	jobType string,
+	jobType model.JobType,
 	dataset string,
 	hasData func(context.Context) (bool, error),
 ) {
 	var req model.ForceIngestRequest
-	if err := decodeForceIngestRequest(r.Body, &req); err != nil {
+	if err := decodeJSONBody(r.Body, &req, jsonBodyOptions{}); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
@@ -194,24 +185,10 @@ func (h *ReferenceIngestHandler) create(
 	}
 
 	writeJSON(w, http.StatusCreated, ReferenceIngestResponse{
-		Job: ReferenceIngestJobResponse{
+		Job: QueuedJobResponse{
 			ID:     job.ID,
 			Type:   job.Type,
 			Status: job.Status,
 		},
 	})
-}
-
-func decodeForceIngestRequest(body io.Reader, req *model.ForceIngestRequest) error {
-	decoder := json.NewDecoder(body)
-	if err := decoder.Decode(req); err != nil {
-		if errors.Is(err, io.EOF) {
-			*req = model.ForceIngestRequest{}
-			return nil
-		}
-
-		return err
-	}
-
-	return nil
 }

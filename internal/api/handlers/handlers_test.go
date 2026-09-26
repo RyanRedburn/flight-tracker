@@ -208,6 +208,34 @@ func TestJobsGetEnrichedWeatherIngest(t *testing.T) {
 	}
 }
 
+func TestJobsGetUnknownType(t *testing.T) {
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+
+	h := NewJobsHandler(&storetest.Stub{
+		GetJobFn: func(_ context.Context, id string) (*model.Job, error) {
+			return &model.Job{
+				ID:        id,
+				Type:      model.JobType("not_a_job"),
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/job-unknown", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "job-unknown")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Get(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+}
+
 func TestJobsList(t *testing.T) {
 	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 

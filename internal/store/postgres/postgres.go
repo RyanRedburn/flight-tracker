@@ -75,10 +75,6 @@ func (s *Store) MigrationVersion(ctx context.Context) (store.MigrationVersion, e
 	return store.MigrationVersion{Version: version, Dirty: dirty}, nil
 }
 
-func (s *Store) CreateJob(ctx context.Context, job *model.Job) error {
-	return execCreateJob(ctx, s.db, job)
-}
-
 func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
 	row := s.db.QueryRowContext(ctx, store.QueryGetJob, id)
 	job, err := scanJob(row)
@@ -109,26 +105,6 @@ func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
 	}
 
 	return jobs, rows.Err()
-}
-
-func (s *Store) UpdateJob(ctx context.Context, job *model.Job) error {
-	var errMsg sql.NullString
-	if job.Error != "" {
-		errMsg = sql.NullString{String: job.Error, Valid: true}
-	}
-
-	_, err := s.db.ExecContext(ctx, store.QueryUpdateJob,
-		job.Type,
-		string(job.Status),
-		nullJSON(job.Result),
-		errMsg,
-		job.UpdatedAt.UTC(),
-		nullTime(job.StartedAt),
-		nullTime(job.EndedAt),
-		job.ID,
-	)
-
-	return err
 }
 
 type rowScanner interface {

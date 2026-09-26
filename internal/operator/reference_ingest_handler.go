@@ -12,7 +12,7 @@ import (
 type ReferenceIngestHandler struct {
 	ingest  *ourairports.Service
 	dataset store.ReferenceDataset
-	jobType string
+	jobType model.JobType
 }
 
 func NewCountriesHandler(ingest *ourairports.Service) *ReferenceIngestHandler {
@@ -30,7 +30,7 @@ func NewAirportsHandler(ingest *ourairports.Service) *ReferenceIngestHandler {
 func newReferenceIngestHandler(
 	ingest *ourairports.Service,
 	dataset store.ReferenceDataset,
-	jobType string,
+	jobType model.JobType,
 ) *ReferenceIngestHandler {
 	return &ReferenceIngestHandler{
 		ingest:  ingest,
@@ -39,7 +39,7 @@ func newReferenceIngestHandler(
 	}
 }
 
-func (h *ReferenceIngestHandler) Type() string {
+func (h *ReferenceIngestHandler) Type() model.JobType {
 	return h.jobType
 }
 

@@ -14,21 +14,21 @@ const (
 	JobStatusFailed    JobStatus = "failed"
 )
 
-const JobTypeImportFlightPerformance = "import_flight_performance"
-
-const JobTypeImportWeatherObservations = "import_weather_observations"
+type JobType string
 
 const (
-	JobTypeImportCountries           = "import_countries"
-	JobTypeImportRegions             = "import_regions"
-	JobTypeImportAirports            = "import_airports"
-	JobTypeImportWeatherStations     = "import_weather_stations"
-	JobTypeRebuildRouteTravelWindows = "rebuild_route_travel_windows"
+	JobTypeImportFlightPerformance   JobType = "import_flight_performance"
+	JobTypeImportWeatherObservations JobType = "import_weather_observations"
+	JobTypeImportCountries           JobType = "import_countries"
+	JobTypeImportRegions             JobType = "import_regions"
+	JobTypeImportAirports            JobType = "import_airports"
+	JobTypeImportWeatherStations     JobType = "import_weather_stations"
+	JobTypeRebuildRouteTravelWindows JobType = "rebuild_route_travel_windows"
 )
 
 type Job struct {
 	ID        string          `json:"id"`
-	Type      string          `json:"type"`
+	Type      JobType         `json:"type"`
 	Status    JobStatus       `json:"status"`
 	Result    json.RawMessage `json:"result,omitempty"`
 	Error     string          `json:"error,omitempty"`

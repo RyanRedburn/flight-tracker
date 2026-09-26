@@ -36,15 +36,13 @@ func (s *Store) ConsumeRateLimit(ctx context.Context, bucketKey string, requests
 		return store.RateLimitResult{}, fmt.Errorf("consume rate limit: %w", err)
 	}
 
-	s.deleteStaleRateLimitBuckets(ctx)
-
 	return store.RateLimitResultFromMilli(allowed, int(tokens), requestsPerMinute, now.UTC()), nil
 }
 
-func (s *Store) deleteStaleRateLimitBuckets(ctx context.Context) {
-	if time.Now().UnixNano()&63 != 0 {
-		return
+func (s *Store) DeleteStaleRateLimitBuckets(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, store.QueryDeleteStaleRateLimitBuckets, time.Now().UTC().Add(-staleRateLimitTTL)); err != nil {
+		return fmt.Errorf("delete stale rate limit buckets: %w", err)
 	}
 
-	_, _ = s.db.ExecContext(ctx, store.QueryDeleteStaleRateLimitBuckets, time.Now().UTC().Add(-staleRateLimitTTL))
+	return nil
 }

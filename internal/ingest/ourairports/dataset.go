@@ -46,7 +46,7 @@ func Columns(dataset store.ReferenceDataset) ([]string, error) {
 	}
 }
 
-func JobType(dataset store.ReferenceDataset) (string, error) {
+func JobType(dataset store.ReferenceDataset) (model.JobType, error) {
 	switch dataset {
 	case store.ReferenceCountries:
 		return model.JobTypeImportCountries, nil

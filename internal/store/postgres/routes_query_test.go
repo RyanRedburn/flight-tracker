@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -124,6 +125,17 @@ func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
 
 			if strings.Contains(query, carrierStatsExtraPlaceholder) {
 				t.Fatal("placeholder should be replaced")
+			}
+
+			if strings.Contains(query, carrierStatsMinSamplePlaceholder) {
+				t.Fatal("min sample placeholder should be replaced")
+			}
+
+			if name != "overall" {
+				want := "HAVING COUNT(*) >= " + strconv.Itoa(store.CarrierStatsMinSampleSize)
+				if !strings.Contains(query, want) {
+					t.Fatalf("query missing %s", want)
+				}
 			}
 
 			if len(args) != 4 {

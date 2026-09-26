@@ -24,10 +24,10 @@ func TestRebuildTravelWindowsCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var checkedType string
+			var checkedType model.JobType
 
 			h := NewRebuildTravelWindowsHandler(&storetest.Stub{
-				ActiveIngestJobFn: func(_ context.Context, jobType string) (bool, error) {
+				ActiveIngestJobFn: func(_ context.Context, jobType model.JobType) (bool, error) {
 					checkedType = jobType
 
 					return false, nil
@@ -75,7 +75,7 @@ func TestRebuildTravelWindowsCreate(t *testing.T) {
 
 func TestRebuildTravelWindowsActiveConflict(t *testing.T) {
 	h := NewRebuildTravelWindowsHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return true, nil
 		},
 	})
@@ -104,7 +104,7 @@ func TestRebuildTravelWindowsActiveConflict(t *testing.T) {
 
 func TestRebuildTravelWindowsCreateConflict(t *testing.T) {
 	h := NewRebuildTravelWindowsHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, string) (bool, error) {
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		CreateRebuildRouteTravelWindowsJobFn: func(context.Context) (*model.Job, error) {
