@@ -142,3 +142,47 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, windows)
 }
+
+// WeatherStats returns on-time performance by METAR category at each end of a route.
+//
+//	@Summary		Route weather category stats
+//	@Description	On-time performance by observed METAR category at the origin and at the destination. Origin and dest are 3-letter airport codes. Date range, carrier, flight number, and days of week follow route stats (max 366 days; flight_number requires carrier; days of week 1=Monday through 7=Sunday). Each flight is matched to the nearest observation within ±30 minutes. Origin time is crs_dep_time on flight_date in the origin station timezone. Destination time is that departure instant plus crs_elapsed_time minutes (CRS block); crs_arr_time is not used. A side with no station mapping, no usable clock, or no observation in the window is flights_unmatched and is never treated as VFR_FAIR. One category per observation, first match: THUNDER (wxcodes contain TS, including VCTS and TSRA at any intensity), LIFR (ceiling < 500 ft or visibility < 1 SM), IFR (ceiling < 1000 ft or visibility < 3 SM), MVFR (ceiling ≤ 3000 ft or visibility ≤ 5 SM), WINDY (greater of gust and sknt ≥ 25 kt), PRECIP (RA/DZ/SN/UP/PL/FZ and related precip codes; not BR-only mist), else VFR_FAIR. UNKNOWN when visibility, ceiling, and wind are all missing and thunder/precip did not match. Ceiling is the lowest BKN, OVC, or VV height across skyc1–skyc3. on_time_rate matches route stats: not cancelled, then not diverted, then arr_del15 < 1. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. A date, weekday, or flight-number filter that matches nothing returns 200 with zero flights. Reads precomputed rollups.
+//	@Tags			routes,external
+//	@Produce		json
+//	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			dest			query		string	true	"Destination airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			start_date		query		string	true	"Range start (YYYY-MM-DD)"	Format(date)
+//	@Param			end_date		query		string	true	"Range end (YYYY-MM-DD), on or after start_date"	Format(date)
+//	@Param			carrier			query		string	false	"Marketing carrier code (required if flight_number is set)"	minlength(2)	maxlength(2)
+//	@Param			flight_number	query		string	false	"Flight number (requires carrier)"
+//	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
+//	@Success		200				{object}	model.RouteWeatherStats
+//	@Failure		400				{object}	ErrorResponse
+//	@Failure		401				{object}	ErrorResponse
+//	@Failure		403				{object}	ErrorResponse
+//	@Failure		404				{object}	ErrorResponse
+//	@Failure		429				{object}	ErrorResponse
+//	@Failure		500				{object}	ErrorResponse
+//	@Security		ApiKeyAuth
+//	@Router			/api/v1/routes/weather-stats [get]
+func (h *RoutesHandler) WeatherStats(w http.ResponseWriter, r *http.Request) {
+	filter, err := query.ParseRouteStats(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	stats, err := h.store.RouteWeatherStats(r.Context(), filter)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route weather stats not found"})
+			return
+		}
+
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route weather stats"})
+
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}

@@ -48,13 +48,16 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 				JobID:    jobID,
 				Year:     2024,
 				Month:    1,
-				Stations: []string{"ORD", "JFK"},
+				Stations: []string{testStationORD, "JFK"},
 			}, nil
 		},
 		ReplaceWeatherObservationsByMonthFn: func(_ context.Context, year, month int, _ []string, rows [][]string) error {
 			replaceYear, replaceMonth = year, month
 			replaceRows = len(rows)
 
+			return nil
+		},
+		RebuildRouteWeatherStatsFn: func(context.Context) error {
 			return nil
 		},
 	}
@@ -83,5 +86,56 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 
 	if result["rows_imported"] == nil || result["rows_imported"].(float64) != float64(replaceRows) {
 		t.Fatalf("result = %v, want rows_imported = %d", result, replaceRows)
+	}
+}
+
+func TestWeatherIngestHandlerRebuildsWeatherStats(t *testing.T) {
+	ctx := context.Background()
+
+	rebuilds := 0
+	st := &storetest.Stub{
+		GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
+			return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
+		},
+		ReplaceWeatherObservationsByMonthFn: func(context.Context, int, int, []string, [][]string) error {
+			return nil
+		},
+		RebuildRouteWeatherStatsFn: func(context.Context) error {
+			rebuilds++
+
+			return nil
+		},
+	}
+
+	path := iemFixtureCSVPath(t)
+	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
+		return path, func() {}, nil
+	})
+
+	h := NewWeatherIngestHandler(st, svc)
+	if _, err := h.Process(ctx, &model.Job{ID: testJobID}); err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	if rebuilds != 1 {
+		t.Fatalf("rebuilds = %d, want 1", rebuilds)
+	}
+}
+
+func TestWeatherIngestHandlerSkipsRebuildOnImportError(t *testing.T) {
+	ctx := context.Background()
+	st := &storetest.Stub{
+		GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
+			return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
+		},
+	}
+
+	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
+		return "", func() {}, errImportFailed
+	})
+
+	h := NewWeatherIngestHandler(st, svc)
+	if _, err := h.Process(ctx, &model.Job{ID: testJobID}); err == nil {
+		t.Fatal("expected import error")
 	}
 }

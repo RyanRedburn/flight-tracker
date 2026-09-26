@@ -690,6 +690,179 @@ const (
 )
 
 const (
+	QueryRouteWeatherStats = `
+		SELECT side, category, SUM(on_time_count)::int, SUM(flights)::int
+		FROM route_weather_category_buckets
+		WHERE origin = $1
+			AND dest = $2
+			AND flight_date >= $3
+			AND flight_date <= $4
+			/*wxextra*/
+		GROUP BY side, category`
+
+	QueryTruncateRouteWeatherStats = `
+		TRUNCATE route_weather_category_buckets`
+
+	// Full replace of per-side route weather rollups.
+	// Match window is ±30 minutes (store.WeatherMatchWindowMinutes). Nearest
+	// observation wins; an equal distance keeps the earlier valid time.
+	// Origin clock: crs_dep_time on flight_date at the origin station tzname.
+	// Destination clock: that departure instant plus crs_elapsed_time minutes.
+	// crs_arr_time is not used. A side with no mapped station, no usable clock,
+	// or no observation in the window is UNMATCHED (not VFR_FAIR).
+	// On time is not cancelled, then not diverted, then arr_del15 < 1.
+	// flight_number -1 stands in for a missing marketing flight number.
+	QueryInsertRouteWeatherStats = `
+		WITH origin_stations AS (
+			SELECT aws.airport_code, btrim(aws.iem_sid) AS iem_sid, aws.tzname
+			FROM airport_weather_stations aws
+			INNER JOIN pg_timezone_names tz ON tz.name = aws.tzname
+			WHERE aws.matched
+				AND aws.iem_sid IS NOT NULL
+				AND btrim(aws.iem_sid) <> ''
+				AND aws.tzname IS NOT NULL
+				AND btrim(aws.tzname) <> ''
+		),
+		dest_stations AS (
+			SELECT aws.airport_code, btrim(aws.iem_sid) AS iem_sid
+			FROM airport_weather_stations aws
+			WHERE aws.matched
+				AND aws.iem_sid IS NOT NULL
+				AND btrim(aws.iem_sid) <> ''
+		),
+		flights AS (
+			SELECT
+				btrim(f.origin) AS origin,
+				btrim(f.dest) AS dest,
+				COALESCE(NULLIF(btrim(f.iata_code_marketing_airline), ''), '') AS carrier,
+				f.flight_date,
+				CASE
+					WHEN f.day_of_week BETWEEN 1 AND 7 THEN f.day_of_week
+					ELSE EXTRACT(ISODOW FROM f.flight_date)::int
+				END AS day_of_week,
+				COALESCE(f.flight_number_marketing_airline, -1) AS flight_number,
+				f.crs_dep_time,
+				f.crs_elapsed_time,
+				` + sqlIsOnTime + ` AS is_on_time
+			FROM flight_performance f
+			WHERE f.origin IS NOT NULL AND btrim(f.origin) <> ''
+				AND f.dest IS NOT NULL AND btrim(f.dest) <> ''
+				AND f.flight_date IS NOT NULL
+		),
+		clocks AS (
+			SELECT
+				f.origin,
+				f.dest,
+				f.carrier,
+				f.flight_date,
+				f.day_of_week,
+				f.flight_number,
+				f.crs_elapsed_time,
+				f.is_on_time,
+				os.iem_sid AS origin_sid,
+				ds.iem_sid AS dest_sid,
+				CASE
+					WHEN os.iem_sid IS NOT NULL
+						AND f.crs_dep_time IS NOT NULL
+						AND f.crs_dep_time BETWEEN 0 AND 2359
+						AND (f.crs_dep_time / 100) BETWEEN 0 AND 23
+						AND (f.crs_dep_time % 100) BETWEEN 0 AND 59
+					THEN (
+						(f.flight_date + make_time((f.crs_dep_time / 100), (f.crs_dep_time % 100), 0))
+						AT TIME ZONE os.tzname
+					)
+					ELSE NULL
+				END AS sched_dep
+			FROM flights f
+			LEFT JOIN origin_stations os ON os.airport_code = f.origin
+			LEFT JOIN dest_stations ds ON ds.airport_code = f.dest
+		),
+		timed AS (
+			SELECT
+				c.*,
+				CASE
+					WHEN c.sched_dep IS NOT NULL
+						AND c.dest_sid IS NOT NULL
+						AND c.crs_elapsed_time IS NOT NULL
+						AND c.crs_elapsed_time > 0
+					THEN c.sched_dep + (INTERVAL '1 minute' * c.crs_elapsed_time)
+					ELSE NULL
+				END AS sched_arr
+			FROM clocks c
+		),
+		matched AS (
+			SELECT
+				t.origin,
+				t.dest,
+				t.carrier,
+				t.flight_date,
+				t.day_of_week,
+				t.flight_number,
+				t.is_on_time,
+				CASE
+					WHEN t.sched_dep IS NULL OR t.origin_sid IS NULL THEN 'UNMATCHED'
+					ELSE COALESCE(ow.category, 'UNMATCHED')
+				END AS origin_category,
+				CASE
+					WHEN t.sched_arr IS NULL OR t.dest_sid IS NULL THEN 'UNMATCHED'
+					ELSE COALESCE(dw.category, 'UNMATCHED')
+				END AS dest_category
+			FROM timed t
+			LEFT JOIN LATERAL (
+				SELECT COALESCE(NULLIF(btrim(w.category), ''), 'UNKNOWN') AS category
+				FROM weather_observations w
+				WHERE t.sched_dep IS NOT NULL
+					AND t.origin_sid IS NOT NULL
+					AND w.station = t.origin_sid
+					AND w.valid >= t.sched_dep - INTERVAL '30 minutes'
+					AND w.valid <= t.sched_dep + INTERVAL '30 minutes'
+				ORDER BY abs(EXTRACT(EPOCH FROM (w.valid - t.sched_dep))), w.valid
+				LIMIT 1
+			) ow ON true
+			LEFT JOIN LATERAL (
+				SELECT COALESCE(NULLIF(btrim(w.category), ''), 'UNKNOWN') AS category
+				FROM weather_observations w
+				WHERE t.sched_arr IS NOT NULL
+					AND t.dest_sid IS NOT NULL
+					AND w.station = t.dest_sid
+					AND w.valid >= t.sched_arr - INTERVAL '30 minutes'
+					AND w.valid <= t.sched_arr + INTERVAL '30 minutes'
+				ORDER BY abs(EXTRACT(EPOCH FROM (w.valid - t.sched_arr))), w.valid
+				LIMIT 1
+			) dw ON true
+		),
+		sided AS (
+			SELECT
+				origin, dest, carrier, flight_date, day_of_week, flight_number,
+				'origin'::text AS side, origin_category AS category, is_on_time
+			FROM matched
+			UNION ALL
+			SELECT
+				origin, dest, carrier, flight_date, day_of_week, flight_number,
+				'dest'::text AS side, dest_category AS category, is_on_time
+			FROM matched
+		)
+		INSERT INTO route_weather_category_buckets (
+			origin, dest, carrier, flight_date, day_of_week, flight_number,
+			side, category, on_time_count, flights
+		)
+		SELECT
+			origin,
+			dest,
+			carrier,
+			flight_date,
+			day_of_week,
+			flight_number,
+			side,
+			category,
+			COUNT(*) FILTER (WHERE is_on_time)::int,
+			COUNT(*)::int
+		FROM sided
+		GROUP BY origin, dest, carrier, flight_date, day_of_week, flight_number, side, category
+		HAVING COUNT(*) >= 1`
+)
+
+const (
 	//nolint:gosec // G101: SQL column name key_hash, not a credential
 	QueryCreateAPIKey = `
 		INSERT INTO api_keys (id, prefix, key_hash, role, name, created_at, revoked_at)

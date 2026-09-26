@@ -464,6 +464,203 @@ func TestRoutesOutlookBadRequest(t *testing.T) {
 	}
 }
 
+func TestRoutesWeatherStats(t *testing.T) {
+	var gotFilter store.RouteStatsFilter
+
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteWeatherStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			gotFilter = filter
+
+			return &model.RouteWeatherStats{
+				Origin:    testOriginORD,
+				Dest:      testDestLAX,
+				StartDate: "2026-04-01",
+				EndDate:   "2026-04-30",
+				Filters: model.RouteStatsFilters{
+					Carrier:    "UA",
+					DaysOfWeek: []int{1, 2},
+				},
+				Flights: 9,
+				OriginWeather: model.WeatherSideStats{
+					Flights:          9,
+					FlightsUnmatched: 2,
+					Categories: []model.WeatherCategoryStat{
+						{Category: model.WeatherCategoryThunder, Flights: 4, OnTimeRate: 0.25},
+						{Category: model.WeatherCategoryVFRFair, Flights: 3, OnTimeRate: 0.67},
+					},
+				},
+				DestWeather: model.WeatherSideStats{
+					Flights:          9,
+					FlightsUnmatched: 1,
+					Categories: []model.WeatherCategoryStat{
+						{Category: model.WeatherCategoryIFR, Flights: 2, OnTimeRate: 0.5},
+					},
+				},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ord&dest=lax&start_date=2026-04-01&end_date=2026-04-30&carrier=ua&days_of_week=1,2", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	if gotFilter.Origin != testOriginORD || gotFilter.Dest != testDestLAX || gotFilter.Carrier != "UA" {
+		t.Fatalf("filter = %+v", gotFilter)
+	}
+
+	if len(gotFilter.DaysOfWeek) != 2 {
+		t.Fatalf("days = %#v", gotFilter.DaysOfWeek)
+	}
+
+	var stats model.RouteWeatherStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if stats.Flights != 9 {
+		t.Fatalf("flights = %d, want 9", stats.Flights)
+	}
+
+	if stats.OriginWeather.FlightsUnmatched != 2 || stats.DestWeather.FlightsUnmatched != 1 {
+		t.Fatalf("unmatched origin=%d dest=%d", stats.OriginWeather.FlightsUnmatched, stats.DestWeather.FlightsUnmatched)
+	}
+
+	if len(stats.OriginWeather.Categories) != 2 || stats.OriginWeather.Categories[0].Category != model.WeatherCategoryThunder {
+		t.Fatalf("origin categories = %+v", stats.OriginWeather.Categories)
+	}
+
+	if len(stats.DestWeather.Categories) != 1 || stats.DestWeather.Categories[0].Category != model.WeatherCategoryIFR {
+		t.Fatalf("dest categories = %+v", stats.DestWeather.Categories)
+	}
+}
+
+func TestRoutesWeatherStatsEmpty(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteWeatherStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			return store.AssembleRouteWeatherStats(store.RouteStatsFilter{
+				Origin:    testOriginORD,
+				Dest:      testDestLAX,
+				StartDate: "2026-04-01",
+				EndDate:   "2026-04-30",
+			}, nil), nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var stats model.RouteWeatherStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if stats.Flights != 0 || stats.OriginWeather.FlightsUnmatched != 0 || stats.DestWeather.FlightsUnmatched != 0 {
+		t.Fatalf("empty = %+v", stats)
+	}
+
+	if len(stats.OriginWeather.Categories) != len(model.WeatherCategoryOrder()) {
+		t.Fatalf("categories = %d", len(stats.OriginWeather.Categories))
+	}
+}
+
+func TestRoutesWeatherStatsNotFound(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteWeatherStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			return nil, store.ErrNotFound
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30&carrier=UA", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	assertNotFound(t, rec, "route weather stats not found")
+}
+
+func TestRoutesWeatherStatsBadRequest(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestRoutesWeatherStatsCarrierFilter(t *testing.T) {
+	var gotCarrier string
+
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteWeatherStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			gotCarrier = filter.Carrier
+
+			stats := store.AssembleRouteWeatherStats(filter, []store.WeatherCategoryCount{
+				{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryVFRFair, OnTimeCount: 1, Flights: 1},
+				{Side: store.WeatherSideDest, Category: model.WeatherCategoryVFRFair, OnTimeCount: 1, Flights: 1},
+			})
+
+			return stats, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30&carrier=UA&flight_number=100", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	if gotCarrier != "UA" {
+		t.Fatalf("carrier = %q, want UA", gotCarrier)
+	}
+
+	var stats model.RouteWeatherStats
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if stats.Filters.Carrier != "UA" || stats.Filters.FlightNumber != "100" {
+		t.Fatalf("filters = %+v", stats.Filters)
+	}
+}
+
+func TestRoutesWeatherStatsStoreError(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteWeatherStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			return nil, store.ErrConflict
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-04-01&end_date=2026-04-30", nil)
+	rec := httptest.NewRecorder()
+	h.WeatherStats(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.Error != "failed to compute route weather stats" {
+		t.Fatalf("error = %q", resp.Error)
+	}
+}
+
 func assertNotFound(t *testing.T, rec *httptest.ResponseRecorder, want string) {
 	t.Helper()
 

@@ -29,6 +29,14 @@ func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.
 	)
 }
 
+func (s *Store) CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error) {
+	return s.insertPendingTypeJob(
+		ctx,
+		model.JobTypeRebuildRouteWeatherStats,
+		store.WeatherStatsRebuildJobLockKey,
+	)
+}
+
 // insertPendingTypeJob inserts one pending jobs row for a parameterless job.
 // lockKey is the advisory-lock namespace (hashtext); key 0 matches other type-only jobs.
 func (s *Store) insertPendingTypeJob(ctx context.Context, jobType model.JobType, lockKey string) (*model.Job, error) {

@@ -38,6 +38,7 @@ type Store interface {
 	ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
 	CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
+	CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error)
 	HasReferenceData(ctx context.Context, dataset ReferenceDataset) (bool, error)
 	ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error
@@ -55,6 +56,8 @@ type Store interface {
 	RouteOutlook(ctx context.Context, filter RouteOutlookFilter) (*model.RouteOutlook, error)
 	RouteTravelWindows(ctx context.Context, filter RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindows(ctx context.Context) error
+	RouteWeatherStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteWeatherStats, error)
+	RebuildRouteWeatherStats(ctx context.Context) error
 	CarrierStats(ctx context.Context, filter CarrierStatsFilter) (*model.CarrierStats, error)
 	DataFreshness(ctx context.Context) (model.DataFreshness, error)
 	Ping(ctx context.Context) error
