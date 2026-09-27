@@ -188,10 +188,6 @@ func extractCSV(zipPath, destDir string) (string, error) {
 			return "", err
 		}
 
-		if !strings.HasPrefix(destPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
-			return "", fmt.Errorf("zip entry %q escapes destination directory", file.Name)
-		}
-
 		rc, err := file.Open()
 		if err != nil {
 			return "", fmt.Errorf("open csv in zip: %w", err)
