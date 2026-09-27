@@ -53,12 +53,16 @@ func TestParseFixtureCSV(t *testing.T) {
 }
 
 func TestDBColumnsIncludePartitionKeys(t *testing.T) {
-	if len(DBColumns) != len(ObservationColumns)+2 {
-		t.Fatalf("len(DBColumns) = %d, want %d", len(DBColumns), len(ObservationColumns)+2)
+	if len(DBColumns) != len(ObservationColumns)+4 {
+		t.Fatalf("len(DBColumns) = %d, want %d", len(DBColumns), len(ObservationColumns)+4)
 	}
 
 	if DBColumns[0] != colYear || DBColumns[1] != colMonth {
 		t.Fatalf("DBColumns prefix = %q,%q, want year,month", DBColumns[0], DBColumns[1])
+	}
+
+	if DBColumns[len(DBColumns)-2] != colCeilingFt || DBColumns[len(DBColumns)-1] != colCategory {
+		t.Fatalf("DBColumns suffix = %q,%q, want ceiling_ft,category", DBColumns[len(DBColumns)-2], DBColumns[len(DBColumns)-1])
 	}
 }
 

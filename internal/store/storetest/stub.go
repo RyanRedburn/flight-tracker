@@ -29,6 +29,7 @@ type Stub struct {
 	ActiveIngestJobFn                     func(ctx context.Context, jobType model.JobType) (bool, error)
 	CreateReferenceIngestJobFn            func(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJobFn  func(ctx context.Context) (*model.Job, error)
+	CreateRebuildRouteWeatherStatsJobFn   func(ctx context.Context) (*model.Job, error)
 	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
@@ -46,6 +47,8 @@ type Stub struct {
 	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
 	RouteTravelWindowsFn                  func(ctx context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindowsFn           func(ctx context.Context) error
+	RouteWeatherStatsFn                   func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteWeatherStats, error)
+	RebuildRouteWeatherStatsFn            func(ctx context.Context) error
 	CarrierStatsFn                        func(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error)
 	DataFreshnessFn                       func(ctx context.Context) (model.DataFreshness, error)
 	PingFn                                func(ctx context.Context) error
@@ -191,6 +194,14 @@ func (s *Stub) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.J
 	return s.CreateRebuildRouteTravelWindowsJobFn(ctx)
 }
 
+func (s *Stub) CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error) {
+	if s.CreateRebuildRouteWeatherStatsJobFn == nil {
+		panic("unexpected call: CreateRebuildRouteWeatherStatsJob")
+	}
+
+	return s.CreateRebuildRouteWeatherStatsJobFn(ctx)
+}
+
 func (s *Stub) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {
 	if s.HasReferenceDataFn == nil {
 		panic("unexpected call: HasReferenceData")
@@ -331,6 +342,22 @@ func (s *Stub) RebuildRouteTravelWindows(ctx context.Context) error {
 	}
 
 	return s.RebuildRouteTravelWindowsFn(ctx)
+}
+
+func (s *Stub) RouteWeatherStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+	if s.RouteWeatherStatsFn == nil {
+		panic("unexpected call: RouteWeatherStats")
+	}
+
+	return s.RouteWeatherStatsFn(ctx, filter)
+}
+
+func (s *Stub) RebuildRouteWeatherStats(ctx context.Context) error {
+	if s.RebuildRouteWeatherStatsFn == nil {
+		panic("unexpected call: RebuildRouteWeatherStats")
+	}
+
+	return s.RebuildRouteWeatherStatsFn(ctx)
 }
 
 func (s *Stub) CarrierStats(ctx context.Context, filter store.CarrierStatsFilter) (*model.CarrierStats, error) {

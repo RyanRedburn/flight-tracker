@@ -142,3 +142,47 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, windows)
 }
+
+// WeatherStats returns on-time performance by METAR category at each end of a route.
+//
+//	@Summary		Route weather category stats
+//	@Description	On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: thunderstorms (THUNDER), low ceiling or visibility (LIFR, IFR, MVFR), wind (WINDY), precipitation (PRECIP), fair weather (VFR_FAIR), and an observation too incomplete to classify (UNKNOWN), plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
+//	@Tags			routes,external
+//	@Produce		json
+//	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			dest			query		string	true	"Destination airport IATA code"	minlength(3)	maxlength(3)
+//	@Param			start_date		query		string	true	"Range start (YYYY-MM-DD)"	Format(date)
+//	@Param			end_date		query		string	true	"Range end (YYYY-MM-DD), on or after start_date"	Format(date)
+//	@Param			carrier			query		string	false	"Marketing carrier code (required if flight_number is set)"	minlength(2)	maxlength(2)
+//	@Param			flight_number	query		string	false	"Flight number (requires carrier)"
+//	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
+//	@Success		200				{object}	model.RouteWeatherStats
+//	@Failure		400				{object}	ErrorResponse
+//	@Failure		401				{object}	ErrorResponse
+//	@Failure		403				{object}	ErrorResponse
+//	@Failure		404				{object}	ErrorResponse
+//	@Failure		429				{object}	ErrorResponse
+//	@Failure		500				{object}	ErrorResponse
+//	@Security		ApiKeyAuth
+//	@Router			/api/v1/routes/weather-stats [get]
+func (h *RoutesHandler) WeatherStats(w http.ResponseWriter, r *http.Request) {
+	filter, err := query.ParseRouteStats(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	stats, err := h.store.RouteWeatherStats(r.Context(), filter)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route weather stats not found"})
+			return
+		}
+
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route weather stats"})
+
+		return
+	}
+
+	writeJSON(w, http.StatusOK, stats)
+}

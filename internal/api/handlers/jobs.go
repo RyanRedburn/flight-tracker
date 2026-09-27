@@ -196,7 +196,8 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 		model.JobTypeImportRegions,
 		model.JobTypeImportAirports,
 		model.JobTypeImportWeatherStations,
-		model.JobTypeRebuildRouteTravelWindows:
+		model.JobTypeRebuildRouteTravelWindows,
+		model.JobTypeRebuildRouteWeatherStats:
 		return resp, nil
 	default:
 		return JobResponse{}, fmt.Errorf("unknown job type %q", job.Type)

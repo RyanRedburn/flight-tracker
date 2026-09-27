@@ -26,6 +26,7 @@ const (
 	pathSwaggerInternalHTML  = "/swagger/internal/index.html"
 	pathDataFreshness        = "/api/v1/data-freshness"
 	pathRebuildTravelWindows = "/api/v1/rebuild/travel-windows"
+	pathRebuildWeatherStats  = "/api/v1/rebuild/weather-stats"
 )
 
 func testLogger() *slog.Logger {
@@ -74,6 +75,15 @@ func routerStub() *storetest.Stub {
 				UpdatedAt: now,
 			}, nil
 		},
+		CreateRebuildRouteWeatherStatsJobFn: func(context.Context) (*model.Job, error) {
+			return &model.Job{
+				ID:        "job-wx-rebuild",
+				Type:      model.JobTypeRebuildRouteWeatherStats,
+				Status:    model.JobStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}, nil
+		},
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
 				DiversionAirports: []model.AirportCount{},
@@ -85,6 +95,9 @@ func routerStub() *storetest.Stub {
 		RouteTravelWindowsFn: func(context.Context, store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
 			return emptyTravelWindows(), nil
 		},
+		RouteWeatherStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteWeatherStats, error) {
+			return emptyWeatherStats(), nil
+		},
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
 				BestRoutes:    []model.CarrierRouteStat{},
@@ -93,6 +106,13 @@ func routerStub() *storetest.Stub {
 				WorstAirports: []model.CarrierAirportStat{},
 			}, nil
 		},
+	}
+}
+
+func emptyWeatherStats() *model.RouteWeatherStats {
+	return &model.RouteWeatherStats{
+		OriginWeather: model.WeatherSideStats{Categories: []model.WeatherCategoryStat{}},
+		DestWeather:   model.WeatherSideStats{Categories: []model.WeatherCategoryStat{}},
 	}
 }
 
@@ -124,6 +144,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
 		{http.MethodGet, pathDataFreshness, http.StatusOK},
 		{http.MethodPost, pathRebuildTravelWindows, http.StatusCreated},
+		{http.MethodPost, pathRebuildWeatherStats, http.StatusCreated},
 		{http.MethodPost, pathIngestCountries, http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
@@ -132,6 +153,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", http.StatusOK},
+		{http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, pathCarrierStatsUA, http.StatusOK},
 		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
 		{http.MethodGet, "/missing", http.StatusNotFound},

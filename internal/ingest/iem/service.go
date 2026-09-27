@@ -100,6 +100,11 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int, stations []s
 		return ImportResult{}, err
 	}
 
+	dbColumns, dbRows, err = withCategoryColumns(dbColumns, dbRows)
+	if err != nil {
+		return ImportResult{}, err
+	}
+
 	if err := s.store.ReplaceWeatherObservationsByMonth(ctx, year, month, dbColumns, dbRows); err != nil {
 		return ImportResult{}, fmt.Errorf("load weather: %w", err)
 	}

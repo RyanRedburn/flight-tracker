@@ -90,8 +90,9 @@ var airportWeatherStationColumns = []string{
 // dataVars are IEM `data=` columns (station/valid are always returned).
 var dataVars = ObservationColumns[2:]
 
-// DBColumns is the weather_observations insert column order.
-var DBColumns = append([]string{colYear, colMonth}, ObservationColumns...)
+// DBColumns is the weather_observations insert column order, including
+// ceiling_ft and category computed at load (not present in the IEM CSV).
+var DBColumns = append(append([]string{colYear, colMonth}, ObservationColumns...), colCeilingFt, colCategory)
 
 func csvHeaderToColumn(header string) string {
 	return strings.TrimSpace(header)

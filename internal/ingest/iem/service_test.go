@@ -61,6 +61,26 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Errorf("partition columns = %q,%q, want year,month", gotColumns[0], gotColumns[1])
 	}
 
+	ceilingIdx, categoryIdx := -1, -1
+
+	for i, col := range gotColumns {
+		switch col {
+		case colCeilingFt:
+			ceilingIdx = i
+		case colCategory:
+			categoryIdx = i
+		}
+	}
+
+	if ceilingIdx < 0 || categoryIdx < 0 {
+		t.Fatal("ceiling_ft and category columns missing from replace columns")
+	}
+
+	// Fixture row 0: OVC 1500, 10 SM, 11 kt, -SN → MVFR (ceiling beats precip).
+	if gotRows[0][ceilingIdx] != "1500" || gotRows[0][categoryIdx] != "MVFR" {
+		t.Fatalf("row 0 ceiling/category = %q/%q, want 1500/MVFR", gotRows[0][ceilingIdx], gotRows[0][categoryIdx])
+	}
+
 	validIdx := -1
 
 	for i, col := range gotColumns {

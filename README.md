@@ -237,6 +237,13 @@ curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
+# Re-import weather months already loaded so each row gets ceiling_ft and category.
+# Each successful month rebuilds route weather-stats rollups.
+# Use force when that month already has observations.
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1,"force":true}'
+
 # Re-import reference data that already exists
 curl -X POST http://localhost:8080/api/v1/ingest/airports \
   -H "Content-Type: application/json" \
@@ -275,9 +282,23 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=UA"
 
+# On-time rate by observed weather category at the origin and destination
+# (required: origin, dest, start_date, end_date; optional: carrier, flight_number
+# [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).
+# Each side lists category buckets plus flights with no matching observation. Missing weather is not fair.
+# 404 when that route (or route+carrier, when carrier is set) has no flight-performance data.
+# A date, weekday, or flight-number filter that matches nothing still returns 200 with zeros.
+curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30"
+curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA"
+
 # Queue a full rebuild of those rollups from flight_performance (admin, empty body).
 # 409 when a rebuild_route_travel_windows job is already pending or running.
 curl -X POST http://localhost:8080/api/v1/rebuild/travel-windows \
+  -H "Authorization: Bearer $API_KEY"
+
+# Queue a full rebuild of route weather-category rollups (admin, empty body).
+# 409 when a rebuild_route_weather_stats job is already pending or running.
+curl -X POST http://localhost:8080/api/v1/rebuild/weather-stats \
   -H "Authorization: Bearer $API_KEY"
 
 # Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
@@ -310,7 +331,9 @@ curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
 - `start_year` must be >= 2018 (earliest flight performance data supported by this service).
 - Workers poll the database, download the source zip for each month, and load `flight_performance`.
 - After a successful month load, the worker rebuilds `route_travel_window_scopes` and `route_travel_window_buckets` from `flight_performance` (advisory lock, full replace) so `GET /api/v1/routes/travel-windows` can read rollups only.
+- The same load also rebuilds `route_weather_category_buckets` (separate advisory lock) so `GET /api/v1/routes/weather-stats` can read rollups only.
 - Admins can queue that same full rebuild without re-importing a month: `POST /api/v1/rebuild/travel-windows` with an empty body. Returns **409** if a `rebuild_route_travel_windows` job is already pending or running.
+- Admins can queue the weather-category rollup rebuild with `POST /api/v1/rebuild/weather-stats` (empty body). Returns **409** if a `rebuild_route_weather_stats` job is already pending or running. The rebuild uses `category` stored on weather observations. Later flight, weather-observation, and weather-station loads rebuild it themselves.
 - Returns **409** if a pending/running ingest job already exists for a requested month.
 - Returns **409** if flight data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.
@@ -326,6 +349,8 @@ Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/i
 - Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
 - `start_year` must be >= 2018 (aligned with flight performance coverage).
 - Workers poll the database, download ASOS/METAR CSV for the month and stations from IEM, and replace `weather_observations` for that month.
+- Each loaded observation stores `ceiling_ft` and one `category`, computed in Go at ingest. Rows with a null `category` are skipped when the rollup is rebuilt. Match rules are in `internal/ingest/iem/documents/asos_observations.md`.
+- After a successful month load, the worker rebuilds `route_weather_category_buckets`.
 - Returns **409** if a pending/running weather ingest job already exists for a requested month.
 - Returns **409** if weather data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.
@@ -340,6 +365,7 @@ Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field
 - Creates one `import_weather_stations` job.
 - Workers download US IEM ASOS GeoJSON, full-replace `weather_stations`, and rebuild `airport_weather_stations` from distinct BTS `origin`/`dest` codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. If airports reference data is missing, matching falls back to exact IATA=`sid` only. Unmatched airports are stored as rows with `matched = false`.
 - Empty BTS data still replaces the catalog; the mapping table is empty and the job succeeds.
+- After a successful load, the worker rebuilds `route_weather_category_buckets` because station ids and timezones change which observation matches each flight. Match rules are in `internal/ingest/iem/documents/asos_observations.md`.
 - Returns **409** if a pending/running job already exists for this dataset.
 - Returns **409** if mapping tables already have rows and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace both tables.

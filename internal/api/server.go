@@ -36,6 +36,7 @@ func newRouter(
 	weatherIngest := handlers.NewWeatherIngestHandler(s, maxIngestMonths, weatherStations, logger)
 	referenceIngest := handlers.NewReferenceIngestHandler(s)
 	rebuild := handlers.NewRebuildTravelWindowsHandler(s)
+	rebuildWeather := handlers.NewRebuildWeatherStatsHandler(s)
 	freshness := handlers.NewFreshnessHandler(s)
 	keys := handlers.NewKeysHandler(s)
 	protect := middleware.NewProtector(s, middleware.ProtectorConfig{
@@ -85,6 +86,7 @@ func newRouter(
 			r.Get("/jobs/{id}", jobs.Get)
 			r.Get("/data-freshness", freshness.Get)
 			r.Post("/rebuild/travel-windows", rebuild.Create)
+			r.Post("/rebuild/weather-stats", rebuildWeather.Create)
 			r.Get("/keys", keys.List)
 			r.Post("/keys", keys.Create)
 			r.Post("/keys/{id}/revoke", keys.Revoke)
@@ -95,6 +97,7 @@ func newRouter(
 			r.Get("/routes/stats", routes.Stats)
 			r.Get("/routes/outlook", routes.Outlook)
 			r.Get("/routes/travel-windows", routes.TravelWindows)
+			r.Get("/routes/weather-stats", routes.WeatherStats)
 			r.Get("/carriers/stats", carriers.Stats)
 		})
 	})

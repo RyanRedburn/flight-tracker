@@ -34,12 +34,16 @@ func (h *FlightPerformanceIngestHandler) Process(ctx context.Context, job *model
 		return nil, err
 	}
 
-	// The month COPY is already committed. Rebuild typical-year rollups from
-	// flight_performance. RebuildRouteTravelWindows holds TravelWindowRebuildLockKey
-	// for the truncate and insert. Queueing uses TravelWindowRebuildJobLockKey
-	// and does not hold that lock.
+	// The month COPY is already committed. Rebuild typical-year rollups and
+	// route weather-category rollups from flight_performance. Each rebuild
+	// holds its own advisory lock for the truncate and insert. Queueing uses
+	// a separate lock and does not wait for that commit.
 	if err := h.store.RebuildRouteTravelWindows(ctx); err != nil {
 		return nil, fmt.Errorf("rebuild route travel windows: %w", err)
+	}
+
+	if err := h.store.RebuildRouteWeatherStats(ctx); err != nil {
+		return nil, fmt.Errorf("rebuild route weather stats: %w", err)
 	}
 
 	return json.Marshal(result)
