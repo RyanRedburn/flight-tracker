@@ -133,6 +133,23 @@ func writeZipBody(out *os.File, body io.Reader) error {
 	return nil
 }
 
+func csvDestPath(destDir, entryName string) (string, error) {
+	base := filepath.Base(entryName)
+	if base == "" || base == "." || base == ".." {
+		return "", fmt.Errorf("unsafe zip entry name %q", entryName)
+	}
+
+	destPath := filepath.Join(destDir, base)
+	cleanPath := filepath.Clean(destPath)
+	cleanDir := filepath.Clean(destDir) + string(os.PathSeparator)
+
+	if !strings.HasPrefix(cleanPath, cleanDir) {
+		return "", fmt.Errorf("zip entry %q escapes destination directory", entryName)
+	}
+
+	return cleanPath, nil
+}
+
 func extractCSV(zipPath, destDir string) (string, error) {
 	reader, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -166,12 +183,15 @@ func extractCSV(zipPath, destDir string) (string, error) {
 			continue
 		}
 
+		destPath, err := csvDestPath(destDir, file.Name)
+		if err != nil {
+			return "", err
+		}
+
 		rc, err := file.Open()
 		if err != nil {
 			return "", fmt.Errorf("open csv in zip: %w", err)
 		}
-
-		destPath := filepath.Join(destDir, filepath.Base(file.Name))
 
 		out, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
