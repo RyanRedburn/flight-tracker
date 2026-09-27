@@ -70,7 +70,7 @@ IEM CSV; they are injected at import time for month-scoped replace.
 
 Empty `wxcodes` means no phenomena, so fair weather is allowed when the other fields support it. Visibility above 10 SM is clamped to 10 before the thresholds. Negative visibility is treated as missing. Wind speeds outside 0–200 kt are ignored.
 
-Classification runs in Go on each weather load (`internal/ingest/iem/category.go`). The schema migration adds the columns and does not classify rows already stored. After deploying onto a database that already has weather observations, re-import those months with `POST /api/v1/ingest/weather` and `force: true`. A row with a null `category` is skipped when route weather stats are rebuilt.
+Classification runs in Go on each weather load (`internal/ingest/iem/category.go`). A row with a null `category` is skipped when route weather stats are rebuilt.
 
 ## Route weather stats
 
@@ -83,7 +83,7 @@ Each flight is joined to the nearest observation within ±30 minutes. An equal d
 
 A side is `UNMATCHED` when the airport has no matched station, the clock cannot be built, no observation falls in the window, or every observation in the window has a null `category`. Unmatched flights are `flights_unmatched` on that side. They are never counted as `VFR_FAIR`. `UNKNOWN` is only the stored category for a matched observation that lacks visibility, ceiling, and wind.
 
-The worker rebuilds the rollup (advisory lock, full replace) after a successful flight-performance load, weather-observation load, or weather-station load. The rebuild reads stored `category` values only. Admins can queue the same rebuild with `POST /api/v1/rebuild/weather-stats`. After deploying onto observations loaded before these columns existed, re-import weather first (`force: true`); each successful month load rebuilds the rollup. Use the POST rebuild when flights or station mappings change and the observations are already classified.
+The worker rebuilds the rollup (advisory lock, full replace) after a successful flight-performance load, weather-observation load, or weather-station load. The rebuild reads stored `category` values only. Admins can queue the same rebuild with `POST /api/v1/rebuild/weather-stats`. Use the POST rebuild when flights or station mappings change and the observations are already classified.
 
 ## Notes for analysis
 

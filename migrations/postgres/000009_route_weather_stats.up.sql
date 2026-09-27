@@ -1,8 +1,6 @@
 -- METAR category columns on weather_observations, plus per-side route weather rollups.
 -- ceiling_ft and category are filled by weather ingest in Go
--- (internal/ingest/iem/category.go). This migration does not classify rows
--- already stored. Re-import weather observations so those columns are populated,
--- then rebuild route weather stats (the weather load does that itself).
+-- (internal/ingest/iem/category.go).
 --
 -- route_weather_category_buckets is the read model for GET /api/v1/routes/weather-stats.
 -- Grain is per side (origin or dest), not an origin-category × dest-category matrix.
