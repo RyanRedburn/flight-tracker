@@ -31,7 +31,7 @@ func NewRebuildWeatherStatsHandler(s store.Store) *RebuildWeatherStatsHandler {
 // Create queues a full rebuild of route weather-category rollups.
 //
 //	@Summary		Queue route weather-stats rollup rebuild
-//	@Description	Queues a full replace of route_weather_category_buckets from flight_performance and classified weather_observations. Nearest observation within ±30 minutes of scheduled departure (origin CRS local time) and scheduled arrival (that departure plus crs_elapsed_time minutes). The body must be empty. Returns 409 when a rebuild job is already pending or running.
+//	@Description	Queues a full replace of route weather-category rollups from flight performance and weather observations. The body must be empty. Returns 409 when a rebuild job is already pending or running.
 //	@Tags			rebuild,internal
 //	@Produce		json
 //	@Success		201	{object}	RebuildWeatherStatsResponse
