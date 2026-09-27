@@ -101,6 +101,14 @@ func TestLoadDefaults(t *testing.T) {
 		t.Errorf("OurAirportsDownloadTimeout = %v, want 5m", cfg.OurAirportsDownloadTimeout)
 	}
 
+	if cfg.MCTBaseURL != "https://minimumconnectiontime.com" {
+		t.Errorf("MCTBaseURL = %q, want default minimumconnectiontime URL", cfg.MCTBaseURL)
+	}
+
+	if cfg.MCTHTTPTimeout != 2*time.Minute {
+		t.Errorf("MCTHTTPTimeout = %v, want 2m", cfg.MCTHTTPTimeout)
+	}
+
 	if cfg.MaxIngestMonths != 24 {
 		t.Errorf("MaxIngestMonths = %d, want 24", cfg.MaxIngestMonths)
 	}

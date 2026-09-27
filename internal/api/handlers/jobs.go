@@ -195,6 +195,7 @@ func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobRes
 	case model.JobTypeImportCountries,
 		model.JobTypeImportRegions,
 		model.JobTypeImportAirports,
+		model.JobTypeImportAirportMCT,
 		model.JobTypeImportWeatherStations,
 		model.JobTypeRebuildRouteTravelWindows,
 		model.JobTypeRebuildRouteWeatherStats:

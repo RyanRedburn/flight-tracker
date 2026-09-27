@@ -88,6 +88,29 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 	h.createReference(w, r, store.ReferenceAirports)
 }
 
+// CreateAirportMCT queues an airport minimum-connection-time ingest job.
+//
+//	@Summary		Queue airport MCT ingest
+//	@Description	Queues a full import of airport minimum connection times from https://minimumconnectiontime.com. Values are compiled planning estimates, not official OAG or IATA MCT, and not airline-, terminal-, or flight-number-specific rules. The worker paginates GET /api/airports and full-replaces airport_mct (IATA code plus domestic/international and interline minutes). An empty body is treated as {"force":false}. Set force=true to replace existing rows. Re-import about once a month; request handlers do not call the upstream API.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
+//	@Router			/api/v1/ingest/mct [post]
+func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, model.JobTypeImportAirportMCT, string(store.ReferenceAirportMCT), func(ctx context.Context) (bool, error) {
+		return h.store.HasReferenceData(ctx, store.ReferenceAirportMCT)
+	})
+}
+
 // CreateWeatherStations queues an IEM ASOS catalog and BTS airport mapping ingest job.
 //
 //	@Summary		Queue weather station mapping ingest

@@ -1,0 +1,78 @@
+{
+  "data": [
+    {
+      "@context": "https://schema.org",
+      "@type": "Airport",
+      "amenityFeature": [
+        {
+          "@type": "LocationFeatureSpecification",
+          "name": "Domestic to Domestic Connection Time",
+          "value": "60 minutes"
+        }
+      ],
+      "city": "Atlanta",
+      "code": "ATL",
+      "country": "United States of America",
+      "iataCode": "ATL",
+      "icao": "KATL",
+      "international": true,
+      "last_updated": "2026-03-29",
+      "latitude": 33.63666667,
+      "longitude": -84.42805556,
+      "mct_domestic_to_domestic": 60,
+      "mct_domestic_to_international": 90,
+      "mct_interline": 120,
+      "mct_international_to_domestic": 90,
+      "mct_international_to_international": 120,
+      "name": "Hartsfield-Jackson Atlanta International Airport",
+      "region": "North America"
+    },
+    {
+      "city": "Anaa",
+      "code": "aaa",
+      "country": "French Polynesia",
+      "iataCode": "AAA",
+      "icao": "NTGA",
+      "international": false,
+      "last_updated": "2026-03-30",
+      "latitude": -17.352,
+      "longitude": -145.509,
+      "mct_domestic_to_domestic": 35,
+      "mct_domestic_to_international": 65,
+      "mct_interline": 100,
+      "mct_international_to_domestic": 65,
+      "mct_international_to_international": 80,
+      "name": "Anaa Airport"
+    },
+    {
+      "city": "Denver",
+      "code": "DEN",
+      "country": "United States of America",
+      "iataCode": "DEN",
+      "icao": "KDEN",
+      "international": true,
+      "last_updated": "2026-03-29",
+      "latitude": 39.5,
+      "longitude": 200,
+      "mct_domestic_to_domestic": 40,
+      "mct_domestic_to_international": null,
+      "mct_interline": 120,
+      "mct_international_to_domestic": 90,
+      "mct_international_to_international": 90,
+      "name": "Denver International"
+    },
+    {
+      "code": "A",
+      "iataCode": "",
+      "name": "Not an IATA airport"
+    }
+  ],
+  "pagination": {
+    "has_next": true,
+    "has_prev": false,
+    "page": 1,
+    "per_page": 100,
+    "total": 6,
+    "total_pages": 2
+  }
+}

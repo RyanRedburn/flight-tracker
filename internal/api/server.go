@@ -77,6 +77,7 @@ func newRouter(
 			r.Post("/ingest/countries", referenceIngest.CreateCountries)
 			r.Post("/ingest/regions", referenceIngest.CreateRegions)
 			r.Post("/ingest/airports", referenceIngest.CreateAirports)
+			r.Post("/ingest/mct", referenceIngest.CreateAirportMCT)
 			r.Post("/ingest/weather-stations", referenceIngest.CreateWeatherStations)
 		})
 

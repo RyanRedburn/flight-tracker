@@ -148,6 +148,7 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, pathIngestCountries, http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
+		{http.MethodPost, "/api/v1/ingest/mct", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/weather-stations", http.StatusCreated},
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
@@ -202,6 +203,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec must not include /api/v1/ingest/weather-stations")
 	}
 
+	if _, ok := external["/api/v1/ingest/mct"]; ok {
+		t.Fatal("external spec must not include /api/v1/ingest/mct")
+	}
+
 	if _, ok := external[pathHealth]; ok {
 		t.Fatal("external spec must not include /health")
 	}
@@ -222,6 +227,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 	for _, path := range []string{
 		pathHealth,
 		"/api/v1/ingest",
+		"/api/v1/ingest/mct",
 		"/api/v1/ingest/weather-stations",
 		"/api/v1/jobs",
 		pathDataFreshness,

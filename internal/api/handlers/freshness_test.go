@@ -36,8 +36,8 @@ func TestFreshnessGetEmpty(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if len(body.Datasets) != 6 {
-		t.Fatalf("len = %d, want 6", len(body.Datasets))
+	if len(body.Datasets) != 7 {
+		t.Fatalf("len = %d, want 7", len(body.Datasets))
 	}
 
 	for _, raw := range body.Datasets {

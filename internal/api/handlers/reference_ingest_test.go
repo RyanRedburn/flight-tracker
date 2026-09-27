@@ -66,6 +66,8 @@ func postReferenceIngest(t *testing.T, h *ReferenceIngestHandler, path string, b
 		h.CreateRegions(rec, req)
 	case "/api/v1/ingest/airports":
 		h.CreateAirports(rec, req)
+	case "/api/v1/ingest/mct":
+		h.CreateAirportMCT(rec, req)
 	case "/api/v1/ingest/weather-stations":
 		h.CreateWeatherStations(rec, req)
 	default:
@@ -326,6 +328,134 @@ func TestReferenceIngestCreateJobActiveConflict(t *testing.T) {
 
 	if body.JobType != model.JobTypeImportCountries {
 		t.Errorf("job_type = %q, want %q", body.JobType, model.JobTypeImportCountries)
+	}
+}
+
+const pathAirportMCT = "/api/v1/ingest/mct"
+
+func TestAirportMCTIngestCreate(t *testing.T) {
+	h := NewReferenceIngestHandler(referenceSuccessStub())
+
+	rec := postReferenceIngest(t, h, pathAirportMCT, map[string]any{})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var resp ReferenceIngestResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if resp.Job.Type != model.JobTypeImportAirportMCT {
+		t.Errorf("job type = %q, want %q", resp.Job.Type, model.JobTypeImportAirportMCT)
+	}
+
+	if resp.Job.Status != model.JobStatusPending || resp.Job.ID == "" {
+		t.Errorf("job = %+v, want pending id", resp.Job)
+	}
+}
+
+func TestAirportMCTIngestEmptyBody(t *testing.T) {
+	h := NewReferenceIngestHandler(referenceSuccessStub())
+
+	rec := postReferenceIngest(t, h, pathAirportMCT, nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAirportMCTIngestActiveJobConflictIgnoresForce(t *testing.T) {
+	var sawForceCheck bool
+
+	h := NewReferenceIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+			return true, nil
+		},
+		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+			sawForceCheck = true
+
+			return false, nil
+		},
+	})
+
+	rec := postReferenceIngest(t, h, pathAirportMCT, map[string]any{jsonForce: true})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	if sawForceCheck {
+		t.Fatal("force must not skip the active-job conflict")
+	}
+
+	var body ReferenceIngestConflictResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.JobType != model.JobTypeImportAirportMCT {
+		t.Errorf("job_type = %q, want %q", body.JobType, model.JobTypeImportAirportMCT)
+	}
+
+	if body.Dataset != "" {
+		t.Errorf("dataset = %q, want empty", body.Dataset)
+	}
+}
+
+func TestAirportMCTIngestExistingDataConflict(t *testing.T) {
+	h := NewReferenceIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+			return false, nil
+		},
+		HasReferenceDataFn: func(_ context.Context, dataset store.ReferenceDataset) (bool, error) {
+			if dataset != store.ReferenceAirportMCT {
+				t.Errorf("dataset = %q, want %q", dataset, store.ReferenceAirportMCT)
+			}
+
+			return true, nil
+		},
+	})
+
+	rec := postReferenceIngest(t, h, pathAirportMCT, map[string]any{jsonForce: false})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body ReferenceIngestConflictResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Dataset != string(store.ReferenceAirportMCT) {
+		t.Errorf("dataset = %q, want %q", body.Dataset, store.ReferenceAirportMCT)
+	}
+
+	if body.JobType != "" {
+		t.Errorf("job_type = %q, want empty", body.JobType)
+	}
+}
+
+func TestAirportMCTIngestForceReimport(t *testing.T) {
+	h := NewReferenceIngestHandler(&storetest.Stub{
+		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+			return false, nil
+		},
+		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+			t.Fatal("force=true must skip the exists-data check")
+
+			return true, nil
+		},
+		CreateReferenceIngestJobFn: func(_ context.Context, jobType model.JobType) (*model.Job, error) {
+			return &model.Job{
+				ID:     "job-mct",
+				Type:   jobType,
+				Status: model.JobStatusPending,
+			}, nil
+		},
+	})
+
+	rec := postReferenceIngest(t, h, pathAirportMCT, map[string]any{jsonForce: true})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -9,6 +9,7 @@ const (
 	DatasetIDCountries           = "countries"
 	DatasetIDRegions             = "regions"
 	DatasetIDAirports            = "airports"
+	DatasetIDAirportMCT          = "airport_mct"
 
 	FreshnessPeriodTypeMonth    = "month"
 	FreshnessPeriodTypeSnapshot = "snapshot"

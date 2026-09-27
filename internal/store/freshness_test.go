@@ -19,6 +19,7 @@ func TestAssembleDataFreshnessEmpty(t *testing.T) {
 		model.DatasetIDCountries,
 		model.DatasetIDRegions,
 		model.DatasetIDAirports,
+		model.DatasetIDAirportMCT,
 	}
 
 	if len(got.Datasets) != len(wantIDs) {

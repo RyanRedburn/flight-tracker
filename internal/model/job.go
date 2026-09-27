@@ -22,6 +22,7 @@ const (
 	JobTypeImportCountries           JobType = "import_countries"
 	JobTypeImportRegions             JobType = "import_regions"
 	JobTypeImportAirports            JobType = "import_airports"
+	JobTypeImportAirportMCT          JobType = "import_airport_mct"
 	JobTypeImportWeatherStations     JobType = "import_weather_stations"
 	JobTypeRebuildRouteTravelWindows JobType = "rebuild_route_travel_windows"
 	JobTypeRebuildRouteWeatherStats  JobType = "rebuild_route_weather_stats"

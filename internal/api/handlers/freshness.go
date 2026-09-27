@@ -47,7 +47,7 @@ func NewFreshnessHandler(s store.Store) *FreshnessHandler {
 // Get returns last successful ingest time and the latest covered period for each dataset.
 //
 //	@Summary		Dataset freshness
-//	@Description	Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, and airports. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.
+//	@Description	Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. airport_mct holds planning estimates from minimumconnectiontime.com, not official OAG or IATA MCT. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.
 //	@Tags			freshness,internal
 //	@Produce		json
 //	@Success		200	{object}	DataFreshnessResponse

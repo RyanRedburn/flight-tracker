@@ -53,6 +53,7 @@ func freshnessDatasetIDs() []string {
 		model.DatasetIDCountries,
 		model.DatasetIDRegions,
 		model.DatasetIDAirports,
+		model.DatasetIDAirportMCT,
 	}
 }
 
@@ -64,7 +65,7 @@ func freshnessKindOrDefault(id string, kind FreshnessKind) FreshnessKind {
 	switch id {
 	case model.DatasetIDFlightPerformance, model.DatasetIDWeatherObservations:
 		return FreshnessKindMonth
-	case model.DatasetIDWeatherStations, model.DatasetIDCountries, model.DatasetIDRegions, model.DatasetIDAirports:
+	case model.DatasetIDWeatherStations, model.DatasetIDCountries, model.DatasetIDRegions, model.DatasetIDAirports, model.DatasetIDAirportMCT:
 		return FreshnessKindSnapshot
 	default:
 		return ""

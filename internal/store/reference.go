@@ -8,9 +8,10 @@ import (
 type ReferenceDataset string
 
 const (
-	ReferenceCountries ReferenceDataset = "countries"
-	ReferenceRegions   ReferenceDataset = "regions"
-	ReferenceAirports  ReferenceDataset = "airports"
+	ReferenceCountries  ReferenceDataset = "countries"
+	ReferenceRegions    ReferenceDataset = "regions"
+	ReferenceAirports   ReferenceDataset = "airports"
+	ReferenceAirportMCT ReferenceDataset = "airport_mct"
 )
 
 var ErrInvalidReferenceDataset = errors.New("invalid reference dataset")
@@ -23,6 +24,8 @@ func (d ReferenceDataset) Table() (string, error) {
 		return "regions", nil
 	case ReferenceAirports:
 		return "airports", nil
+	case ReferenceAirportMCT:
+		return "airport_mct", nil
 	default:
 		return "", fmt.Errorf("%w: %q", ErrInvalidReferenceDataset, d)
 	}

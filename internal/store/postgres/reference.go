@@ -182,6 +182,10 @@ func (s *Store) ReplaceAirports(ctx context.Context, columns []string, rows [][]
 	return s.replaceReferenceTable(ctx, store.ReferenceAirports, store.QueryDeleteAllAirports, columns, rows)
 }
 
+func (s *Store) ReplaceAirportMCT(ctx context.Context, columns []string, rows [][]string) error {
+	return s.replaceReferenceTable(ctx, store.ReferenceAirportMCT, store.QueryDeleteAllAirportMCT, columns, rows)
+}
+
 func (s *Store) replaceReferenceTable(
 	ctx context.Context,
 	dataset store.ReferenceDataset,
@@ -207,6 +211,7 @@ func isReferenceJobType(jobType model.JobType) bool {
 	case model.JobTypeImportCountries,
 		model.JobTypeImportRegions,
 		model.JobTypeImportAirports,
+		model.JobTypeImportAirportMCT,
 		model.JobTypeImportWeatherStations:
 		return true
 	default:
@@ -222,6 +227,8 @@ func hasReferenceDataQuery(dataset store.ReferenceDataset) (string, error) {
 		return store.QueryHasRegionsData, nil
 	case store.ReferenceAirports:
 		return store.QueryHasAirportsData, nil
+	case store.ReferenceAirportMCT:
+		return store.QueryHasAirportMCTData, nil
 	default:
 		return "", fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
 	}

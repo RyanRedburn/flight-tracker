@@ -30,6 +30,8 @@ type Config struct {
 	IEMGeoJSONTimeout          time.Duration `env:"IEM_GEOJSON_TIMEOUT" envDefault:"2m"`
 	OurAirportsBaseURL         string        `env:"OURAIRPORTS_BASE_URL" envDefault:"https://raw.githubusercontent.com/davidmegginson/ourairports-data/main"`
 	OurAirportsDownloadTimeout time.Duration `env:"OURAIRPORTS_DOWNLOAD_TIMEOUT" envDefault:"5m"`
+	MCTBaseURL                 string        `env:"MCT_BASE_URL" envDefault:"https://minimumconnectiontime.com"`
+	MCTHTTPTimeout             time.Duration `env:"MCT_HTTP_TIMEOUT" envDefault:"2m"`
 	MaxIngestMonths            int           `env:"MAX_INGEST_MONTHS" envDefault:"24"`
 	LogLevel                   slog.Level    `env:"LOG_LEVEL" envDefault:"info"`
 	AuthDisabled               bool          `env:"AUTH_DISABLED" envDefault:"false"`
