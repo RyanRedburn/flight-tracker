@@ -237,6 +237,13 @@ curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
+# Re-import weather months already loaded so each row gets ceiling_ft and category.
+# The migration does not classify existing rows. Each successful month rebuilds
+# route weather-stats rollups. Use force when that month already has observations.
+curl -X POST http://localhost:8080/api/v1/ingest/weather \
+  -H "Content-Type: application/json" \
+  -d '{"start_year":2024,"start_month":1,"force":true}'
+
 # Re-import reference data that already exists
 curl -X POST http://localhost:8080/api/v1/ingest/airports \
   -H "Content-Type: application/json" \
@@ -326,7 +333,7 @@ curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
 - After a successful month load, the worker rebuilds `route_travel_window_scopes` and `route_travel_window_buckets` from `flight_performance` (advisory lock, full replace) so `GET /api/v1/routes/travel-windows` can read rollups only.
 - The same load also rebuilds `route_weather_category_buckets` (separate advisory lock) so `GET /api/v1/routes/weather-stats` can read rollups only.
 - Admins can queue that same full rebuild without re-importing a month: `POST /api/v1/rebuild/travel-windows` with an empty body. Returns **409** if a `rebuild_route_travel_windows` job is already pending or running.
-- Admins can queue the weather-category rollup rebuild with `POST /api/v1/rebuild/weather-stats` (empty body). Returns **409** if a `rebuild_route_weather_stats` job is already pending or running. Queue it once after deploying so flights already loaded are matched; later flight, weather-observation, and weather-station loads rebuild it themselves.
+- Admins can queue the weather-category rollup rebuild with `POST /api/v1/rebuild/weather-stats` (empty body). Returns **409** if a `rebuild_route_weather_stats` job is already pending or running. The rebuild uses `category` stored on weather observations. After deploying onto observations loaded before those columns existed, re-import weather with `force: true` first (that load rebuilds the rollup). Later flight, weather-observation, and weather-station loads rebuild it themselves.
 - Returns **409** if a pending/running ingest job already exists for a requested month.
 - Returns **409** if flight data already exists and `force` is not set.
 - `force: true` skips the data-exists check; workers always replace the target month on import.
@@ -342,7 +349,7 @@ Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/i
 - Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
 - `start_year` must be >= 2018 (aligned with flight performance coverage).
 - Workers poll the database, download ASOS/METAR CSV for the month and stations from IEM, and replace `weather_observations` for that month.
-- Each loaded observation stores `ceiling_ft` and one `category`. Match rules for route weather stats are in `internal/ingest/iem/documents/asos_observations.md`.
+- Each loaded observation stores `ceiling_ft` and one `category`, computed in Go at ingest. The migration adds those columns and does not classify rows already stored. Re-import existing months with `force: true` after deploy. Rows with a null `category` are skipped when the rollup is rebuilt. Match rules are in `internal/ingest/iem/documents/asos_observations.md`.
 - After a successful month load, the worker rebuilds `route_weather_category_buckets`.
 - Returns **409** if a pending/running weather ingest job already exists for a requested month.
 - Returns **409** if weather data already exists and `force` is not set.

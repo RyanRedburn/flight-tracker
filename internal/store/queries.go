@@ -705,11 +705,12 @@ const (
 
 	// Full replace of per-side route weather rollups.
 	// Match window is ±30 minutes (store.WeatherMatchWindowMinutes). Nearest
-	// observation wins; an equal distance keeps the earlier valid time.
+	// observation with a stored category wins; an equal distance keeps the earlier valid time.
 	// Origin clock: crs_dep_time on flight_date at the origin station tzname.
 	// Destination clock: that departure instant plus crs_elapsed_time minutes.
 	// crs_arr_time is not used. A side with no mapped station, no usable clock,
-	// or no observation in the window is UNMATCHED (not VFR_FAIR).
+	// or no observation with a stored category in the window is UNMATCHED
+	// (not VFR_FAIR). Category is the value written at weather ingest.
 	// On time is not cancelled, then not diverted, then arr_del15 < 1.
 	// flight_number -1 stands in for a missing marketing flight number.
 	QueryInsertRouteWeatherStats = `
@@ -809,22 +810,26 @@ const (
 				END AS dest_category
 			FROM timed t
 			LEFT JOIN LATERAL (
-				SELECT COALESCE(NULLIF(btrim(w.category), ''), 'UNKNOWN') AS category
+				SELECT btrim(w.category) AS category
 				FROM weather_observations w
 				WHERE t.sched_dep IS NOT NULL
 					AND t.origin_sid IS NOT NULL
 					AND w.station = t.origin_sid
+					AND w.category IS NOT NULL
+					AND btrim(w.category) <> ''
 					AND w.valid >= t.sched_dep - INTERVAL '30 minutes'
 					AND w.valid <= t.sched_dep + INTERVAL '30 minutes'
 				ORDER BY abs(EXTRACT(EPOCH FROM (w.valid - t.sched_dep))), w.valid
 				LIMIT 1
 			) ow ON true
 			LEFT JOIN LATERAL (
-				SELECT COALESCE(NULLIF(btrim(w.category), ''), 'UNKNOWN') AS category
+				SELECT btrim(w.category) AS category
 				FROM weather_observations w
 				WHERE t.sched_arr IS NOT NULL
 					AND t.dest_sid IS NOT NULL
 					AND w.station = t.dest_sid
+					AND w.category IS NOT NULL
+					AND btrim(w.category) <> ''
 					AND w.valid >= t.sched_arr - INTERVAL '30 minutes'
 					AND w.valid <= t.sched_arr + INTERVAL '30 minutes'
 				ORDER BY abs(EXTRACT(EPOCH FROM (w.valid - t.sched_arr))), w.valid
