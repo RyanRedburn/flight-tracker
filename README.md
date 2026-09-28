@@ -4,7 +4,7 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, weather station mappings, and airport reference data (countries, regions, airports).
+Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, weather station mappings, airport reference data (countries, regions, airports), and airport minimum connection times.
 
 ## Features
 
@@ -12,6 +12,7 @@ Go service with a REST API and an in-process background worker for importing fli
 - `POST /api/v1/ingest/weather` to queue per-month ASOS/METAR weather observation import jobs
 - `POST /api/v1/ingest/weather-stations` to queue IEM ASOS catalog and BTS airport mapping import
 - `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
+- `POST /api/v1/ingest/mct` to queue airport minimum connection time imports
 - Poll-based background workers that download, parse, and load data into Postgres
 - REST API for route performance stats, typical-year travel windows, carrier performance stats, booking outlook probabilities, and job status
 - Hashed API keys in Postgres (`consumer`, `subscriber`, `admin`) with shared, multi-replica rate limits
@@ -104,6 +105,8 @@ Environment variables (defaults shown):
 | `IEM_GEOJSON_TIMEOUT` | `2m` | HTTP timeout for IEM station GeoJSON downloads |
 | `OURAIRPORTS_BASE_URL` | `https://raw.githubusercontent.com/davidmegginson/ourairports-data/main` | OurAirports (reference data source) CSV base URL |
 | `OURAIRPORTS_DOWNLOAD_TIMEOUT` | `5m` | HTTP timeout for OurAirports CSV downloads |
+| `MCT_BASE_URL` | `https://minimumconnectiontime.com` | Minimum Connection Time API origin (override in tests) |
+| `MCT_HTTP_TIMEOUT` | `2m` | Per-request HTTP timeout for paginated airport MCT downloads |
 | `MAX_INGEST_MONTHS` | `24` | Max months per flight-performance ingest request |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `AUTH_DISABLED` | `false` | When `true`, skip API authentication **and** rate limits. Explicit local/dev fail-open; the process logs a warning. Production must leave this false. |
@@ -222,6 +225,11 @@ curl -X POST http://localhost:8080/api/v1/ingest/airports \
   -H "Content-Type: application/json" \
   -d '{}'
 
+# Queue airport minimum connection times (independent of the reference-data order above)
+curl -X POST http://localhost:8080/api/v1/ingest/mct \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
 # Queue weather station catalog + BTS airport mapping (after at least one BTS month)
 curl -X POST http://localhost:8080/api/v1/ingest/weather-stations \
   -H "Content-Type: application/json" \
@@ -249,13 +257,18 @@ curl -X POST http://localhost:8080/api/v1/ingest/airports \
   -H "Content-Type: application/json" \
   -d '{"force":true}'
 
+# Re-import airport MCT rows that already exist
+curl -X POST http://localhost:8080/api/v1/ingest/mct \
+  -H "Content-Type: application/json" \
+  -d '{"force":true}'
+
 # Get job status
 curl http://localhost:8080/api/v1/jobs/<job-id>
 
 # List recent jobs
 curl http://localhost:8080/api/v1/jobs
 
-# Dataset freshness (admin): last successful ingest and latest covered period per dataset.
+# Dataset freshness (admin): last successful ingest, how long that job took, and the latest covered period per dataset.
 # Ingest timestamps and periods are null when that dataset has never been loaded.
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
 
@@ -381,6 +394,19 @@ Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field
 
 Source adapter: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
 
+#### Airport minimum connection times (`POST /api/v1/ingest/mct`)
+
+- Creates one `import_airport_mct` job.
+- The worker pages `GET /api/airports` on [Minimum Connection Time](https://minimumconnectiontime.com) (about one request per second, with backoff on HTTP 429 and 5xx). It does not use `minimal=true`, because that view omits connection-time fields. Request handlers never call this API.
+- A successful job full-replaces `airport_mct`.
+- These minutes are compiled planning estimates from public sources. They are **not** official OAG or IATA minimum connection times, and they are not airline-, terminal-, or flight-number-specific rules. A carrier can require a longer connection than the stored figure.
+- Attribute the source with a link to [minimumconnectiontime.com](https://minimumconnectiontime.com) if you publish a product that uses these values.
+- Returns **409** if a pending or running job already exists for this dataset, even when `force` is true.
+- Returns **409** if `airport_mct` already has rows and `force` is not set.
+- `force: true` skips the data-exists check. The worker still full-replaces the table.
+- A failed download does not change `airport_mct`. Re-import about once a month; the source revises estimates as airport procedures change.
+- `MCT_BASE_URL` and `MCT_HTTP_TIMEOUT` override the origin and the per-request timeout.
+
 ### Job leases and shutdown
 
 Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` and write `lease_expires_at` (claim sets the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
@@ -433,7 +459,7 @@ docs/full/            Generated OpenAPI (full / internal Swagger)
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
 internal/database/    Store factory (driver selection)
-internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAirports) download/parse/load
+internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAirports, MCT) download/parse/load
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, Postgres implementation, test stub

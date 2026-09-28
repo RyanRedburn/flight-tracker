@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -20,14 +21,15 @@ const (
 // HasRows is true when that table or a sibling loaded by the same replace
 // (airport_weather_stations) has rows.
 type FreshnessInput struct {
-	Kind     FreshnessKind
-	JobID    string
-	EndedAt  *time.Time
-	Year     int
-	Month    int
-	HasMonth bool
-	RowCount int64
-	HasRows  bool
+	Kind      FreshnessKind
+	JobID     string
+	StartedAt *time.Time
+	EndedAt   *time.Time
+	Year      int
+	Month     int
+	HasMonth  bool
+	RowCount  int64
+	HasRows   bool
 }
 
 // AssembleDataFreshness builds the stable dataset list from raw watermarks.
@@ -53,6 +55,7 @@ func freshnessDatasetIDs() []string {
 		model.DatasetIDCountries,
 		model.DatasetIDRegions,
 		model.DatasetIDAirports,
+		model.DatasetIDAirportMCT,
 	}
 }
 
@@ -64,7 +67,7 @@ func freshnessKindOrDefault(id string, kind FreshnessKind) FreshnessKind {
 	switch id {
 	case model.DatasetIDFlightPerformance, model.DatasetIDWeatherObservations:
 		return FreshnessKindMonth
-	case model.DatasetIDWeatherStations, model.DatasetIDCountries, model.DatasetIDRegions, model.DatasetIDAirports:
+	case model.DatasetIDWeatherStations, model.DatasetIDCountries, model.DatasetIDRegions, model.DatasetIDAirports, model.DatasetIDAirportMCT:
 		return FreshnessKindSnapshot
 	default:
 		return ""
@@ -78,6 +81,7 @@ func datasetFromFreshness(id string, in FreshnessInput) model.DatasetFreshness {
 		jobID := in.JobID
 		ds.LastSuccessfulJobID = &jobID
 		ds.LastSuccessfulIngestAt = cloneTime(in.EndedAt)
+		ds.LastSuccessfulIngestDuration = ingestDuration(in.StartedAt, in.EndedAt)
 	}
 
 	ds.LatestPeriod = freshnessPeriod(in)
@@ -127,6 +131,23 @@ func snapshotFreshnessPeriod(in FreshnessInput) *model.FreshnessPeriod {
 	}
 
 	return period
+}
+
+// ingestDuration is HH:MM:ss from ended_at - started_at; null if start or end is missing or inverted.
+func ingestDuration(start, end *time.Time) *string {
+	if start == nil || end == nil {
+		return nil
+	}
+
+	d := end.Sub(*start)
+	if d < 0 {
+		return nil
+	}
+
+	seconds := int64(d / time.Second)
+	formatted := fmt.Sprintf("%02d:%02d:%02d", seconds/3600, (seconds%3600)/60, seconds%60)
+
+	return &formatted
 }
 
 func cloneTime(t *time.Time) *time.Time {

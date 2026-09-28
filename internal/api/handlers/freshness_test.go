@@ -36,8 +36,8 @@ func TestFreshnessGetEmpty(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if len(body.Datasets) != 6 {
-		t.Fatalf("len = %d, want 6", len(body.Datasets))
+	if len(body.Datasets) != 7 {
+		t.Fatalf("len = %d, want 7", len(body.Datasets))
 	}
 
 	for _, raw := range body.Datasets {
@@ -46,7 +46,7 @@ func TestFreshnessGetEmpty(t *testing.T) {
 			t.Fatalf("decode dataset: %v", err)
 		}
 
-		for _, key := range []string{"last_successful_ingest_at", "latest_period", "last_successful_job_id"} {
+		for _, key := range []string{"last_successful_ingest_at", "last_successful_ingest_duration", "latest_period", "last_successful_job_id"} {
 			if string(fields[key]) != "null" {
 				t.Errorf("%s = %s, want null", key, fields[key])
 			}
@@ -56,17 +56,19 @@ func TestFreshnessGetEmpty(t *testing.T) {
 
 func TestFreshnessGetPartial(t *testing.T) {
 	ended := time.Date(2026, 9, 18, 14, 22, 0, 123456789, time.UTC)
+	started := ended.Add(-90*time.Second - 500*time.Millisecond)
 
 	h := NewFreshnessHandler(&storetest.Stub{
 		DataFreshnessFn: func(context.Context) (model.DataFreshness, error) {
 			return store.AssembleDataFreshness(map[string]store.FreshnessInput{
 				model.DatasetIDFlightPerformance: {
-					Kind:     store.FreshnessKindMonth,
-					JobID:    "job-fp",
-					EndedAt:  &ended,
-					Year:     2026,
-					Month:    6,
-					HasMonth: true,
+					Kind:      store.FreshnessKindMonth,
+					JobID:     "job-fp",
+					StartedAt: &started,
+					EndedAt:   &ended,
+					Year:      2026,
+					Month:     6,
+					HasMonth:  true,
 				},
 				model.DatasetIDCountries: {
 					Kind:     store.FreshnessKindSnapshot,
@@ -116,6 +118,10 @@ func TestFreshnessGetPartial(t *testing.T) {
 		t.Fatalf("flight job = %v", fp.LastSuccessfulJobID)
 	}
 
+	if fp.LastSuccessfulIngestDuration == nil || *fp.LastSuccessfulIngestDuration != "00:01:30" {
+		t.Fatalf("flight duration = %v, want 00:01:30", fp.LastSuccessfulIngestDuration)
+	}
+
 	if fp.LatestPeriod == nil || fp.LatestPeriod.Type != model.FreshnessPeriodTypeMonth {
 		t.Fatalf("flight period = %+v", fp.LatestPeriod)
 	}
@@ -141,13 +147,17 @@ func TestFreshnessGetPartial(t *testing.T) {
 		t.Fatalf("countries row_count = %v", countries.LatestPeriod.RowCount)
 	}
 
+	if countries.LastSuccessfulIngestDuration != nil {
+		t.Fatalf("countries duration = %v, want null without started_at", countries.LastSuccessfulIngestDuration)
+	}
+
 	regions := byID[model.DatasetIDRegions]
 	if regions.LatestPeriod != nil || regions.LastSuccessfulIngestAt != nil || regions.LastSuccessfulJobID != nil {
 		t.Fatalf("regions = %+v, want empty", regions)
 	}
 
 	weather := byID[model.DatasetIDWeatherObservations]
-	if weather.LatestPeriod != nil || weather.LastSuccessfulJobID != nil {
+	if weather.LatestPeriod != nil || weather.LastSuccessfulJobID != nil || weather.LastSuccessfulIngestDuration != nil {
 		t.Fatalf("weather = %+v, want empty", weather)
 	}
 

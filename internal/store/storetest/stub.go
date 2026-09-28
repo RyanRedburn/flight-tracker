@@ -34,6 +34,7 @@ type Stub struct {
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
+	ReplaceAirportMCTFn                   func(ctx context.Context, columns []string, rows [][]string) error
 	HasWeatherStationsDataFn              func(ctx context.Context) (bool, error)
 	ReplaceWeatherStationsFn              func(ctx context.Context, stationColumns []string, stationRows [][]string, mappingColumns []string, mappingRows [][]string) error
 	ListAirportWeatherStationsFn          func(ctx context.Context) ([]store.AirportWeatherStation, error)
@@ -232,6 +233,14 @@ func (s *Stub) ReplaceAirports(ctx context.Context, columns []string, rows [][]s
 	}
 
 	return s.ReplaceAirportsFn(ctx, columns, rows)
+}
+
+func (s *Stub) ReplaceAirportMCT(ctx context.Context, columns []string, rows [][]string) error {
+	if s.ReplaceAirportMCTFn == nil {
+		panic("unexpected call: ReplaceAirportMCT")
+	}
+
+	return s.ReplaceAirportMCTFn(ctx, columns, rows)
 }
 
 func (s *Stub) HasWeatherStationsData(ctx context.Context) (bool, error) {

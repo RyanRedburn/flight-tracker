@@ -10,8 +10,9 @@ import (
 )
 
 type jobWatermark struct {
-	id      sql.NullString
-	endedAt sql.NullTime
+	id        sql.NullString
+	startedAt sql.NullTime
+	endedAt   sql.NullTime
 }
 
 func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) {
@@ -29,6 +30,8 @@ func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) 
 		regionsCount              int64
 		airportsJob               jobWatermark
 		airportsCount             int64
+		mctJob                    jobWatermark
+		mctCount                  int64
 	)
 
 	err := s.db.QueryRowContext(ctx, store.QueryDataFreshness,
@@ -39,28 +42,39 @@ func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) 
 		model.JobTypeImportCountries,
 		model.JobTypeImportRegions,
 		model.JobTypeImportAirports,
+		model.JobTypeImportAirportMCT,
 	).Scan(
 		&flightJob.id,
+		&flightJob.startedAt,
 		&flightJob.endedAt,
 		&flightYear,
 		&flightMonth,
 		&weatherJob.id,
+		&weatherJob.startedAt,
 		&weatherJob.endedAt,
 		&weatherYear,
 		&weatherMonth,
 		&stationsJob.id,
+		&stationsJob.startedAt,
 		&stationsJob.endedAt,
 		&stationsCount,
 		&mappingsCount,
 		&countriesJob.id,
+		&countriesJob.startedAt,
 		&countriesJob.endedAt,
 		&countriesCount,
 		&regionsJob.id,
+		&regionsJob.startedAt,
 		&regionsJob.endedAt,
 		&regionsCount,
 		&airportsJob.id,
+		&airportsJob.startedAt,
 		&airportsJob.endedAt,
 		&airportsCount,
+		&mctJob.id,
+		&mctJob.startedAt,
+		&mctJob.endedAt,
+		&mctCount,
 	)
 	if err != nil {
 		return model.DataFreshness{}, fmt.Errorf("query data freshness: %w", err)
@@ -72,9 +86,10 @@ func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) 
 		model.DatasetIDWeatherStations: stationsJob.toInput(
 			store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, stationsCount, stationsCount > 0 || mappingsCount > 0,
 		),
-		model.DatasetIDCountries: countriesJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, countriesCount, countriesCount > 0),
-		model.DatasetIDRegions:   regionsJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, regionsCount, regionsCount > 0),
-		model.DatasetIDAirports:  airportsJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, airportsCount, airportsCount > 0),
+		model.DatasetIDCountries:  countriesJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, countriesCount, countriesCount > 0),
+		model.DatasetIDRegions:    regionsJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, regionsCount, regionsCount > 0),
+		model.DatasetIDAirports:   airportsJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, airportsCount, airportsCount > 0),
+		model.DatasetIDAirportMCT: mctJob.toInput(store.FreshnessKindSnapshot, sql.NullInt64{}, sql.NullInt64{}, mctCount, mctCount > 0),
 	}
 
 	return store.AssembleDataFreshness(byID), nil
@@ -89,6 +104,11 @@ func (w jobWatermark) toInput(kind store.FreshnessKind, year, month sql.NullInt6
 
 	if w.id.Valid {
 		in.JobID = w.id.String
+	}
+
+	if w.startedAt.Valid {
+		started := w.startedAt.Time
+		in.StartedAt = &started
 	}
 
 	if w.endedAt.Valid {

@@ -131,13 +131,15 @@ const (
 		FROM airports
 		WHERE iata_code = ANY($1)`
 
-	QueryDeleteAllCountries = `DELETE FROM countries`
-	QueryDeleteAllRegions   = `DELETE FROM regions`
-	QueryDeleteAllAirports  = `DELETE FROM airports`
+	QueryDeleteAllCountries  = `DELETE FROM countries`
+	QueryDeleteAllRegions    = `DELETE FROM regions`
+	QueryDeleteAllAirports   = `DELETE FROM airports`
+	QueryDeleteAllAirportMCT = `DELETE FROM airport_mct`
 
-	QueryHasCountriesData = `SELECT 1 FROM countries LIMIT 1`
-	QueryHasRegionsData   = `SELECT 1 FROM regions LIMIT 1`
-	QueryHasAirportsData  = `SELECT 1 FROM airports LIMIT 1`
+	QueryHasCountriesData  = `SELECT 1 FROM countries LIMIT 1`
+	QueryHasRegionsData    = `SELECT 1 FROM regions LIMIT 1`
+	QueryHasAirportsData   = `SELECT 1 FROM airports LIMIT 1`
+	QueryHasAirportMCTData = `SELECT 1 FROM airport_mct LIMIT 1`
 
 	QueryDeleteAllWeatherStations        = `DELETE FROM weather_stations`
 	QueryDeleteAllAirportWeatherStations = `DELETE FROM airport_weather_stations`
@@ -944,8 +946,8 @@ const (
 		WHERE last_refill_at < $1`
 
 	// Single-statement read of completed-job watermarks and covered periods.
-	// $1 = completed status. $2..$7 = job types, in dataset order:
-	// flight performance, weather observations, weather stations, countries, regions, airports.
+	// $1 = completed status. $2..$8 = job types, in dataset order:
+	// flight performance, weather observations, weather stations, countries, regions, airports, airport MCT.
 	// Month periods are the max (year, month) stored in the data tables, which can differ
 	// from the month of the most recently completed job (partial backfill).
 	QueryDataFreshness = `
@@ -953,10 +955,11 @@ const (
 			SELECT DISTINCT ON (type)
 				type,
 				id,
+				started_at,
 				ended_at
 			FROM jobs
 			WHERE status = $1
-			  AND type IN ($2, $3, $4, $5, $6, $7)
+			  AND type IN ($2, $3, $4, $5, $6, $7, $8)
 			ORDER BY type, ended_at DESC NULLS LAST, id DESC
 		),
 		flight_month AS (
@@ -977,24 +980,34 @@ const (
 		)
 		SELECT
 			(SELECT id FROM last_job WHERE type = $2),
+			(SELECT started_at FROM last_job WHERE type = $2),
 			(SELECT ended_at FROM last_job WHERE type = $2),
 			(SELECT year FROM flight_month),
 			(SELECT month FROM flight_month),
 			(SELECT id FROM last_job WHERE type = $3),
+			(SELECT started_at FROM last_job WHERE type = $3),
 			(SELECT ended_at FROM last_job WHERE type = $3),
 			(SELECT year FROM weather_month),
 			(SELECT month FROM weather_month),
 			(SELECT id FROM last_job WHERE type = $4),
+			(SELECT started_at FROM last_job WHERE type = $4),
 			(SELECT ended_at FROM last_job WHERE type = $4),
 			(SELECT COUNT(*) FROM weather_stations),
 			(SELECT COUNT(*) FROM airport_weather_stations),
 			(SELECT id FROM last_job WHERE type = $5),
+			(SELECT started_at FROM last_job WHERE type = $5),
 			(SELECT ended_at FROM last_job WHERE type = $5),
 			(SELECT COUNT(*) FROM countries),
 			(SELECT id FROM last_job WHERE type = $6),
+			(SELECT started_at FROM last_job WHERE type = $6),
 			(SELECT ended_at FROM last_job WHERE type = $6),
 			(SELECT COUNT(*) FROM regions),
 			(SELECT id FROM last_job WHERE type = $7),
+			(SELECT started_at FROM last_job WHERE type = $7),
 			(SELECT ended_at FROM last_job WHERE type = $7),
-			(SELECT COUNT(*) FROM airports)`
+			(SELECT COUNT(*) FROM airports),
+			(SELECT id FROM last_job WHERE type = $8),
+			(SELECT started_at FROM last_job WHERE type = $8),
+			(SELECT ended_at FROM last_job WHERE type = $8),
+			(SELECT COUNT(*) FROM airport_mct)`
 )

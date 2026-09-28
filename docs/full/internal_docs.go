@@ -117,7 +117,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, and airports. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.",
+                "description": "Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.",
                 "produces": [
                     "application/json"
                 ],
@@ -330,6 +330,81 @@ const docTemplateinternal = `{
                     "internal"
                 ],
                 "summary": "Queue countries reference data ingest",
+                "parameters": [
+                    {
+                        "description": "Optional force flag",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/model.ForceIngestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReferenceIngestConflictResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ingest/mct": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Queues an import of airport minimum connection times from https://minimumconnectiontime.com. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ingest",
+                    "internal"
+                ],
+                "summary": "Queue airport MCT ingest",
                 "parameters": [
                     {
                         "description": "Optional force flag",
@@ -1688,6 +1763,9 @@ const docTemplateinternal = `{
                 "last_successful_ingest_at": {
                     "type": "string"
                 },
+                "last_successful_ingest_duration": {
+                    "type": "string"
+                },
                 "last_successful_job_id": {
                     "type": "string"
                 },
@@ -2278,6 +2356,7 @@ const docTemplateinternal = `{
                 "import_countries",
                 "import_regions",
                 "import_airports",
+                "import_airport_mct",
                 "import_weather_stations",
                 "rebuild_route_travel_windows",
                 "rebuild_route_weather_stats"
@@ -2288,6 +2367,7 @@ const docTemplateinternal = `{
                 "JobTypeImportCountries",
                 "JobTypeImportRegions",
                 "JobTypeImportAirports",
+                "JobTypeImportAirportMCT",
                 "JobTypeImportWeatherStations",
                 "JobTypeRebuildRouteTravelWindows",
                 "JobTypeRebuildRouteWeatherStats"

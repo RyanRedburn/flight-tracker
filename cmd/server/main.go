@@ -48,6 +48,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/database"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
+	"github.com/RyanRedburn/flight-tracker/internal/ingest/mct"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/operator"
 )
@@ -114,6 +115,9 @@ func run() int {
 	oaDownloader := ourairports.NewDownloader(cfg.OurAirportsBaseURL, cfg.OurAirportsDownloadTimeout)
 	oaIngest := ourairports.NewService(st, oaDownloader)
 
+	mctDownloader := mct.NewDownloader(cfg.MCTBaseURL, cfg.MCTHTTPTimeout)
+	mctIngest := mct.NewService(st, mctDownloader)
+
 	processor, err := operator.NewProcessor(st,
 		operator.NewFlightPerformanceIngestHandler(st, flightPerformanceIngest),
 		operator.NewRebuildRouteTravelWindowsHandler(st),
@@ -123,6 +127,7 @@ func run() int {
 		operator.NewCountriesHandler(oaIngest),
 		operator.NewRegionsHandler(oaIngest),
 		operator.NewAirportsHandler(oaIngest),
+		operator.NewAirportMCTHandler(mctIngest),
 	)
 	if err != nil {
 		logger.Error("build job processor", "error", err)

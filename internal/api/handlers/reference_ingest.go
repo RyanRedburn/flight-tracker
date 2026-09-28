@@ -88,6 +88,29 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 	h.createReference(w, r, store.ReferenceAirports)
 }
 
+// CreateAirportMCT queues an airport minimum-connection-time ingest job.
+//
+//	@Summary		Queue airport MCT ingest
+//	@Description	Queues an import of airport minimum connection times from https://minimumconnectiontime.com. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Tags			ingest,internal
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
+//	@Success		201		{object}	ReferenceIngestResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		401		{object}	ErrorResponse
+//	@Failure		403		{object}	ErrorResponse
+//	@Failure		409		{object}	ReferenceIngestConflictResponse
+//	@Failure		429		{object}	ErrorResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Security		ApiKeyAuth
+//	@Router			/api/v1/ingest/mct [post]
+func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http.Request) {
+	h.create(w, r, model.JobTypeImportAirportMCT, string(store.ReferenceAirportMCT), func(ctx context.Context) (bool, error) {
+		return h.store.HasReferenceData(ctx, store.ReferenceAirportMCT)
+	})
+}
+
 // CreateWeatherStations queues an IEM ASOS catalog and BTS airport mapping ingest job.
 //
 //	@Summary		Queue weather station mapping ingest

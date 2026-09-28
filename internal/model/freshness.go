@@ -9,6 +9,7 @@ const (
 	DatasetIDCountries           = "countries"
 	DatasetIDRegions             = "regions"
 	DatasetIDAirports            = "airports"
+	DatasetIDAirportMCT          = "airport_mct"
 
 	FreshnessPeriodTypeMonth    = "month"
 	FreshnessPeriodTypeSnapshot = "snapshot"
@@ -21,10 +22,11 @@ type DataFreshness struct {
 
 // DatasetFreshness is one current dataset. Nil fields mean that signal is absent.
 type DatasetFreshness struct {
-	ID                     string
-	LastSuccessfulIngestAt *time.Time
-	LatestPeriod           *FreshnessPeriod
-	LastSuccessfulJobID    *string
+	ID                           string
+	LastSuccessfulIngestAt       *time.Time
+	LastSuccessfulIngestDuration *string
+	LatestPeriod                 *FreshnessPeriod
+	LastSuccessfulJobID          *string
 }
 
 // FreshnessPeriod is either a covered month or a full-table snapshot.

@@ -1,0 +1,45 @@
+{
+  "data": [
+    {
+      "city": "Atlanta",
+      "code": "ATL",
+      "country": "United States of America",
+      "iataCode": "ATL",
+      "icao": "KATL",
+      "international": true,
+      "last_updated": "2026-03-29",
+      "latitude": 33.63666667,
+      "longitude": -84.42805556,
+      "mct_domestic_to_domestic": 1,
+      "mct_domestic_to_international": 1,
+      "mct_interline": 1,
+      "mct_international_to_domestic": 1,
+      "mct_international_to_international": 1,
+      "name": "Duplicate Atlanta should be ignored"
+    },
+    {
+      "city": "London",
+      "code": "lhr",
+      "country": "United Kingdom",
+      "icao": "EGLL",
+      "international": true,
+      "last_updated": "2026-03-29",
+      "latitude": 51.47,
+      "longitude": -0.4543,
+      "mct_domestic_to_domestic": 60,
+      "mct_domestic_to_international": 90,
+      "mct_interline": 120,
+      "mct_international_to_domestic": 90,
+      "mct_international_to_international": 90,
+      "name": "London Heathrow"
+    }
+  ],
+  "pagination": {
+    "has_next": false,
+    "has_prev": true,
+    "page": 2,
+    "per_page": 100,
+    "total": 6,
+    "total_pages": 2
+  }
+}
