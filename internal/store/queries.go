@@ -141,6 +141,15 @@ const (
 	QueryHasAirportsData   = `SELECT 1 FROM airports LIMIT 1`
 	QueryHasAirportMCTData = `SELECT 1 FROM airport_mct LIMIT 1`
 
+	QueryAirportMCTMinutes = `
+		SELECT
+			mct_domestic_to_domestic,
+			mct_domestic_to_international,
+			mct_international_to_domestic,
+			mct_international_to_international
+		FROM airport_mct
+		WHERE iata_code = $1`
+
 	QueryDeleteAllWeatherStations        = `DELETE FROM weather_stations`
 	QueryDeleteAllAirportWeatherStations = `DELETE FROM airport_weather_stations`
 
@@ -521,7 +530,12 @@ const (
 				FROM classified
 				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
 			) AS median_arr_delayed,
-			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep
+			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep,
+			(
+				SELECT percentile_cont(0.9) WITHIN GROUP (ORDER BY arr_delay_minutes)
+				FROM classified
+				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
+			) AS p90_arr
 		FROM classified`
 
 	QueryRouteTravelWindowScope = `

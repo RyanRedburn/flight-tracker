@@ -101,6 +101,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		avgArrDelayed    sql.NullFloat64
 		medianArrDelayed sql.NullFloat64
 		avgDep           sql.NullFloat64
+		p90Arr           sql.NullFloat64
 	)
 
 	err = s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
@@ -123,6 +124,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		&avgArrDelayed,
 		&medianArrDelayed,
 		&avgDep,
+		&p90Arr,
 	)
 	if err != nil {
 		return nil, err
@@ -143,9 +145,56 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	out.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
 	out.LikelyDepartureDelayMinutes = nullFloat(avgDep)
 
+	if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
+		return nil, err
+	}
+
 	out.RoundForResponse()
 
 	return out, nil
+}
+
+func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOutlook, p90 sql.NullFloat64) error {
+	var (
+		delay *float64
+		mct   *store.AirportConnectionMCT
+	)
+
+	if !out.InsufficientSample && p90.Valid {
+		v := p90.Float64
+		delay = &v
+
+		loaded, err := s.airportConnectionMCT(ctx, out.Dest)
+		if err != nil {
+			return err
+		}
+
+		mct = loaded
+	}
+
+	out.RecommendedConnectionMinutes = store.ConnectionRecommendation(out.InsufficientSample, delay, mct)
+
+	return nil
+}
+
+func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*store.AirportConnectionMCT, error) {
+	var dd, di, id, ii sql.NullInt64
+
+	err := s.db.QueryRowContext(ctx, store.QueryAirportMCTMinutes, iata).Scan(&dd, &di, &id, &ii)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &store.AirportConnectionMCT{
+		DomesticToDomestic:           nullIntPtr(dd),
+		DomesticToInternational:      nullIntPtr(di),
+		InternationalToDomestic:      nullIntPtr(id),
+		InternationalToInternational: nullIntPtr(ii),
+	}, nil
 }
 
 func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTime, error) {
@@ -295,4 +344,14 @@ func nullFloat(n sql.NullFloat64) float64 {
 	}
 
 	return n.Float64
+}
+
+func nullIntPtr(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+
+	v := int(n.Int64)
+
+	return &v
 }

@@ -108,6 +108,81 @@ func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 	}
 }
 
+func TestRecommendedConnectionMinutesJSON(t *testing.T) {
+	body, err := json.Marshal(RouteOutlook{})
+	if err != nil {
+		t.Fatalf("marshal nulls: %v", err)
+	}
+
+	assertNullConnectionMinutes(t, jsonField(t, body, "recommended_connection_minutes"))
+
+	dd := 0
+	di := 60
+	id := 50
+	ii := 200
+
+	populated, err := json.Marshal(RouteOutlook{
+		RecommendedConnectionMinutes: RecommendedConnectionMinutes{
+			DomesticToDomestic:           &dd,
+			DomesticToInternational:      &di,
+			InternationalToDomestic:      &id,
+			InternationalToInternational: &ii,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal populated: %v", err)
+	}
+
+	var got RecommendedConnectionMinutes
+	if err := json.Unmarshal(jsonField(t, populated, "recommended_connection_minutes"), &got); err != nil {
+		t.Fatalf("decode recommended_connection_minutes: %v", err)
+	}
+
+	assertMinutes(t, "domestic_to_domestic", got.DomesticToDomestic, 0)
+	assertMinutes(t, "domestic_to_international", got.DomesticToInternational, 60)
+	assertMinutes(t, "international_to_domestic", got.InternationalToDomestic, 50)
+	assertMinutes(t, "international_to_international", got.InternationalToInternational, 200)
+}
+
+func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
+	t.Helper()
+
+	var buckets map[string]*int
+	if err := json.Unmarshal(raw, &buckets); err != nil {
+		t.Fatalf("decode connection minutes: %v", err)
+	}
+
+	for _, key := range []string{
+		"domestic_to_domestic",
+		"domestic_to_international",
+		"international_to_domestic",
+		"international_to_international",
+	} {
+		value, ok := buckets[key]
+		if !ok {
+			t.Errorf("missing %s", key)
+			continue
+		}
+
+		if value != nil {
+			t.Errorf("%s = %d, want null", key, *value)
+		}
+	}
+}
+
+func assertMinutes(t *testing.T, name string, got *int, want int) {
+	t.Helper()
+
+	if got == nil {
+		t.Errorf("%s = null, want %d", name, want)
+		return
+	}
+
+	if *got != want {
+		t.Errorf("%s = %d, want %d", name, *got, want)
+	}
+}
+
 func TestRouteOutlookRoundForResponse(t *testing.T) {
 	out := RouteOutlook{
 		OnTimeProbability:             1.0 / 3.0,
