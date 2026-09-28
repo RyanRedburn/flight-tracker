@@ -269,7 +269,6 @@ curl http://localhost:8080/api/v1/jobs/<job-id>
 curl http://localhost:8080/api/v1/jobs
 
 # Dataset freshness (admin): last successful ingest, how long that job took, and the latest covered period per dataset.
-# last_successful_ingest_duration is HH:MM:ss (hours are not wrapped at 24). It is null when the job never completed or start/end cannot form a duration. A same-second run is 00:00:00.
 # Ingest timestamps and periods are null when that dataset has never been loaded.
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
 
