@@ -46,7 +46,7 @@ func TestFreshnessGetEmpty(t *testing.T) {
 			t.Fatalf("decode dataset: %v", err)
 		}
 
-		for _, key := range []string{"last_successful_ingest_at", "last_successful_ingest_duration_seconds", "latest_period", "last_successful_job_id"} {
+		for _, key := range []string{"last_successful_ingest_at", "last_successful_ingest_duration", "latest_period", "last_successful_job_id"} {
 			if string(fields[key]) != "null" {
 				t.Errorf("%s = %s, want null", key, fields[key])
 			}
@@ -118,8 +118,8 @@ func TestFreshnessGetPartial(t *testing.T) {
 		t.Fatalf("flight job = %v", fp.LastSuccessfulJobID)
 	}
 
-	if fp.LastSuccessfulIngestDurationSeconds == nil || *fp.LastSuccessfulIngestDurationSeconds != 90 {
-		t.Fatalf("flight duration = %v, want 90", fp.LastSuccessfulIngestDurationSeconds)
+	if fp.LastSuccessfulIngestDuration == nil || *fp.LastSuccessfulIngestDuration != "00:01:30" {
+		t.Fatalf("flight duration = %v, want 00:01:30", fp.LastSuccessfulIngestDuration)
 	}
 
 	if fp.LatestPeriod == nil || fp.LatestPeriod.Type != model.FreshnessPeriodTypeMonth {
@@ -147,8 +147,8 @@ func TestFreshnessGetPartial(t *testing.T) {
 		t.Fatalf("countries row_count = %v", countries.LatestPeriod.RowCount)
 	}
 
-	if countries.LastSuccessfulIngestDurationSeconds != nil {
-		t.Fatalf("countries duration = %v, want null without started_at", countries.LastSuccessfulIngestDurationSeconds)
+	if countries.LastSuccessfulIngestDuration != nil {
+		t.Fatalf("countries duration = %v, want null without started_at", countries.LastSuccessfulIngestDuration)
 	}
 
 	regions := byID[model.DatasetIDRegions]
@@ -157,7 +157,7 @@ func TestFreshnessGetPartial(t *testing.T) {
 	}
 
 	weather := byID[model.DatasetIDWeatherObservations]
-	if weather.LatestPeriod != nil || weather.LastSuccessfulJobID != nil || weather.LastSuccessfulIngestDurationSeconds != nil {
+	if weather.LatestPeriod != nil || weather.LastSuccessfulJobID != nil || weather.LastSuccessfulIngestDuration != nil {
 		t.Fatalf("weather = %+v, want empty", weather)
 	}
 

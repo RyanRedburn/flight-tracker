@@ -31,7 +31,7 @@ func TestAssembleDataFreshnessEmpty(t *testing.T) {
 			t.Errorf("datasets[%d].id = %q, want %q", i, ds.ID, wantIDs[i])
 		}
 
-		if ds.LastSuccessfulIngestAt != nil || ds.LastSuccessfulIngestDurationSeconds != nil || ds.LatestPeriod != nil || ds.LastSuccessfulJobID != nil {
+		if ds.LastSuccessfulIngestAt != nil || ds.LastSuccessfulIngestDuration != nil || ds.LatestPeriod != nil || ds.LastSuccessfulJobID != nil {
 			t.Errorf("datasets[%d] = %+v, want empty", i, ds)
 		}
 	}
@@ -88,8 +88,8 @@ func TestAssembleDataFreshnessPartialBackfill(t *testing.T) {
 		t.Fatalf("flight ingest at = %v, want %s", fp.LastSuccessfulIngestAt, ended.UTC())
 	}
 
-	if fp.LastSuccessfulIngestDurationSeconds != nil {
-		t.Fatalf("flight duration = %v, want nil without started_at", fp.LastSuccessfulIngestDurationSeconds)
+	if fp.LastSuccessfulIngestDuration != nil {
+		t.Fatalf("flight duration = %v, want nil without started_at", fp.LastSuccessfulIngestDuration)
 	}
 
 	if fp.LatestPeriod == nil || fp.LatestPeriod.Type != model.FreshnessPeriodTypeMonth {
@@ -156,7 +156,8 @@ func TestAssembleDataFreshnessPartialBackfill(t *testing.T) {
 
 func TestAssembleDataFreshnessDuration(t *testing.T) {
 	ended := time.Date(2026, 9, 18, 14, 22, 30, 0, time.UTC)
-	started := ended.Add(-125*time.Second - 400*time.Millisecond)
+	started := ended.Add(-5025*time.Second - 400*time.Millisecond)
+	longRun := ended.Add(-26 * time.Hour)
 	inverted := ended.Add(time.Second)
 
 	got := AssembleDataFreshness(map[string]FreshnessInput{
@@ -192,31 +193,44 @@ func TestAssembleDataFreshnessDuration(t *testing.T) {
 			HasRows:   true,
 			RowCount:  1,
 		},
+		model.DatasetIDAirportMCT: {
+			Kind:      FreshnessKindSnapshot,
+			JobID:     "job-mct",
+			StartedAt: &longRun,
+			EndedAt:   &ended,
+			HasRows:   true,
+			RowCount:  1,
+		},
 	})
 
 	byID := indexFreshness(t, got)
 
 	fp := byID[model.DatasetIDFlightPerformance]
-	if fp.LastSuccessfulIngestDurationSeconds == nil || *fp.LastSuccessfulIngestDurationSeconds != 125 {
-		t.Fatalf("flight duration = %v, want 125", fp.LastSuccessfulIngestDurationSeconds)
+	if fp.LastSuccessfulIngestDuration == nil || *fp.LastSuccessfulIngestDuration != "01:23:45" {
+		t.Fatalf("flight duration = %v, want 01:23:45", fp.LastSuccessfulIngestDuration)
 	}
 
 	countries := byID[model.DatasetIDCountries]
-	if countries.LastSuccessfulJobID == nil || countries.LastSuccessfulIngestDurationSeconds != nil {
-		t.Fatalf("countries duration = %v, want nil", countries.LastSuccessfulIngestDurationSeconds)
+	if countries.LastSuccessfulJobID == nil || countries.LastSuccessfulIngestDuration != nil {
+		t.Fatalf("countries duration = %v, want nil", countries.LastSuccessfulIngestDuration)
 	}
 
 	regions := byID[model.DatasetIDRegions]
-	if regions.LastSuccessfulIngestDurationSeconds != nil {
-		t.Fatalf("regions duration = %v, want nil when end is before start", regions.LastSuccessfulIngestDurationSeconds)
+	if regions.LastSuccessfulIngestDuration != nil {
+		t.Fatalf("regions duration = %v, want nil when end is before start", regions.LastSuccessfulIngestDuration)
 	}
 
 	airports := byID[model.DatasetIDAirports]
-	if airports.LastSuccessfulIngestDurationSeconds == nil || *airports.LastSuccessfulIngestDurationSeconds != 0 {
-		t.Fatalf("airports duration = %v, want 0", airports.LastSuccessfulIngestDurationSeconds)
+	if airports.LastSuccessfulIngestDuration == nil || *airports.LastSuccessfulIngestDuration != "00:00:00" {
+		t.Fatalf("airports duration = %v, want 00:00:00", airports.LastSuccessfulIngestDuration)
 	}
 
-	if byID[model.DatasetIDWeatherObservations].LastSuccessfulIngestDurationSeconds != nil {
+	mct := byID[model.DatasetIDAirportMCT]
+	if mct.LastSuccessfulIngestDuration == nil || *mct.LastSuccessfulIngestDuration != "26:00:00" {
+		t.Fatalf("mct duration = %v, want 26:00:00", mct.LastSuccessfulIngestDuration)
+	}
+
+	if byID[model.DatasetIDWeatherObservations].LastSuccessfulIngestDuration != nil {
 		t.Fatal("weather duration = set, want nil without a completed job")
 	}
 }

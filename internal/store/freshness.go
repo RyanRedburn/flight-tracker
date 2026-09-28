@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -80,7 +81,7 @@ func datasetFromFreshness(id string, in FreshnessInput) model.DatasetFreshness {
 		jobID := in.JobID
 		ds.LastSuccessfulJobID = &jobID
 		ds.LastSuccessfulIngestAt = cloneTime(in.EndedAt)
-		ds.LastSuccessfulIngestDurationSeconds = ingestDurationSeconds(in.StartedAt, in.EndedAt)
+		ds.LastSuccessfulIngestDuration = ingestDuration(in.StartedAt, in.EndedAt)
 	}
 
 	ds.LatestPeriod = freshnessPeriod(in)
@@ -132,11 +133,12 @@ func snapshotFreshnessPeriod(in FreshnessInput) *model.FreshnessPeriod {
 	return period
 }
 
-// ingestDurationSeconds is the last successful run length in whole seconds.
+// ingestDuration is the last successful run length as HH:MM:ss.
+// Hours are not wrapped at 24. Sub-second remainders are truncated.
 // Claim writes started_at; completion writes ended_at. A requeued job clears
 // started_at, and older completed rows can lack it, so a missing or inverted
-// pair is absent rather than zero.
-func ingestDurationSeconds(start, end *time.Time) *int {
+// pair is absent rather than 00:00:00.
+func ingestDuration(start, end *time.Time) *string {
 	if start == nil || end == nil {
 		return nil
 	}
@@ -146,9 +148,10 @@ func ingestDurationSeconds(start, end *time.Time) *int {
 		return nil
 	}
 
-	seconds := int(d / time.Second)
+	seconds := int64(d / time.Second)
+	formatted := fmt.Sprintf("%02d:%02d:%02d", seconds/3600, (seconds%3600)/60, seconds%60)
 
-	return &seconds
+	return &formatted
 }
 
 func cloneTime(t *time.Time) *time.Time {

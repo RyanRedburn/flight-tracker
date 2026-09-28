@@ -18,10 +18,10 @@ type DataFreshnessResponse struct {
 type DatasetFreshnessResponse struct {
 	ID                     string  `json:"id"`
 	LastSuccessfulIngestAt *string `json:"last_successful_ingest_at"`
-	// LastSuccessfulIngestDurationSeconds is how long the newest completed ingest of this dataset took, in whole seconds (ended_at minus started_at, truncated). Null when that job is missing a start or end, or the end is before the start.
-	LastSuccessfulIngestDurationSeconds *int                     `json:"last_successful_ingest_duration_seconds"`
-	LatestPeriod                        *FreshnessPeriodResponse `json:"latest_period"`
-	LastSuccessfulJobID                 *string                  `json:"last_successful_job_id"`
+	// LastSuccessfulIngestDuration is how long the newest completed ingest of this dataset took, as HH:MM:ss (hours may exceed 24; sub-seconds are truncated). Null when that job is missing a start or end, or the end is before the start.
+	LastSuccessfulIngestDuration *string                  `json:"last_successful_ingest_duration"`
+	LatestPeriod                 *FreshnessPeriodResponse `json:"latest_period"`
+	LastSuccessfulJobID          *string                  `json:"last_successful_job_id"`
 }
 
 // FreshnessPeriodResponse is a covered month or a full-table snapshot.
@@ -49,7 +49,7 @@ func NewFreshnessHandler(s store.Store) *FreshnessHandler {
 // Get returns last successful ingest time and the latest covered period for each dataset.
 //
 //	@Summary		Dataset freshness
-//	@Description	Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. last_successful_ingest_duration_seconds is that job's length in whole seconds (ended_at minus started_at). It is null when the dataset has no completed job, or that job has no started_at, no ended_at, or an end before its start. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.
+//	@Description	Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. last_successful_ingest_duration is that job's length as HH:MM:ss (ended_at minus started_at, truncated to whole seconds; hours are not wrapped at 24). It is null when the dataset has no completed job, or that job has no started_at, no ended_at, or an end before its start. A same-second run is 00:00:00. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.
 //	@Tags			freshness,internal
 //	@Produce		json
 //	@Success		200	{object}	DataFreshnessResponse
@@ -83,10 +83,10 @@ func toDataFreshnessResponse(in model.DataFreshness) DataFreshnessResponse {
 
 func toDatasetFreshnessResponse(ds model.DatasetFreshness) DatasetFreshnessResponse {
 	resp := DatasetFreshnessResponse{
-		ID:                                  ds.ID,
-		LastSuccessfulIngestAt:              formatTimePtr(ds.LastSuccessfulIngestAt),
-		LastSuccessfulIngestDurationSeconds: ds.LastSuccessfulIngestDurationSeconds,
-		LastSuccessfulJobID:                 ds.LastSuccessfulJobID,
+		ID:                           ds.ID,
+		LastSuccessfulIngestAt:       formatTimePtr(ds.LastSuccessfulIngestAt),
+		LastSuccessfulIngestDuration: ds.LastSuccessfulIngestDuration,
+		LastSuccessfulJobID:          ds.LastSuccessfulJobID,
 	}
 
 	if ds.LatestPeriod != nil {
