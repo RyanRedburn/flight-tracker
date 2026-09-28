@@ -20,14 +20,15 @@ const (
 // HasRows is true when that table or a sibling loaded by the same replace
 // (airport_weather_stations) has rows.
 type FreshnessInput struct {
-	Kind     FreshnessKind
-	JobID    string
-	EndedAt  *time.Time
-	Year     int
-	Month    int
-	HasMonth bool
-	RowCount int64
-	HasRows  bool
+	Kind      FreshnessKind
+	JobID     string
+	StartedAt *time.Time
+	EndedAt   *time.Time
+	Year      int
+	Month     int
+	HasMonth  bool
+	RowCount  int64
+	HasRows   bool
 }
 
 // AssembleDataFreshness builds the stable dataset list from raw watermarks.
@@ -79,6 +80,7 @@ func datasetFromFreshness(id string, in FreshnessInput) model.DatasetFreshness {
 		jobID := in.JobID
 		ds.LastSuccessfulJobID = &jobID
 		ds.LastSuccessfulIngestAt = cloneTime(in.EndedAt)
+		ds.LastSuccessfulIngestDurationSeconds = ingestDurationSeconds(in.StartedAt, in.EndedAt)
 	}
 
 	ds.LatestPeriod = freshnessPeriod(in)
@@ -128,6 +130,25 @@ func snapshotFreshnessPeriod(in FreshnessInput) *model.FreshnessPeriod {
 	}
 
 	return period
+}
+
+// ingestDurationSeconds is the last successful run length in whole seconds.
+// Claim writes started_at; completion writes ended_at. A requeued job clears
+// started_at, and older completed rows can lack it, so a missing or inverted
+// pair is absent rather than zero.
+func ingestDurationSeconds(start, end *time.Time) *int {
+	if start == nil || end == nil {
+		return nil
+	}
+
+	d := end.Sub(*start)
+	if d < 0 {
+		return nil
+	}
+
+	seconds := int(d / time.Second)
+
+	return &seconds
 }
 
 func cloneTime(t *time.Time) *time.Time {

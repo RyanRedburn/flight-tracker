@@ -22,10 +22,11 @@ type DataFreshness struct {
 
 // DatasetFreshness is one current dataset. Nil fields mean that signal is absent.
 type DatasetFreshness struct {
-	ID                     string
-	LastSuccessfulIngestAt *time.Time
-	LatestPeriod           *FreshnessPeriod
-	LastSuccessfulJobID    *string
+	ID                                  string
+	LastSuccessfulIngestAt              *time.Time
+	LastSuccessfulIngestDurationSeconds *int
+	LatestPeriod                        *FreshnessPeriod
+	LastSuccessfulJobID                 *string
 }
 
 // FreshnessPeriod is either a covered month or a full-table snapshot.

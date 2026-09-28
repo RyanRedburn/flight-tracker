@@ -10,8 +10,9 @@ import (
 )
 
 type jobWatermark struct {
-	id      sql.NullString
-	endedAt sql.NullTime
+	id        sql.NullString
+	startedAt sql.NullTime
+	endedAt   sql.NullTime
 }
 
 func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) {
@@ -44,27 +45,34 @@ func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) 
 		model.JobTypeImportAirportMCT,
 	).Scan(
 		&flightJob.id,
+		&flightJob.startedAt,
 		&flightJob.endedAt,
 		&flightYear,
 		&flightMonth,
 		&weatherJob.id,
+		&weatherJob.startedAt,
 		&weatherJob.endedAt,
 		&weatherYear,
 		&weatherMonth,
 		&stationsJob.id,
+		&stationsJob.startedAt,
 		&stationsJob.endedAt,
 		&stationsCount,
 		&mappingsCount,
 		&countriesJob.id,
+		&countriesJob.startedAt,
 		&countriesJob.endedAt,
 		&countriesCount,
 		&regionsJob.id,
+		&regionsJob.startedAt,
 		&regionsJob.endedAt,
 		&regionsCount,
 		&airportsJob.id,
+		&airportsJob.startedAt,
 		&airportsJob.endedAt,
 		&airportsCount,
 		&mctJob.id,
+		&mctJob.startedAt,
 		&mctJob.endedAt,
 		&mctCount,
 	)
@@ -96,6 +104,11 @@ func (w jobWatermark) toInput(kind store.FreshnessKind, year, month sql.NullInt6
 
 	if w.id.Valid {
 		in.JobID = w.id.String
+	}
+
+	if w.startedAt.Valid {
+		started := w.startedAt.Time
+		in.StartedAt = &started
 	}
 
 	if w.endedAt.Valid {

@@ -955,6 +955,7 @@ const (
 			SELECT DISTINCT ON (type)
 				type,
 				id,
+				started_at,
 				ended_at
 			FROM jobs
 			WHERE status = $1
@@ -979,27 +980,34 @@ const (
 		)
 		SELECT
 			(SELECT id FROM last_job WHERE type = $2),
+			(SELECT started_at FROM last_job WHERE type = $2),
 			(SELECT ended_at FROM last_job WHERE type = $2),
 			(SELECT year FROM flight_month),
 			(SELECT month FROM flight_month),
 			(SELECT id FROM last_job WHERE type = $3),
+			(SELECT started_at FROM last_job WHERE type = $3),
 			(SELECT ended_at FROM last_job WHERE type = $3),
 			(SELECT year FROM weather_month),
 			(SELECT month FROM weather_month),
 			(SELECT id FROM last_job WHERE type = $4),
+			(SELECT started_at FROM last_job WHERE type = $4),
 			(SELECT ended_at FROM last_job WHERE type = $4),
 			(SELECT COUNT(*) FROM weather_stations),
 			(SELECT COUNT(*) FROM airport_weather_stations),
 			(SELECT id FROM last_job WHERE type = $5),
+			(SELECT started_at FROM last_job WHERE type = $5),
 			(SELECT ended_at FROM last_job WHERE type = $5),
 			(SELECT COUNT(*) FROM countries),
 			(SELECT id FROM last_job WHERE type = $6),
+			(SELECT started_at FROM last_job WHERE type = $6),
 			(SELECT ended_at FROM last_job WHERE type = $6),
 			(SELECT COUNT(*) FROM regions),
 			(SELECT id FROM last_job WHERE type = $7),
+			(SELECT started_at FROM last_job WHERE type = $7),
 			(SELECT ended_at FROM last_job WHERE type = $7),
 			(SELECT COUNT(*) FROM airports),
 			(SELECT id FROM last_job WHERE type = $8),
+			(SELECT started_at FROM last_job WHERE type = $8),
 			(SELECT ended_at FROM last_job WHERE type = $8),
 			(SELECT COUNT(*) FROM airport_mct)`
 )

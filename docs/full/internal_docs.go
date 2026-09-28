@@ -117,7 +117,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.",
+                "description": "Admin read of how fresh each ingested dataset is. last_successful_ingest_at and last_successful_job_id come from the newest completed job of that type. last_successful_ingest_duration_seconds is that job's length in whole seconds (ended_at minus started_at). It is null when the dataset has no completed job, or that job has no started_at, no ended_at, or an end before its start. latest_period is the max year/month present for flight_performance and weather_observations, or a snapshot (as_of plus row_count) for weather_stations, countries, regions, airports, and airport_mct. Timestamps and periods are null when that dataset has never been ingested and, for snapshots, has no rows. weather_stations row_count is the station catalog; that snapshot is also present when airport_weather_stations has rows.",
                 "produces": [
                     "application/json"
                 ],
@@ -1762,6 +1762,10 @@ const docTemplateinternal = `{
                 },
                 "last_successful_ingest_at": {
                     "type": "string"
+                },
+                "last_successful_ingest_duration_seconds": {
+                    "description": "LastSuccessfulIngestDurationSeconds is how long the newest completed ingest of this dataset took, in whole seconds (ended_at minus started_at, truncated). Null when that job is missing a start or end, or the end is before the start.",
+                    "type": "integer"
                 },
                 "last_successful_job_id": {
                     "type": "string"
