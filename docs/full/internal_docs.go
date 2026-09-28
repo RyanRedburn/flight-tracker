@@ -393,7 +393,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues a full import of airport minimum connection times from https://minimumconnectiontime.com. The worker paginates GET /api/airports and full-replaces airport_mct (IATA code plus domestic/international and interline minutes). An empty body is treated as {\"force\":false}. Set force=true to replace existing rows.",
+                "description": "Queues an import of airport minimum connection times from https://minimumconnectiontime.com. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
                 "consumes": [
                     "application/json"
                 ],

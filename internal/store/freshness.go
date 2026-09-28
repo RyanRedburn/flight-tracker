@@ -133,11 +133,7 @@ func snapshotFreshnessPeriod(in FreshnessInput) *model.FreshnessPeriod {
 	return period
 }
 
-// ingestDuration is the last successful run length as HH:MM:ss.
-// Hours are not wrapped at 24. Sub-second remainders are truncated.
-// Claim writes started_at; completion writes ended_at. A requeued job clears
-// started_at, and older completed rows can lack it, so a missing or inverted
-// pair is absent rather than 00:00:00.
+// ingestDuration is HH:MM:ss from ended_at - started_at; null if start or end is missing or inverted.
 func ingestDuration(start, end *time.Time) *string {
 	if start == nil || end == nil {
 		return nil

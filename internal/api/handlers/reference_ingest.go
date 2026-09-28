@@ -91,7 +91,7 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 // CreateAirportMCT queues an airport minimum-connection-time ingest job.
 //
 //	@Summary		Queue airport MCT ingest
-//	@Description	Queues a full import of airport minimum connection times from https://minimumconnectiontime.com. The worker paginates GET /api/airports and full-replaces airport_mct (IATA code plus domestic/international and interline minutes). An empty body is treated as {"force":false}. Set force=true to replace existing rows.
+//	@Description	Queues an import of airport minimum connection times from https://minimumconnectiontime.com. An empty body is treated as {"force":false}. Set force=true to replace existing data.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json

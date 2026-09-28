@@ -398,14 +398,14 @@ Source adapter: [OurAirports open data](https://ourairports.com/data/) (public d
 
 - Creates one `import_airport_mct` job.
 - The worker pages `GET /api/airports` on [Minimum Connection Time](https://minimumconnectiontime.com) (about one request per second, with backoff on HTTP 429 and 5xx). It does not use `minimal=true`, because that view omits connection-time fields. Request handlers never call this API.
-- A successful job full-replaces `airport_mct`. Each row is one airport: IATA code, name, city, country, ICAO, coordinates, an international flag, five connection times in minutes (domestic-to-domestic, domestic-to-international, international-to-domestic, international-to-international, and interline), and the source `last_updated` date when it parses. A missing minute is stored as NULL.
+- A successful job full-replaces `airport_mct`.
 - These minutes are compiled planning estimates from public sources. They are **not** official OAG or IATA minimum connection times, and they are not airline-, terminal-, or flight-number-specific rules. A carrier can require a longer connection than the stored figure.
 - Attribute the source with a link to [minimumconnectiontime.com](https://minimumconnectiontime.com) if you publish a product that uses these values.
 - Returns **409** if a pending or running job already exists for this dataset, even when `force` is true.
 - Returns **409** if `airport_mct` already has rows and `force` is not set.
 - `force: true` skips the data-exists check. The worker still full-replaces the table.
 - A failed download does not change `airport_mct`. Re-import about once a month; the source revises estimates as airport procedures change.
-- `MCT_BASE_URL` and `MCT_HTTP_TIMEOUT` override the origin and the per-request timeout. `MCT_HTTP_TIMEOUT` is not the whole catalog walk; the job lease stays alive while pages are fetched.
+- `MCT_BASE_URL` and `MCT_HTTP_TIMEOUT` override the origin and the per-request timeout.
 
 ### Job leases and shutdown
 
