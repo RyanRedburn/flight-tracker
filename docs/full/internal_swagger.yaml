@@ -808,8 +808,7 @@ paths:
         and last_successful_job_id come from the newest completed job of that type.
         latest_period is the max year/month present for flight_performance and weather_observations,
         or a snapshot (as_of plus row_count) for weather_stations, countries, regions,
-        airports, and airport_mct. airport_mct holds planning estimates from minimumconnectiontime.com,
-        not official OAG or IATA MCT. Timestamps and periods are null when that dataset
+        airports, and airport_mct. Timestamps and periods are null when that dataset
         has never been ingested and, for snapshots, has no rows. weather_stations
         row_count is the station catalog; that snapshot is also present when airport_weather_stations
         has rows.
@@ -995,12 +994,9 @@ paths:
       consumes:
       - application/json
       description: Queues a full import of airport minimum connection times from https://minimumconnectiontime.com.
-        Values are compiled planning estimates, not official OAG or IATA MCT, and
-        not airline-, terminal-, or flight-number-specific rules. The worker paginates
-        GET /api/airports and full-replaces airport_mct (IATA code plus domestic/international
-        and interline minutes). An empty body is treated as {"force":false}. Set force=true
-        to replace existing rows. Re-import about once a month; request handlers do
-        not call the upstream API.
+        The worker paginates GET /api/airports and full-replaces airport_mct (IATA
+        code plus domestic/international and interline minutes). An empty body is
+        treated as {"force":false}. Set force=true to replace existing rows.
       parameters:
       - description: Optional force flag
         in: body
