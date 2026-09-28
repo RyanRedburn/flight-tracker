@@ -11,9 +11,7 @@ import (
 	"time"
 )
 
-// MCT minutes are planning estimates from Minimum Connection Time
-// (https://minimumconnectiontime.com). They are not official OAG or IATA MCT
-// and are not airline-, terminal-, or flight-number-specific rules.
+// MCT minutes are planning estimates from Minimum Connection Time (https://minimumconnectiontime.com).
 
 const (
 	colIATACode                        = "iata_code"

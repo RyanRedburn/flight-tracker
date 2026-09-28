@@ -1,7 +1,3 @@
--- airport_mct holds planning estimates from Minimum Connection Time
--- (https://minimumconnectiontime.com). These figures are compiled from public
--- sources. They are not official OAG or IATA MCT, and they are not
--- airline-, terminal-, or flight-number-specific rules.
 CREATE TABLE airport_mct (
     iata_code TEXT PRIMARY KEY,
     name TEXT,

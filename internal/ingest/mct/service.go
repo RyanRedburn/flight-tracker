@@ -1,8 +1,5 @@
 // Package mct loads airport minimum connection times from the public
 // Minimum Connection Time API (https://minimumconnectiontime.com).
-//
-// Stored minutes are compiled planning estimates. They are not official OAG
-// or IATA MCT and are not a guarantee for a particular ticket, carrier, or terminal.
 package mct
 
 import (
