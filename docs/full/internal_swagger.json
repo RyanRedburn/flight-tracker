@@ -1142,7 +1142,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, floored by the destination airport's MCT or by 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.",
+                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, plus the destination airport's MCT or 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.",
                 "produces": [
                     "application/json"
                 ],

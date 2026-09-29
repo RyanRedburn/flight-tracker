@@ -22,7 +22,7 @@ type AirportConnectionMCT struct {
 	InternationalToInternational *int
 }
 
-// ConnectionRecommendation is max(max(0, round(arrivalDelayP90)), floor) per connection type.
+// ConnectionRecommendation is max(0, round(arrivalDelayP90)) + floor per connection type.
 // floor is the airport MCT minute when that bucket is set, otherwise 45, 60, 120, or 120.
 // A nil p90 or an insufficient sample returns nulls.
 func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.RecommendedConnectionMinutes {
@@ -46,10 +46,10 @@ func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *
 		internationalToInternational = mct.InternationalToInternational
 	}
 
-	dd := max(delay, connectionFloor(domesticToDomestic, connectionFloorDomesticToDomestic))
-	di := max(delay, connectionFloor(domesticToInternational, connectionFloorDomesticToInternational))
-	id := max(delay, connectionFloor(internationalToDomestic, connectionFloorInternationalToDomestic))
-	ii := max(delay, connectionFloor(internationalToInternational, connectionFloorInternationalToInternational))
+	dd := delay + connectionFloor(domesticToDomestic, connectionFloorDomesticToDomestic)
+	di := delay + connectionFloor(domesticToInternational, connectionFloorDomesticToInternational)
+	id := delay + connectionFloor(internationalToDomestic, connectionFloorInternationalToDomestic)
+	ii := delay + connectionFloor(internationalToInternational, connectionFloorInternationalToInternational)
 
 	return model.RecommendedConnectionMinutes{
 		DomesticToDomestic:           &dd,

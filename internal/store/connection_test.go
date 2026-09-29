@@ -37,7 +37,7 @@ func TestConnectionRecommendation(t *testing.T) {
 		{
 			name: "late-heavy",
 			p90:  &lateP90,
-			want: minutes(180, 180, 180, 180),
+			want: minutes(225, 240, 300, 300),
 		},
 		{
 			name: "cancel-only",
@@ -58,12 +58,12 @@ func TestConnectionRecommendation(t *testing.T) {
 				InternationalToDomestic:      intPtr(150),
 				InternationalToInternational: intPtr(180),
 			},
-			want: minutes(75, 90, 150, 180),
+			want: minutes(95, 110, 170, 200),
 		},
 		{
 			name: "mct missing uses static floors",
 			p90:  floatPtr(50),
-			want: minutes(50, 60, 120, 120),
+			want: minutes(95, 110, 170, 170),
 		},
 		{
 			name: "mct present for only some buckets",
@@ -73,7 +73,7 @@ func TestConnectionRecommendation(t *testing.T) {
 				InternationalToDomestic:      intPtr(30),
 				InternationalToInternational: intPtr(200),
 			},
-			want: minutes(80, 60, 50, 200),
+			want: minutes(130, 110, 80, 250),
 		},
 		{
 			name: "rounds half away from zero",
@@ -81,7 +81,15 @@ func TestConnectionRecommendation(t *testing.T) {
 			mct: &AirportConnectionMCT{
 				DomesticToDomestic: intPtr(40),
 			},
-			want: minutes(45, 60, 120, 120),
+			want: minutes(85, 105, 165, 165),
+		},
+		{
+			name: "delay plus floor",
+			p90:  floatPtr(30),
+			mct: &AirportConnectionMCT{
+				DomesticToDomestic: intPtr(45),
+			},
+			want: minutes(75, 90, 150, 150),
 		},
 		{
 			name: "zero mct and early delay is zero",
