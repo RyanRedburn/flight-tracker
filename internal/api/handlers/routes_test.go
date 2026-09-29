@@ -225,8 +225,10 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 
+	body := rec.Body.Bytes()
+
 	var out model.RouteOutlook
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+	if err := json.Unmarshal(body, &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -241,6 +243,8 @@ func TestRoutesOutlook(t *testing.T) {
 	if out.AnalysisEnd != testAnalysisEnd {
 		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
 	}
+
+	assertNullConnectionMinutesJSON(t, body)
 }
 
 func TestRoutesOutlookEmpty(t *testing.T) {
@@ -281,8 +285,10 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 
+	body := rec.Body.Bytes()
+
 	var out model.RouteOutlook
-	if err := json.NewDecoder(rec.Body).Decode(&out); err != nil {
+	if err := json.Unmarshal(body, &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
@@ -293,6 +299,8 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 	if out.AnalysisEnd != testAnalysisEnd {
 		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
 	}
+
+	assertNullConnectionMinutesJSON(t, body)
 }
 
 func TestRoutesOutlookStoreError(t *testing.T) {
@@ -658,6 +666,42 @@ func TestRoutesWeatherStatsStoreError(t *testing.T) {
 
 	if resp.Error != "failed to compute route weather stats" {
 		t.Fatalf("error = %q", resp.Error)
+	}
+}
+
+func assertNullConnectionMinutesJSON(t *testing.T, body []byte) {
+	t.Helper()
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal outlook: %v", err)
+	}
+
+	rcm, ok := raw["recommended_connection_minutes"]
+	if !ok {
+		t.Fatal("missing recommended_connection_minutes")
+	}
+
+	var buckets map[string]*int
+	if err := json.Unmarshal(rcm, &buckets); err != nil {
+		t.Fatalf("unmarshal recommended_connection_minutes: %v", err)
+	}
+
+	for _, key := range []string{
+		"domestic_to_domestic",
+		"domestic_to_international",
+		"international_to_domestic",
+		"international_to_international",
+	} {
+		value, ok := buckets[key]
+		if !ok {
+			t.Errorf("missing %s", key)
+			continue
+		}
+
+		if value != nil {
+			t.Errorf("%s = %d, want null", key, *value)
+		}
 	}
 }
 

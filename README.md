@@ -283,6 +283,7 @@ curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2
 
 # Booking outlook probabilities for a departure slot (required: origin, dest, carrier, day_of_week, dep_time;
 # optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history).
+# recommended_connection_minutes is a same-airport heuristic (arrival-delay p90 plus dest airport MCT or 45/60/120/120); not an official airline MCT.
 # 404 when that route and carrier have no flight-performance data.
 # A day-of-week or departure-time window that matches nothing still returns 200 with a zero sample.
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
