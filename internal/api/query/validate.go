@@ -73,6 +73,8 @@ func formatValidationFieldError(fieldErr validator.FieldError) string {
 		return "date range must be at most " + fieldErr.Param() + " days"
 	case "hhmm":
 		return field + " must be a valid local time (hhmm)"
+	case "outlook_schedule":
+		return "exactly one of date or day_of_week is required"
 	default:
 		return field + " is invalid"
 	}

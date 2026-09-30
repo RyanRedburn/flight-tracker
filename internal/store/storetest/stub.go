@@ -39,6 +39,7 @@ type Stub struct {
 	ReplaceWeatherStationsFn              func(ctx context.Context, stationColumns []string, stationRows [][]string, mappingColumns []string, mappingRows [][]string) error
 	ListAirportWeatherStationsFn          func(ctx context.Context) ([]store.AirportWeatherStation, error)
 	ListAirportIdentifiersByIATAFn        func(ctx context.Context, codes []string) (map[string]store.AirportIdentifiers, error)
+	ListAirportCountriesByIATAFn          func(ctx context.Context, codes []string) (map[string]string, error)
 	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithWeatherDataFn               func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	DistinctFlightAirportCodesFn          func(ctx context.Context) ([]string, error)
@@ -295,6 +296,14 @@ func (s *Stub) ListAirportIdentifiersByIATA(ctx context.Context, codes []string)
 	}
 
 	return s.ListAirportIdentifiersByIATAFn(ctx, codes)
+}
+
+func (s *Stub) ListAirportCountriesByIATA(ctx context.Context, codes []string) (map[string]string, error) {
+	if s.ListAirportCountriesByIATAFn == nil {
+		panic("unexpected call: ListAirportCountriesByIATA")
+	}
+
+	return s.ListAirportCountriesByIATAFn(ctx, codes)
 }
 
 func (s *Stub) DistinctFlightAirportCodes(ctx context.Context) ([]string, error) {

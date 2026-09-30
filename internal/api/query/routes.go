@@ -1,7 +1,6 @@
 package query
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -22,12 +21,13 @@ type routeStatsQuery struct {
 }
 
 type routeOutlookQuery struct {
-	Origin               string `query:"origin" validate:"required,len=3"`
-	Dest                 string `query:"dest" validate:"required,len=3"`
-	Carrier              string `query:"carrier" validate:"required,len=2"`
-	DayOfWeek            int    `query:"day_of_week" validate:"required,gte=1,lte=7"`
-	DepTime              string `query:"dep_time" validate:"required,hhmm"`
-	DepTimeWindowMinutes *int   `query:"dep_time_window_minutes" validate:"omitempty,gte=1,lte=120"`
+	Origin               string    `query:"origin" validate:"required,len=3"`
+	Dest                 string    `query:"dest" validate:"required,len=3"`
+	Carrier              string    `query:"carrier" validate:"required,len=2"`
+	DayOfWeek            *int      `query:"day_of_week" validate:"omitempty,gte=1,lte=7"`
+	Date                 time.Time `query:"date"`
+	DepTime              string    `query:"dep_time" validate:"required,hhmm"`
+	DepTimeWindowMinutes *int      `query:"dep_time_window_minutes" validate:"omitempty,gte=1,lte=120"`
 }
 
 type routeTravelWindowsQuery struct {
@@ -39,6 +39,7 @@ type routeTravelWindowsQuery struct {
 func init() {
 	_ = validate.RegisterValidation("hhmm", validateHHMM)
 	validate.RegisterStructValidation(validateRouteStatsSpan, routeStatsQuery{})
+	validate.RegisterStructValidation(validateRouteOutlookSchedule, routeOutlookQuery{})
 }
 
 func ParseRouteStats(r *http.Request) (store.RouteStatsFilter, error) {
@@ -76,17 +77,21 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		return store.RouteOutlookFilter{}, err
 	}
 
-	window := store.DefaultDepTimeWindowMinutes
-	if q.DepTimeWindowMinutes != nil {
-		window = *q.DepTimeWindowMinutes
+	window := store.ResolveDepTimeWindowMinutes(q.DepTimeWindowMinutes)
+
+	dayOfWeek := 0
+	if q.DayOfWeek != nil {
+		dayOfWeek = *q.DayOfWeek
+	} else if !q.Date.IsZero() {
+		dayOfWeek = store.ISOWeekday(q.Date)
 	}
 
 	return store.RouteOutlookFilter{
 		Origin:               q.Origin,
 		Dest:                 q.Dest,
 		Carrier:              q.Carrier,
-		DayOfWeek:            q.DayOfWeek,
-		DepTime:              padHHMM(q.DepTime),
+		DayOfWeek:            dayOfWeek,
+		DepTime:              store.FormatHHMM(q.DepTime),
 		DepTimeWindowMinutes: window,
 	}, nil
 }
@@ -113,6 +118,16 @@ func ParseRouteTravelWindows(r *http.Request) (store.RouteTravelWindowsFilter, e
 func validateRouteStatsSpan(sl validator.StructLevel) {
 	q := sl.Current().Interface().(routeStatsQuery)
 	reportDateSpan(sl, q.StartDate, q.EndDate)
+}
+
+func validateRouteOutlookSchedule(sl validator.StructLevel) {
+	q := sl.Current().Interface().(routeOutlookQuery)
+	hasDate := !q.Date.IsZero()
+	hasDay := q.DayOfWeek != nil
+
+	if hasDate == hasDay {
+		sl.ReportError(q.Date, "Date", "date", "outlook_schedule", "")
+	}
 }
 
 func reportDateSpan(sl validator.StructLevel, start, end time.Time) {
@@ -149,13 +164,4 @@ func uniqueDays(days []int) []int {
 	}
 
 	return out
-}
-
-func padHHMM(raw string) string {
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return raw
-	}
-
-	return fmt.Sprintf("%04d", n)
 }

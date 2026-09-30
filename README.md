@@ -281,12 +281,21 @@ curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-fresh
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&days_of_week=1,2,3,4,5"
 
-# Booking outlook probabilities for a departure slot (required: origin, dest, carrier, day_of_week, dep_time;
+# Booking outlook probabilities for a departure slot (required: origin, dest, carrier, dep_time, and exactly one of day_of_week or date;
 # optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history).
+# date (YYYY-MM-DD) selects that weekday for the same historical sample. Both or neither is 400.
 # recommended_connection_minutes is a same-airport heuristic (arrival-delay p90 plus dest airport MCT or 45/60/120/120); not an official airline MCT.
 # 404 when that route and carrier have no flight-performance data.
 # A day-of-week or departure-time window that matches nothing still returns 200 with a zero sample.
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
+curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700"
+
+# Itinerary outlook for 2–4 ordered legs. Each leg uses the route outlook sample for that date's weekday.
+# Connections compare the local layover, including a later outbound date, to the inbound recommended connection minutes.
+# 200 when the body is valid, including a leg with no historical route (that leg's outlook is null).
+curl -X POST http://localhost:8080/api/v1/itineraries/outlook \
+  -H "Content-Type: application/json" \
+  -d '{"legs":[{"origin":"BOS","dest":"ORD","carrier":"UA","date":"2026-10-06","dep_time":"0700","arr_time":"0905"},{"origin":"ORD","dest":"LAX","carrier":"UA","date":"2026-10-06","dep_time":"1100","arr_time":"1330"}]}'
 
 # Typical-year travel windows (required: origin, dest; optional: carrier).
 # Pools the last up to 2 years of flight-performance data (shorter if that is all

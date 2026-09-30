@@ -153,6 +153,8 @@ func TestNewRouterRoutes(t *testing.T) {
 		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
+		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700", http.StatusOK},
+		{http.MethodPost, "/api/v1/itineraries/outlook", http.StatusBadRequest},
 		{http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", http.StatusOK},
 		{http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
 		{http.MethodGet, pathCarrierStatsUA, http.StatusOK},
@@ -185,6 +187,10 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 
 	if _, ok := external["/api/v1/routes/outlook"]; !ok {
 		t.Fatal("external spec missing /api/v1/routes/outlook")
+	}
+
+	if _, ok := external["/api/v1/itineraries/outlook"]; !ok {
+		t.Fatal("external spec missing /api/v1/itineraries/outlook")
 	}
 
 	if _, ok := external["/api/v1/routes/travel-windows"]; !ok {
@@ -235,6 +241,7 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		"/api/v1/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
+		"/api/v1/itineraries/outlook",
 		"/api/v1/routes/travel-windows",
 		"/api/v1/carriers/stats",
 	} {

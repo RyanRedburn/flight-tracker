@@ -3,6 +3,7 @@ package query
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -90,6 +91,10 @@ func TestParseRouteOutlookWindowAndErrors(t *testing.T) {
 		t.Errorf("window = %d, want 45", filter.DepTimeWindowMinutes)
 	}
 
+	if filter.DayOfWeek != 2 {
+		t.Errorf("day_of_week = %d, want 2", filter.DayOfWeek)
+	}
+
 	tests := []string{
 		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=8&dep_time=0700",
 		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=2500",
@@ -100,6 +105,54 @@ func TestParseRouteOutlookWindowAndErrors(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, url, nil)
 		if _, err := ParseRouteOutlook(req); err == nil {
 			t.Fatalf("expected error for %s", url)
+		}
+	}
+}
+
+func TestParseRouteOutlookDate(t *testing.T) {
+	tests := []struct {
+		name    string
+		date    string
+		wantDay int
+	}{
+		{name: "tuesday", date: "2026-10-06", wantDay: 2},
+		{name: "sunday", date: "2026-10-04", wantDay: 7},
+		{name: "monday", date: "2026-10-05", wantDay: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=BOS&dest=ORD&carrier=UA&date="+tt.date+"&dep_time=0700", nil)
+
+			filter, err := ParseRouteOutlook(req)
+			if err != nil {
+				t.Fatalf("ParseRouteOutlook() error = %v", err)
+			}
+
+			if filter.DayOfWeek != tt.wantDay {
+				t.Errorf("day_of_week = %d, want %d", filter.DayOfWeek, tt.wantDay)
+			}
+		})
+	}
+}
+
+func TestParseRouteOutlookScheduleXOR(t *testing.T) {
+	tests := []string{
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&dep_time=0700",
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&date=2026-10-06&dep_time=0700",
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-13-01&dep_time=0700",
+	}
+
+	for _, url := range tests {
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+
+		_, err := ParseRouteOutlook(req)
+		if err == nil {
+			t.Fatalf("expected error for %s", url)
+		}
+
+		if url != tests[2] && !strings.Contains(err.Error(), "exactly one of date or day_of_week is required") {
+			t.Fatalf("ParseRouteOutlook() error = %q", err.Error())
 		}
 	}
 }

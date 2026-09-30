@@ -104,6 +104,76 @@
                 }
             }
         },
+        "/api/v1/itineraries/outlook": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Historical route outlook for each of 2–4 ordered legs, plus the connection after each leg except the last. Leg index and after_leg are zero-based. Each leg uses the same sample as route outlook, with the weekday taken from its date. The response is 200 when the body is valid. A leg whose origin, destination, and carrier have no flight-performance data has a null outlook and an error string. Layover uses each leg's local arrival and departure date and time, so a later outbound date is an overnight or multi-day connection. Connection type compares airport countries with the connection airport: an endpoint is international when its country differs. Slack is that layover minus the inbound recommended minutes for the inferred type. Status is ok when the layover covers that recommendation, tight when it is shorter, and unknown when the legs do not meet, a needed country or recommendation is missing, the inbound outlook failed, or the layover cannot be computed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "itineraries",
+                    "external"
+                ],
+                "summary": "Itinerary booking outlook",
+                "parameters": [
+                    {
+                        "description": "Ordered legs",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.ItineraryOutlookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.ItineraryOutlookResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/routes/outlook": {
             "get": {
                 "security": [
@@ -111,7 +181,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, plus the destination airport's MCT or 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.",
+                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD) is required; sending both or neither is rejected. A date selects that weekday for the same historical sample. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, plus the destination airport's MCT or 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.",
                 "produces": [
                     "application/json"
                 ],
@@ -152,10 +222,16 @@
                         "maximum": 7,
                         "minimum": 1,
                         "type": "integer",
-                        "description": "Day of week (1=Mon … 7=Sun)",
+                        "description": "Weekday (1=Mon … 7=Sun); exactly one of day_of_week or date",
                         "name": "day_of_week",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Calendar date (YYYY-MM-DD); exactly one of day_of_week or date",
+                        "name": "date",
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -805,6 +881,150 @@
                 },
                 "weather": {
                     "type": "number"
+                }
+            }
+        },
+        "model.ItineraryConnection": {
+            "type": "object",
+            "properties": {
+                "after_leg": {
+                    "type": "integer"
+                },
+                "airport": {
+                    "type": "string"
+                },
+                "connection_type": {
+                    "type": "string",
+                    "enum": [
+                        "domestic_to_domestic",
+                        "domestic_to_international",
+                        "international_to_domestic",
+                        "international_to_international"
+                    ]
+                },
+                "layover_minutes": {
+                    "type": "integer"
+                },
+                "recommended_connection_minutes": {
+                    "type": "integer"
+                },
+                "slack_minutes": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "ok",
+                        "tight",
+                        "unknown"
+                    ]
+                }
+            }
+        },
+        "model.ItineraryLeg": {
+            "type": "object",
+            "required": [
+                "arr_time",
+                "carrier",
+                "date",
+                "dep_time",
+                "dest",
+                "origin"
+            ],
+            "properties": {
+                "arr_time": {
+                    "type": "string"
+                },
+                "carrier": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "dep_time": {
+                    "type": "string"
+                },
+                "dep_time_window_minutes": {
+                    "type": "integer",
+                    "maximum": 120,
+                    "minimum": 1
+                },
+                "dest": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ItineraryOutlookLeg": {
+            "type": "object",
+            "properties": {
+                "arr_time": {
+                    "type": "string"
+                },
+                "carrier": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "day_of_week": {
+                    "type": "integer"
+                },
+                "dep_time": {
+                    "type": "string"
+                },
+                "dep_time_window_minutes": {
+                    "type": "integer"
+                },
+                "dest": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "outlook": {
+                    "$ref": "#/definitions/model.RouteOutlook"
+                }
+            }
+        },
+        "model.ItineraryOutlookRequest": {
+            "type": "object",
+            "required": [
+                "legs"
+            ],
+            "properties": {
+                "legs": {
+                    "type": "array",
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "items": {
+                        "$ref": "#/definitions/model.ItineraryLeg"
+                    }
+                }
+            }
+        },
+        "model.ItineraryOutlookResponse": {
+            "type": "object",
+            "properties": {
+                "connections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ItineraryConnection"
+                    }
+                },
+                "legs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ItineraryOutlookLeg"
+                    }
                 }
             }
         },

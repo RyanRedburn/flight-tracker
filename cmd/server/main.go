@@ -23,6 +23,8 @@
 //	@tag.description			Queue a full rebuild of travel-window rollups
 //	@tag.name					routes
 //	@tag.description			Route performance stats, booking outlook, and typical-year travel windows
+//	@tag.name					itineraries
+//	@tag.description			Multi-leg itinerary outlook
 //	@tag.name					carriers
 //	@tag.description			Carrier performance stats
 //	@tag.name					keys
