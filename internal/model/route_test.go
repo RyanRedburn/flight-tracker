@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -133,10 +134,26 @@ func TestConnectionGuidanceJSON(t *testing.T) {
 		t.Fatalf("decode connection: %v", err)
 	}
 
-	assertConnectionMinutesJSON(t, "domestic_to_domestic", got.DomesticToDomestic, 0)
-	assertConnectionMinutesJSON(t, "domestic_to_international", got.DomesticToInternational, 60)
-	assertConnectionMinutesJSON(t, "international_to_domestic", got.InternationalToDomestic, 50)
-	assertConnectionMinutesJSON(t, "international_to_international", got.InternationalToInternational, 200)
+	assertConnectionMinutesJSON(t, "domestic_to_domestic", got.DomesticToDomestic, 0, false)
+	assertConnectionMinutesJSON(t, "domestic_to_international", got.DomesticToInternational, 60, false)
+	assertConnectionMinutesJSON(t, "international_to_domestic", got.InternationalToDomestic, 50, false)
+	assertConnectionMinutesJSON(t, "international_to_international", got.InternationalToInternational, 200, false)
+
+	if !strings.Contains(string(populated), `"floor_only":false`) {
+		t.Fatalf("airport bucket JSON = %s", populated)
+	}
+
+	floor := ConnectionGuidanceFromRecommended(45, 60, 120, 120)
+	floor.DomesticToDomestic.FloorOnly = true
+
+	floorBody, err := json.Marshal(floor.DomesticToDomestic)
+	if err != nil {
+		t.Fatalf("marshal floor bucket: %v", err)
+	}
+
+	if !strings.Contains(string(floorBody), `"floor_only":true`) {
+		t.Fatalf("floor bucket JSON = %s", floorBody)
+	}
 }
 
 func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
@@ -165,7 +182,7 @@ func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
 	}
 }
 
-func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinutes, recommended int) {
+func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinutes, recommended int, floorOnly bool) {
 	t.Helper()
 
 	if got == nil {
@@ -173,8 +190,8 @@ func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinut
 		return
 	}
 
-	if got.RecommendedMinutes != recommended || got.LooseMinutes != recommended+ConnectionLooseSlackMinutes {
-		t.Errorf("%s = %+v, want recommended %d loose %d", name, got, recommended, recommended+ConnectionLooseSlackMinutes)
+	if got.RecommendedMinutes != recommended || got.LooseMinutes != recommended+ConnectionLooseSlackMinutes || got.FloorOnly != floorOnly {
+		t.Errorf("%s = %+v, want recommended %d loose %d floor_only %v", name, got, recommended, recommended+ConnectionLooseSlackMinutes, floorOnly)
 	}
 }
 

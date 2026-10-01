@@ -27,16 +27,19 @@ func TestConnectionRecommendation(t *testing.T) {
 		p90          *float64
 		mct          *AirportConnectionMCT
 		want         model.ConnectionGuidance
+		floors       [4]bool
 	}{
 		{
-			name: "early-heavy",
-			p90:  &earlyP90,
-			want: minutes(45, 60, 120, 120),
+			name:   "early-heavy",
+			p90:    &earlyP90,
+			want:   minutes(45, 60, 120, 120),
+			floors: allFloors(),
 		},
 		{
-			name: "late-heavy",
-			p90:  &lateP90,
-			want: minutes(225, 240, 300, 300),
+			name:   "late-heavy",
+			p90:    &lateP90,
+			want:   minutes(225, 240, 300, 300),
+			floors: allFloors(),
 		},
 		{
 			name: "cancel-only",
@@ -60,9 +63,17 @@ func TestConnectionRecommendation(t *testing.T) {
 			want: minutes(95, 110, 170, 200),
 		},
 		{
-			name: "mct missing uses static floors",
-			p90:  floatPtr(50),
-			want: minutes(95, 110, 170, 170),
+			name:   "mct missing uses static floors",
+			p90:    floatPtr(50),
+			want:   minutes(95, 110, 170, 170),
+			floors: allFloors(),
+		},
+		{
+			name:   "mct row with null buckets uses static floors",
+			p90:    floatPtr(50),
+			mct:    &AirportConnectionMCT{},
+			want:   minutes(95, 110, 170, 170),
+			floors: allFloors(),
 		},
 		{
 			name: "mct present for only some buckets",
@@ -72,7 +83,8 @@ func TestConnectionRecommendation(t *testing.T) {
 				InternationalToDomestic:      intPtr(30),
 				InternationalToInternational: intPtr(200),
 			},
-			want: minutes(130, 110, 80, 250),
+			want:   minutes(130, 110, 80, 250),
+			floors: [4]bool{false, true, false, false},
 		},
 		{
 			name: "rounds half away from zero",
@@ -80,7 +92,8 @@ func TestConnectionRecommendation(t *testing.T) {
 			mct: &AirportConnectionMCT{
 				DomesticToDomestic: intPtr(40),
 			},
-			want: minutes(85, 105, 165, 165),
+			want:   minutes(85, 105, 165, 165),
+			floors: [4]bool{false, true, true, true},
 		},
 		{
 			name: "delay plus floor",
@@ -88,7 +101,17 @@ func TestConnectionRecommendation(t *testing.T) {
 			mct: &AirportConnectionMCT{
 				DomesticToDomestic: intPtr(45),
 			},
-			want: minutes(75, 90, 150, 150),
+			want:   minutes(75, 90, 150, 150),
+			floors: [4]bool{false, true, true, true},
+		},
+		{
+			name: "airport minute equal to static floor is not floor-only",
+			p90:  floatPtr(0),
+			mct: &AirportConnectionMCT{
+				DomesticToDomestic: intPtr(connectionFloorDomesticToDomestic),
+			},
+			want:   minutes(connectionFloorDomesticToDomestic, connectionFloorDomesticToInternational, connectionFloorInternationalToDomestic, connectionFloorInternationalToInternational),
+			floors: [4]bool{false, true, true, true},
 		},
 		{
 			name: "zero mct and early delay is zero",
@@ -101,7 +124,7 @@ func TestConnectionRecommendation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ConnectionRecommendation(tt.insufficient, tt.p90, tt.mct)
-			assertConnectionGuidance(t, got, tt.want)
+			assertConnectionGuidance(t, got, withFloors(tt.want, tt.floors))
 		})
 	}
 }
@@ -129,6 +152,27 @@ func assertConnectionMinutes(t *testing.T, name string, got, want *model.Connect
 
 func minutes(dd, di, id, ii int) model.ConnectionGuidance {
 	return model.ConnectionGuidanceFromRecommended(dd, di, id, ii)
+}
+
+func withFloors(g model.ConnectionGuidance, floors [4]bool) model.ConnectionGuidance {
+	buckets := []*model.ConnectionMinutes{
+		g.DomesticToDomestic,
+		g.DomesticToInternational,
+		g.InternationalToDomestic,
+		g.InternationalToInternational,
+	}
+
+	for i, bucket := range buckets {
+		if bucket != nil {
+			bucket.FloorOnly = floors[i]
+		}
+	}
+
+	return g
+}
+
+func allFloors() [4]bool {
+	return [4]bool{true, true, true, true}
 }
 
 func floatPtr(v float64) *float64 {

@@ -75,6 +75,20 @@ type ItineraryConnection struct {
 	SlackMinutes       *int    `json:"slack_minutes"`
 	Status             string  `json:"status" enums:"loose,ok,tight,unknown"`
 	Confidence         string  `json:"confidence" enums:"high,low,unknown"`
+	// Reason explains status. evaluated is a same-day classification.
+	// overnight is a classified connection whose outbound local date is later, including multi-day.
+	// multi_airport means the airports differ. missing_country means the domestic/international type cannot be determined.
+	// missing_outlook means the inbound leg has no outlook, which is the route-outlook 404 case and not empty_sample.
+	// empty_sample and insufficient_sample are the inbound sample_reason, so status stays unknown and confidence stays unknown or low.
+	// missing_threshold means a sufficient sample has no bucket for this type.
+	// negative_layover means departure is before arrival. invalid_schedule means the layover date or clock could not be read.
+	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
+	// Overnight is true when a positive layover uses a later outbound local date.
+	// It stays true when reason names a different unknown cause.
+	Overnight bool `json:"overnight"`
+	// FloorOnly is copied from the inbound outlook bucket. True means that bucket used the static MCT floor.
+	// False means the airport minute was present. Null means no bucket was used.
+	FloorOnly *bool `json:"floor_only"`
 }
 
 func (r *ItineraryOutlookRequest) Validate() error {

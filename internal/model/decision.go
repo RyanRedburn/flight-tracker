@@ -30,6 +30,19 @@ const (
 	SampleReasonSufficient         = "sufficient"
 	SampleReasonInsufficientSample = "insufficient_sample"
 	SampleReasonEmptySample        = "empty_sample"
+
+	// ConnectionReason explains an itinerary status, including unknown.
+	// empty_sample and insufficient_sample are the inbound outlook sample_reason,
+	// not a second sparse flag. missing_outlook is a null inbound outlook
+	// (route outlook 404 / leg error), which is not empty_sample.
+	ConnectionReasonEvaluated        = "evaluated"
+	ConnectionReasonOvernight        = "overnight"
+	ConnectionReasonMultiAirport     = "multi_airport"
+	ConnectionReasonMissingCountry   = "missing_country"
+	ConnectionReasonMissingOutlook   = "missing_outlook"
+	ConnectionReasonMissingThreshold = "missing_threshold"
+	ConnectionReasonNegativeLayover  = "negative_layover"
+	ConnectionReasonInvalidSchedule  = "invalid_schedule"
 )
 
 const (
@@ -50,10 +63,17 @@ const (
 type ConnectionMinutes struct {
 	RecommendedMinutes int `json:"recommended_minutes"`
 	LooseMinutes       int `json:"loose_minutes"`
+	// FloorOnly is true when the airport MCT minute for this bucket was missing
+	// and the static floor was used: 45 domestic-domestic, 60 domestic-international,
+	// 120 international. False means the airport supplied the minute, including zero.
+	FloorOnly bool `json:"floor_only"`
 }
 
 // ConnectionGuidance is per connection type for one inbound outlook.
-// A null bucket cannot be estimated, so an itinerary status for that type is unknown.
+// A null bucket was not published (empty or thin sample, or no delay estimate),
+// so an itinerary status for that type is unknown.
+// A missing airport MCT minute is not a null bucket: that bucket is published
+// with floor_only true.
 type ConnectionGuidance struct {
 	DomesticToDomestic           *ConnectionMinutes `json:"domestic_to_domestic"`
 	DomesticToInternational      *ConnectionMinutes `json:"domestic_to_international"`
@@ -187,6 +207,43 @@ func (o *RouteOutlook) DecisionConfidence() string {
 	default:
 		return OutlookConfidence(o.SampleSize, o.InsufficientSample)
 	}
+}
+
+// BlockingSampleReason is empty_sample or insufficient_sample when that sample
+// withholds connection thresholds. A sufficient sample returns an empty string.
+// An explicit sample_reason wins. Otherwise a thin or low-confidence non-empty
+// sample is insufficient_sample, and any other empty sample is empty_sample.
+// Nil returns an empty string. A missing inbound outlook is not a sample reason.
+func (o *RouteOutlook) BlockingSampleReason() string {
+	if o == nil {
+		return ""
+	}
+
+	switch reason := o.resolvedSampleReason(); reason {
+	case SampleReasonEmptySample, SampleReasonInsufficientSample:
+		return reason
+	default:
+		return ""
+	}
+}
+
+// resolvedSampleReason is the outlook sample_reason, or the same words derived
+// from the sample size and confidence when the field was not set.
+func (o *RouteOutlook) resolvedSampleReason() string {
+	switch o.SampleReason {
+	case SampleReasonSufficient, SampleReasonInsufficientSample, SampleReasonEmptySample:
+		return o.SampleReason
+	}
+
+	if o.SampleSize > 0 && (o.InsufficientSample || o.Confidence == ConfidenceLow) {
+		return SampleReasonInsufficientSample
+	}
+
+	if o.SampleSize <= 0 && o.Confidence != ConfidenceHigh {
+		return SampleReasonEmptySample
+	}
+
+	return SampleReasonSufficient
 }
 
 // SeasonalConfidence is high when flights meet minSample, low when some flights fall short, and unknown at zero.

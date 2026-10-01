@@ -107,7 +107,7 @@ func TestRankCarrierRoutesFewQualify(t *testing.T) {
 
 func TestRankCarrierAirportsFewQualify(t *testing.T) {
 	best, worst := RankCarrierAirports([]model.CarrierAirportStat{
-		{Airport: "BOS", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
+		{Airport: testAirportBOS, Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
 		{Airport: "DEN", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
 		{Airport: "JFK", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
 		{Airport: "MIA", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
@@ -123,7 +123,7 @@ func TestRankCarrierAirportsFewQualify(t *testing.T) {
 		t.Fatalf("worst len = %d, want 1", len(worst))
 	}
 
-	if best[0].Airport != "BOS" || worst[0].Airport != "SEA" {
+	if best[0].Airport != testAirportBOS || worst[0].Airport != "SEA" {
 		t.Errorf("best[0]=%s worst[0]=%s, want BOS and SEA", best[0].Airport, worst[0].Airport)
 	}
 }

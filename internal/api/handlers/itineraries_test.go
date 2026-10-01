@@ -98,6 +98,10 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Errorf("confidence = %q, want high", conn.Confidence)
 			}
 
+			if conn.Reason != model.ConnectionReasonEvaluated || conn.Overnight || conn.FloorOnly == nil || *conn.FloorOnly {
+				t.Errorf("reason = %q overnight %v floor_only %v", conn.Reason, conn.Overnight, conn.FloorOnly)
+			}
+
 			if len(filters) != 2 {
 				t.Fatalf("outlook calls = %d", len(filters))
 			}
@@ -125,8 +129,12 @@ func TestItineraryOutlookOvernight(t *testing.T) {
 	out := decodeItinerary(t, rec)
 	conn := out.Connections[0]
 
-	if conn.Status != model.ConnectionLoose {
-		t.Fatalf("status = %s, body = %s", conn.Status, rec.Body.String())
+	if conn.Status != model.ConnectionLoose || conn.Reason != model.ConnectionReasonOvernight || !conn.Overnight {
+		t.Fatalf("status = %s reason = %s overnight %v, body = %s", conn.Status, conn.Reason, conn.Overnight, rec.Body.String())
+	}
+
+	if conn.FloorOnly == nil || *conn.FloorOnly {
+		t.Fatalf("floor_only = %v, want false", conn.FloorOnly)
 	}
 
 	assertMinutes(t, "layover", conn.LayoverMinutes, 540)
@@ -158,19 +166,25 @@ func TestItineraryOutlookConnectionTypes(t *testing.T) {
 	}
 
 	want := []struct {
-		airport string
-		typ     string
-		rcm     int
+		airport   string
+		typ       string
+		rcm       int
+		reason    string
+		overnight bool
 	}{
-		{testOriginORD, model.ConnectionDomesticToInternational, 40},
-		{testAirportLHR, model.ConnectionInternationalToInternational, 60},
-		{testAirportCDG, model.ConnectionInternationalToDomestic, 50},
+		{testOriginORD, model.ConnectionDomesticToInternational, 40, model.ConnectionReasonEvaluated, false},
+		{testAirportLHR, model.ConnectionInternationalToInternational, 60, model.ConnectionReasonOvernight, true},
+		{testAirportCDG, model.ConnectionInternationalToDomestic, 50, model.ConnectionReasonEvaluated, false},
 	}
 
 	for i, tt := range want {
 		conn := out.Connections[i]
-		if conn.AfterLeg != i || conn.Airport != tt.airport || conn.Status != model.ConnectionLoose {
+		if conn.AfterLeg != i || conn.Airport != tt.airport || conn.Status != model.ConnectionLoose || conn.Reason != tt.reason || conn.Overnight != tt.overnight {
 			t.Fatalf("connection %d = %+v", i, conn)
+		}
+
+		if conn.FloorOnly == nil || *conn.FloorOnly {
+			t.Fatalf("connection %d floor_only = %v, want false", i, conn.FloorOnly)
 		}
 
 		if conn.ConnectionType == nil || *conn.ConnectionType != tt.typ {
@@ -197,7 +211,7 @@ func TestItineraryOutlookMismatch(t *testing.T) {
 	out := decodeItinerary(t, rec)
 	conn := out.Connections[0]
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.ConnectionType != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMultiAirport || conn.FloorOnly != nil || conn.ConnectionType != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 
@@ -245,7 +259,7 @@ func TestItineraryOutlookMissingLeg(t *testing.T) {
 	}
 
 	conn := out.Connections[0]
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMissingOutlook || conn.FloorOnly != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 
@@ -464,12 +478,12 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	neverSeen := out.Connections[0]
-	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.RecommendedMinutes != nil {
+	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.Reason != model.ConnectionReasonMissingOutlook || neverSeen.FloorOnly != nil || neverSeen.RecommendedMinutes != nil {
 		t.Fatalf("never-seen connection = %+v", neverSeen)
 	}
 
 	emptyConn := out.Connections[1]
-	if emptyConn.Status != model.ConnectionUnknown || emptyConn.Confidence != model.ConfidenceUnknown || emptyConn.RecommendedMinutes != nil {
+	if emptyConn.Status != model.ConnectionUnknown || emptyConn.Confidence != model.ConfidenceUnknown || emptyConn.Reason != model.SampleReasonEmptySample || emptyConn.FloorOnly != nil || emptyConn.RecommendedMinutes != nil {
 		t.Fatalf("empty-sample connection = %+v", emptyConn)
 	}
 
@@ -478,7 +492,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	thinConn := out.Connections[2]
-	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
+	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.SampleReasonInsufficientSample || thinConn.FloorOnly != nil || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
 		t.Fatalf("thin connection = %+v", thinConn)
 	}
 }
