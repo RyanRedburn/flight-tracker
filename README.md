@@ -291,8 +291,7 @@ curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700"
 
 # Itinerary outlook for 2–4 ordered legs. Each leg uses the route outlook sample for that date's weekday.
-# Connections compare the local layover, including a later outbound date, to the inbound recommended connection minutes.
-# 200 when the body is valid, including a leg with no historical route (that leg's outlook is null).
+# A valid body returns 200. A leg with no flight-performance history has a null outlook and an error.
 curl -X POST http://localhost:8080/api/v1/itineraries/outlook \
   -H "Content-Type: application/json" \
   -d '{"legs":[{"origin":"BOS","dest":"ORD","carrier":"UA","date":"2026-10-06","dep_time":"0700","arr_time":"0905"},{"origin":"ORD","dest":"LAX","carrier":"UA","date":"2026-10-06","dep_time":"1100","arr_time":"1330"}]}'

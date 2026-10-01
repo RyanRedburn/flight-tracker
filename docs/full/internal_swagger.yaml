@@ -1310,19 +1310,13 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Historical route outlook for each of 2–4 ordered legs, plus the
-        connection after each leg except the last. Leg index and after_leg are zero-based.
-        Each leg uses the same sample as route outlook, with the weekday taken from
-        its date. The response is 200 when the body is valid. A leg whose origin,
-        destination, and carrier have no flight-performance data has a null outlook
-        and an error string. Layover uses each leg''s local arrival and departure
-        date and time, so a later outbound date is an overnight or multi-day connection.
-        Connection type compares airport countries with the connection airport: an
-        endpoint is international when its country differs. Slack is that layover
-        minus the inbound recommended minutes for the inferred type. Status is ok
-        when the layover covers that recommendation, tight when it is shorter, and
-        unknown when the legs do not meet, a needed country or recommendation is missing,
-        the inbound outlook failed, or the layover cannot be computed.'
+      description: 'Historical outlook for each of 2–4 ordered legs, plus connection
+        risk between adjacent legs. Each leg uses the same sample as route outlook,
+        with weekday taken from its date. A valid body always returns 200; a leg with
+        no flight-performance history has a null outlook and an error. Connections
+        compare the layover (local arrival to next local departure) to the inbound
+        recommended connection minutes: ok when the layover covers that recommendation,
+        tight when shorter, and unknown when it cannot be assessed.'
       parameters:
       - description: Ordered legs
         in: body
