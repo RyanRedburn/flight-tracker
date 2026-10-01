@@ -79,7 +79,11 @@ func TestConnectionType(t *testing.T) {
 }
 
 func TestAssessConnection(t *testing.T) {
-	outlook := &model.RouteOutlook{RecommendedConnectionMinutes: testRecommended()}
+	outlook := &model.RouteOutlook{
+		SampleSize: 40,
+		Confidence: model.ConfidenceHigh,
+		Connection: testRecommended(),
+	}
 	countries := map[string]string{
 		testConnOrigin:   "US",
 		testTravelOrigin: "US",
@@ -90,8 +94,14 @@ func TestAssessConnection(t *testing.T) {
 	}
 
 	dd, di, id, ii := 45, 60, 120, 180
+	looseDD := dd + model.ConnectionLooseSlackMinutes
+	looseDI := di + model.ConnectionLooseSlackMinutes
+	looseID := id + model.ConnectionLooseSlackMinutes
+	looseII := ii + model.ConnectionLooseSlackMinutes
 	layover115 := 115
 	slack70 := 70
+	layover60 := 60
+	slack15 := 15
 	layover35 := 35
 	slackNeg := -10
 	layover540 := 540
@@ -100,137 +110,175 @@ func TestAssessConnection(t *testing.T) {
 	slack120 := 120
 
 	tests := []struct {
-		name          string
-		inbound       model.ItineraryLeg
-		outbound      model.ItineraryLeg
-		outlook       *model.RouteOutlook
-		countries     map[string]string
-		wantStatus    string
-		wantType      string
-		wantLayover   *int
-		wantRecommend *int
-		wantSlack     *int
+		name           string
+		inbound        model.ItineraryLeg
+		outbound       model.ItineraryLeg
+		outlook        *model.RouteOutlook
+		countries      map[string]string
+		wantStatus     string
+		wantConfidence string
+		wantType       string
+		wantLayover    *int
+		wantRecommend  *int
+		wantLoose      *int
+		wantSlack      *int
 	}{
 		{
-			name:          "ok domestic",
-			inbound:       testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound:      testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionOK,
-			wantType:      model.ConnectionDomesticToDomestic,
-			wantLayover:   &layover115,
-			wantRecommend: &dd,
-			wantSlack:     &slack70,
+			name:           "loose domestic",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionLoose,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover115,
+			wantRecommend:  &dd,
+			wantLoose:      &looseDD,
+			wantSlack:      &slack70,
 		},
 		{
-			name:          "tight domestic",
-			inbound:       testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound:      testLeg(testTravelOrigin, testAirportLAX, testDateTue, "0940", "1200"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionTight,
-			wantType:      model.ConnectionDomesticToDomestic,
-			wantLayover:   &layover35,
-			wantRecommend: &dd,
-			wantSlack:     &slackNeg,
+			name:           "ok domestic",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, "1005", "1200"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionOK,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover60,
+			wantRecommend:  &dd,
+			wantLoose:      &looseDD,
+			wantSlack:      &slack15,
 		},
 		{
-			name:          "overnight",
-			inbound:       testLeg(testConnOrigin, testTravelOrigin, testDateTue, "1800", "2200"),
-			outbound:      testLeg(testTravelOrigin, testAirportLAX, testDateWed, testTime0700, "1000"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionOK,
-			wantType:      model.ConnectionDomesticToDomestic,
-			wantLayover:   &layover540,
-			wantRecommend: &dd,
-			wantSlack:     &slack495,
+			name:           "tight domestic",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, "0940", "1200"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionTight,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover35,
+			wantRecommend:  &dd,
+			wantLoose:      &looseDD,
+			wantSlack:      &slackNeg,
 		},
 		{
-			name:          "domestic to international",
-			inbound:       testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
-			outbound:      testLeg(testTravelOrigin, testLHR, testDateTue, "1200", "2300"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionOK,
-			wantType:      model.ConnectionDomesticToInternational,
-			wantLayover:   &layover180,
-			wantRecommend: &di,
-			wantSlack:     &slack120,
+			name:           "overnight",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, "1800", "2200"),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateWed, testTime0700, "1000"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionLoose,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover540,
+			wantRecommend:  &dd,
+			wantLoose:      &looseDD,
+			wantSlack:      &slack495,
 		},
 		{
-			name:          "international to domestic",
-			inbound:       testLeg(testLHR, testTravelOrigin, testDateTue, testTime0700, testTime0900),
-			outbound:      testLeg(testTravelOrigin, testAirportLAX, testDateTue, "1200", "1500"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionOK,
-			wantType:      model.ConnectionInternationalToDomestic,
-			wantLayover:   &layover180,
-			wantRecommend: &id,
-			wantSlack:     intPtr(60),
+			name:           "domestic to international",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+			outbound:       testLeg(testTravelOrigin, testLHR, testDateTue, "1200", "2300"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionLoose,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToInternational,
+			wantLayover:    &layover180,
+			wantRecommend:  &di,
+			wantLoose:      &looseDI,
+			wantSlack:      &slack120,
 		},
 		{
-			name:          "international to international",
-			inbound:       testLeg(testTravelOrigin, testLHR, testDateTue, testTime0700, "1800"),
-			outbound:      testLeg(testLHR, testCDG, testDateTue, "2100", "2300"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionOK,
-			wantType:      model.ConnectionInternationalToInternational,
-			wantLayover:   intPtr(180),
-			wantRecommend: &ii,
-			wantSlack:     intPtr(0),
+			name:           "international to domestic",
+			inbound:        testLeg(testLHR, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, "1200", "1500"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionLoose,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionInternationalToDomestic,
+			wantLayover:    &layover180,
+			wantRecommend:  &id,
+			wantLoose:      &looseID,
+			wantSlack:      intPtr(60),
 		},
 		{
-			name:        "mismatched airports",
-			inbound:     testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
-			outbound:    testLeg("DEN", testAirportLAX, testDateTue, "1200", "1500"),
-			outlook:     outlook,
-			countries:   countries,
-			wantStatus:  model.ConnectionUnknown,
-			wantLayover: &layover180,
+			name:           "international to international",
+			inbound:        testLeg(testTravelOrigin, testLHR, testDateTue, testTime0700, "1800"),
+			outbound:       testLeg(testLHR, testCDG, testDateTue, "2100", "2300"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionOK,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionInternationalToInternational,
+			wantLayover:    intPtr(180),
+			wantRecommend:  &ii,
+			wantLoose:      &looseII,
+			wantSlack:      intPtr(0),
 		},
 		{
-			name:        "missing country",
-			inbound:     testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
-			outbound:    testLeg(testTravelOrigin, testAirportLAX, testDateTue, "1200", "1500"),
-			outlook:     outlook,
-			countries:   map[string]string{testConnOrigin: "US", testAirportLAX: "US"},
-			wantStatus:  model.ConnectionUnknown,
-			wantLayover: &layover180,
+			name:           "mismatched airports",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+			outbound:       testLeg("DEN", testAirportLAX, testDateTue, "1200", "1500"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionUnknown,
+			wantConfidence: model.ConfidenceUnknown,
+			wantLayover:    &layover180,
 		},
 		{
-			name:        "missing outlook",
-			inbound:     testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound:    testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			countries:   countries,
-			wantStatus:  model.ConnectionUnknown,
-			wantType:    model.ConnectionDomesticToDomestic,
-			wantLayover: &layover115,
+			name:           "missing country",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, "1200", "1500"),
+			outlook:        outlook,
+			countries:      map[string]string{testConnOrigin: "US", testAirportLAX: "US"},
+			wantStatus:     model.ConnectionUnknown,
+			wantConfidence: model.ConfidenceUnknown,
+			wantLayover:    &layover180,
+		},
+		{
+			name:           "missing outlook",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
+			countries:      countries,
+			wantStatus:     model.ConnectionUnknown,
+			wantConfidence: model.ConfidenceUnknown,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover115,
 		},
 		{
 			name:     "null recommendation",
 			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
 			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook: &model.RouteOutlook{RecommendedConnectionMinutes: model.RecommendedConnectionMinutes{
-				DomesticToInternational: &di,
-			}},
-			countries:   countries,
-			wantStatus:  model.ConnectionUnknown,
-			wantType:    model.ConnectionDomesticToDomestic,
-			wantLayover: &layover115,
+			outlook: &model.RouteOutlook{
+				SampleSize: 40,
+				Confidence: model.ConfidenceHigh,
+				Connection: model.ConnectionGuidance{
+					DomesticToInternational: model.NewConnectionMinutes(di),
+				},
+			},
+			countries:      countries,
+			wantStatus:     model.ConnectionUnknown,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantLayover:    &layover115,
 		},
 		{
-			name:          "negative layover",
-			inbound:       testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, "1500"),
-			outbound:      testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime0900, "1200"),
-			outlook:       outlook,
-			countries:     countries,
-			wantStatus:    model.ConnectionUnknown,
-			wantType:      model.ConnectionDomesticToDomestic,
-			wantRecommend: &dd,
+			name:           "negative layover",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, "1500"),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime0900, "1200"),
+			outlook:        outlook,
+			countries:      countries,
+			wantStatus:     model.ConnectionUnknown,
+			wantConfidence: model.ConfidenceHigh,
+			wantType:       model.ConnectionDomesticToDomestic,
+			wantRecommend:  &dd,
+			wantLoose:      &looseDD,
 		},
 	}
 
@@ -241,9 +289,14 @@ func TestAssessConnection(t *testing.T) {
 				t.Errorf("status = %q, want %q", got.Status, tt.wantStatus)
 			}
 
+			if got.Confidence != tt.wantConfidence {
+				t.Errorf("confidence = %q, want %q", got.Confidence, tt.wantConfidence)
+			}
+
 			assertStringPtr(t, "connection_type", got.ConnectionType, tt.wantType)
 			assertIntPtr(t, "layover_minutes", got.LayoverMinutes, tt.wantLayover)
-			assertIntPtr(t, "recommended_connection_minutes", got.RecommendedConnectionMinutes, tt.wantRecommend)
+			assertIntPtr(t, "recommended_minutes", got.RecommendedMinutes, tt.wantRecommend)
+			assertIntPtr(t, "loose_minutes", got.LooseMinutes, tt.wantLoose)
 			assertIntPtr(t, "slack_minutes", got.SlackMinutes, tt.wantSlack)
 		})
 	}
@@ -307,15 +360,8 @@ func testLeg(origin, dest, date, dep, arr string) model.ItineraryLeg {
 	}
 }
 
-func testRecommended() model.RecommendedConnectionMinutes {
-	dd, di, id, ii := 45, 60, 120, 180
-
-	return model.RecommendedConnectionMinutes{
-		DomesticToDomestic:           &dd,
-		DomesticToInternational:      &di,
-		InternationalToDomestic:      &id,
-		InternationalToInternational: &ii,
-	}
+func testRecommended() model.ConnectionGuidance {
+	return model.ConnectionGuidanceFromRecommended(45, 60, 120, 180)
 }
 
 func assertStringPtr(t *testing.T, name string, got *string, want string) {

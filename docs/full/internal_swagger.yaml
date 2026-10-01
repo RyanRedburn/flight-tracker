@@ -362,6 +362,24 @@ definitions:
       state:
         type: string
     type: object
+  model.ConnectionGuidance:
+    properties:
+      domestic_to_domestic:
+        $ref: '#/definitions/model.ConnectionMinutes'
+      domestic_to_international:
+        $ref: '#/definitions/model.ConnectionMinutes'
+      international_to_domestic:
+        $ref: '#/definitions/model.ConnectionMinutes'
+      international_to_international:
+        $ref: '#/definitions/model.ConnectionMinutes'
+    type: object
+  model.ConnectionMinutes:
+    properties:
+      loose_minutes:
+        type: integer
+      recommended_minutes:
+        type: integer
+    type: object
   model.CreateAPIKeyRequest:
     properties:
       name:
@@ -432,6 +450,12 @@ definitions:
         type: integer
       airport:
         type: string
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
       connection_type:
         enum:
         - domestic_to_domestic
@@ -441,12 +465,15 @@ definitions:
         type: string
       layover_minutes:
         type: integer
-      recommended_connection_minutes:
+      loose_minutes:
+        type: integer
+      recommended_minutes:
         type: integer
       slack_minutes:
         type: integer
       status:
         enum:
+        - loose
         - ok
         - tight
         - unknown
@@ -559,17 +586,6 @@ definitions:
     - JobTypeImportWeatherStations
     - JobTypeRebuildRouteTravelWindows
     - JobTypeRebuildRouteWeatherStats
-  model.RecommendedConnectionMinutes:
-    properties:
-      domestic_to_domestic:
-        type: integer
-      domestic_to_international:
-        type: integer
-      international_to_domestic:
-        type: integer
-      international_to_international:
-        type: integer
-    type: object
   model.RouteOutlook:
     properties:
       analysis_end:
@@ -580,6 +596,14 @@ definitions:
         type: number
       carrier:
         type: string
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
+      connection:
+        $ref: '#/definitions/model.ConnectionGuidance'
       day_of_week:
         type: integer
       delay_probability:
@@ -608,8 +632,6 @@ definitions:
         type: number
       origin:
         type: string
-      recommended_connection_minutes:
-        $ref: '#/definitions/model.RecommendedConnectionMinutes'
       sample_size:
         type: integer
     type: object
@@ -751,30 +773,69 @@ definitions:
     type: object
   model.TravelWindowDayBucket:
     properties:
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
       day_of_week:
         type: integer
       flights:
         type: integer
       on_time_rate:
         type: number
+      reliability:
+        enum:
+        - reliable
+        - typical
+        - unreliable
+        - unknown
+        type: string
     type: object
   model.TravelWindowHourBucket:
     properties:
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
       flights:
         type: integer
       hour:
         type: integer
       on_time_rate:
         type: number
+      reliability:
+        enum:
+        - reliable
+        - typical
+        - unreliable
+        - unknown
+        type: string
     type: object
   model.TravelWindowMonthBucket:
     properties:
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
       flights:
         type: integer
       month:
         type: integer
       on_time_rate:
         type: number
+      reliability:
+        enum:
+        - reliable
+        - typical
+        - unreliable
+        - unknown
+        type: string
     type: object
   model.WeatherCategoryStat:
     properties:
@@ -1309,13 +1370,18 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Historical outlook for each of 2–4 ordered legs, plus connection
+      description: Historical outlook for each of 2–4 ordered legs, plus connection
         risk between adjacent legs. Each leg uses the same sample as route outlook,
         with weekday taken from its date. A valid body always returns 200; a leg with
-        no flight-performance history has a null outlook and an error. Connections
-        compare the layover (local arrival to next local departure) to the inbound
-        recommended connection minutes: ok when the layover covers that recommendation,
-        tight when shorter, and unknown when it cannot be assessed.'
+        no flight-performance history has a null outlook and an error. status is loose
+        when layover_minutes is at least loose_minutes, ok when it meets recommended_minutes
+        but not loose_minutes, tight when shorter, and unknown when the layover or
+        the inbound threshold is missing. recommended_minutes and loose_minutes are
+        copied from the inbound outlook connection bucket for connection_type. confidence
+        matches that outlook for a classified same-airport connection. It stays unknown
+        when the airports differ or the connection type cannot be classified, even
+        if the inbound outlook confidence is high. A negative gap is not a layover,
+        so status stays unknown even when thresholds are present.
       parameters:
       - description: Ordered legs
         in: body
@@ -1658,18 +1724,22 @@ paths:
       - internal
   /api/v1/routes/outlook:
     get:
-      description: 'On-time, delay, cancellation, and diversion probabilities for
-        a carrier/route/day/departure-time window, based on the trailing analysis
-        period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD)
+      description: On-time, delay, cancellation, and diversion probabilities for a
+        carrier/route/day/departure-time window, based on the trailing analysis period.
+        Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD)
         is required; sending both or neither is rejected. A date selects that weekday
         for the same historical sample. dep_time is local departure time as HHmm (e.g.
-        0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes
-        is a same-airport heuristic: arrival-delay p90 for arrived flights in this
-        outlook, plus the destination airport''s MCT or 45/60/120/120 minutes. It
-        is not an official airline MCT. The four values are null when the sample is
-        insufficient or no arrival delay is available. Returns 404 when the origin,
-        destination, and carrier have no flight-performance data. A day-of-week or
-        departure-time window that matches nothing still returns 200.'
+        0700). dep_time_window_minutes defaults to 30 (max 120). confidence is high
+        when the sample meets the minimum, low when some history is below that minimum,
+        and unknown when the sample is empty. connection is same-airport guidance
+        per connection type. recommended_minutes is arrival-delay p90 plus the destination
+        airport MCT, or 45/60/120/120 when that MCT bucket is missing; it is the smallest
+        layover that is ok. loose_minutes is 30 minutes above recommended_minutes.
+        A shorter layover is tight. A null bucket means that connection status is
+        unknown. These minutes are not an official airline MCT. Itinerary connections
+        use the same thresholds and confidence. Returns 404 when the origin, destination,
+        and carrier have no flight-performance data. A day-of-week or departure-time
+        window that matches nothing still returns 200.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -1849,9 +1919,15 @@ paths:
       description: Typical-year on-time rates by month, day of week (1=Mon … 7=Sun),
         and scheduled local departure hour, pooled from the last up to 2 years of
         flight-performance data for the origin/destination (and marketing carrier
-        when set). Best/worst lists are the top and bottom 3 eligible buckets. The
-        carrier field is omitted when the carrier query param is not set. Returns
-        404 when the route (or route+carrier) has no flight-performance data.
+        when set). Best/worst lists are the top and bottom 3 eligible buckets. Each
+        bucket's confidence and reliability describe that seasonal on-time rate only;
+        they are not connection statuses (not loose, ok, or tight). confidence is
+        high when flights meet the grain's minimum sample and low when the bucket
+        has fewer flights. reliability is reliable at an on-time rate of at least
+        0.80, typical from 0.70 up to 0.80, and unreliable below 0.70, and only when
+        confidence is high; otherwise unknown. The carrier field is omitted when the
+        carrier query param is not set. Returns 404 when the route (or route+carrier)
+        has no flight-performance data.
       parameters:
       - description: Origin airport IATA code
         in: query

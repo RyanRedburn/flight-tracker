@@ -108,46 +108,41 @@ func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 	}
 }
 
-func TestRecommendedConnectionMinutesJSON(t *testing.T) {
-	body, err := json.Marshal(RouteOutlook{})
+func TestConnectionGuidanceJSON(t *testing.T) {
+	body, err := json.Marshal(RouteOutlook{Confidence: ConfidenceUnknown})
 	if err != nil {
 		t.Fatalf("marshal nulls: %v", err)
 	}
 
-	assertNullConnectionMinutes(t, jsonField(t, body, "recommended_connection_minutes"))
+	if jsonFieldString(t, body, "confidence") != ConfidenceUnknown {
+		t.Fatalf("confidence = %s", jsonField(t, body, "confidence"))
+	}
 
-	dd := 0
-	di := 60
-	id := 50
-	ii := 200
+	assertNullConnectionMinutes(t, jsonField(t, body, "connection"))
 
 	populated, err := json.Marshal(RouteOutlook{
-		RecommendedConnectionMinutes: RecommendedConnectionMinutes{
-			DomesticToDomestic:           &dd,
-			DomesticToInternational:      &di,
-			InternationalToDomestic:      &id,
-			InternationalToInternational: &ii,
-		},
+		Confidence: ConfidenceHigh,
+		Connection: ConnectionGuidanceFromRecommended(0, 60, 50, 200),
 	})
 	if err != nil {
 		t.Fatalf("marshal populated: %v", err)
 	}
 
-	var got RecommendedConnectionMinutes
-	if err := json.Unmarshal(jsonField(t, populated, "recommended_connection_minutes"), &got); err != nil {
-		t.Fatalf("decode recommended_connection_minutes: %v", err)
+	var got ConnectionGuidance
+	if err := json.Unmarshal(jsonField(t, populated, "connection"), &got); err != nil {
+		t.Fatalf("decode connection: %v", err)
 	}
 
-	assertMinutes(t, "domestic_to_domestic", got.DomesticToDomestic, 0)
-	assertMinutes(t, "domestic_to_international", got.DomesticToInternational, 60)
-	assertMinutes(t, "international_to_domestic", got.InternationalToDomestic, 50)
-	assertMinutes(t, "international_to_international", got.InternationalToInternational, 200)
+	assertConnectionMinutesJSON(t, "domestic_to_domestic", got.DomesticToDomestic, 0)
+	assertConnectionMinutesJSON(t, "domestic_to_international", got.DomesticToInternational, 60)
+	assertConnectionMinutesJSON(t, "international_to_domestic", got.InternationalToDomestic, 50)
+	assertConnectionMinutesJSON(t, "international_to_international", got.InternationalToInternational, 200)
 }
 
 func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
 	t.Helper()
 
-	var buckets map[string]*int
+	var buckets map[string]*ConnectionMinutes
 	if err := json.Unmarshal(raw, &buckets); err != nil {
 		t.Fatalf("decode connection minutes: %v", err)
 	}
@@ -165,22 +160,33 @@ func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
 		}
 
 		if value != nil {
-			t.Errorf("%s = %d, want null", key, *value)
+			t.Errorf("%s = %+v, want null", key, value)
 		}
 	}
 }
 
-func assertMinutes(t *testing.T, name string, got *int, want int) {
+func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinutes, recommended int) {
 	t.Helper()
 
 	if got == nil {
-		t.Errorf("%s = null, want %d", name, want)
+		t.Errorf("%s = null, want recommended %d", name, recommended)
 		return
 	}
 
-	if *got != want {
-		t.Errorf("%s = %d, want %d", name, *got, want)
+	if got.RecommendedMinutes != recommended || got.LooseMinutes != recommended+ConnectionLooseSlackMinutes {
+		t.Errorf("%s = %+v, want recommended %d loose %d", name, got, recommended, recommended+ConnectionLooseSlackMinutes)
 	}
+}
+
+func jsonFieldString(t *testing.T, body []byte, field string) string {
+	t.Helper()
+
+	var value string
+	if err := json.Unmarshal(jsonField(t, body, field), &value); err != nil {
+		t.Fatalf("decode %s: %v", field, err)
+	}
+
+	return value
 }
 
 func TestRouteOutlookRoundForResponse(t *testing.T) {

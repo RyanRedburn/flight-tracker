@@ -21,7 +21,7 @@ func NewItinerariesHandler(s store.Store) *ItinerariesHandler {
 // ItineraryOutlook returns historical outlook and connection risk for ordered legs.
 //
 //	@Summary		Itinerary booking outlook
-//	@Description	Historical outlook for each of 2–4 ordered legs, plus connection risk between adjacent legs. Each leg uses the same sample as route outlook, with weekday taken from its date. A valid body always returns 200; a leg with no flight-performance history has a null outlook and an error. Connections compare the layover (local arrival to next local departure) to the inbound recommended connection minutes: ok when the layover covers that recommendation, tight when shorter, and unknown when it cannot be assessed.
+//	@Description	Historical outlook for each of 2–4 ordered legs, plus connection risk between adjacent legs. Each leg uses the same sample as route outlook, with weekday taken from its date. A valid body always returns 200; a leg with no flight-performance history has a null outlook and an error. status is loose when layover_minutes is at least loose_minutes, ok when it meets recommended_minutes but not loose_minutes, tight when shorter, and unknown when the layover or the inbound threshold is missing. recommended_minutes and loose_minutes are copied from the inbound outlook connection bucket for connection_type. confidence matches that outlook for a classified same-airport connection. It stays unknown when the airports differ or the connection type cannot be classified, even if the inbound outlook confidence is high. A negative gap is not a layover, so status stays unknown even when thresholds are present.
 //	@Tags			itineraries,external
 //	@Accept			json
 //	@Produce		json

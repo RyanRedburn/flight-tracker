@@ -3,7 +3,6 @@ package store
 import (
 	"math"
 	"sort"
-	"strconv"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -27,7 +26,7 @@ func TestConnectionRecommendation(t *testing.T) {
 		insufficient bool
 		p90          *float64
 		mct          *AirportConnectionMCT
-		want         model.RecommendedConnectionMinutes
+		want         model.ConnectionGuidance
 	}{
 		{
 			name: "early-heavy",
@@ -102,21 +101,21 @@ func TestConnectionRecommendation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ConnectionRecommendation(tt.insufficient, tt.p90, tt.mct)
-			assertConnectionMinutes(t, got, tt.want)
+			assertConnectionGuidance(t, got, tt.want)
 		})
 	}
 }
 
-func assertConnectionMinutes(t *testing.T, got, want model.RecommendedConnectionMinutes) {
+func assertConnectionGuidance(t *testing.T, got, want model.ConnectionGuidance) {
 	t.Helper()
 
-	assertMinutesPtr(t, "domestic_to_domestic", got.DomesticToDomestic, want.DomesticToDomestic)
-	assertMinutesPtr(t, "domestic_to_international", got.DomesticToInternational, want.DomesticToInternational)
-	assertMinutesPtr(t, "international_to_domestic", got.InternationalToDomestic, want.InternationalToDomestic)
-	assertMinutesPtr(t, "international_to_international", got.InternationalToInternational, want.InternationalToInternational)
+	assertConnectionMinutes(t, "domestic_to_domestic", got.DomesticToDomestic, want.DomesticToDomestic)
+	assertConnectionMinutes(t, "domestic_to_international", got.DomesticToInternational, want.DomesticToInternational)
+	assertConnectionMinutes(t, "international_to_domestic", got.InternationalToDomestic, want.InternationalToDomestic)
+	assertConnectionMinutes(t, "international_to_international", got.InternationalToInternational, want.InternationalToInternational)
 }
 
-func assertMinutesPtr(t *testing.T, name string, got, want *int) {
+func assertConnectionMinutes(t *testing.T, name string, got, want *model.ConnectionMinutes) {
 	t.Helper()
 
 	if want == nil && got == nil {
@@ -124,25 +123,12 @@ func assertMinutesPtr(t *testing.T, name string, got, want *int) {
 	}
 
 	if want == nil || got == nil || *got != *want {
-		t.Errorf("%s = %s, want %s", name, formatMinutes(got), formatMinutes(want))
+		t.Errorf("%s = %+v, want %+v", name, got, want)
 	}
 }
 
-func formatMinutes(v *int) string {
-	if v == nil {
-		return "null"
-	}
-
-	return strconv.Itoa(*v)
-}
-
-func minutes(dd, di, id, ii int) model.RecommendedConnectionMinutes {
-	return model.RecommendedConnectionMinutes{
-		DomesticToDomestic:           &dd,
-		DomesticToInternational:      &di,
-		InternationalToDomestic:      &id,
-		InternationalToInternational: &ii,
-	}
+func minutes(dd, di, id, ii int) model.ConnectionGuidance {
+	return model.ConnectionGuidanceFromRecommended(dd, di, id, ii)
 }
 
 func floatPtr(v float64) *float64 {

@@ -57,8 +57,9 @@ func ConnectionType(originCountry, hubCountry, destCountry string) (string, bool
 
 func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.RouteOutlook, countries map[string]string) model.ItineraryConnection {
 	conn := model.ItineraryConnection{
-		Airport: inbound.Dest,
-		Status:  model.ConnectionUnknown,
+		Airport:    inbound.Dest,
+		Status:     model.ConnectionUnknown,
+		Confidence: model.ConfidenceUnknown,
 	}
 
 	if mins, ok := LayoverMinutes(inbound.Date, inbound.ArrTime, outbound.Date, outbound.DepTime); ok {
@@ -84,23 +85,29 @@ func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.Route
 
 	conn.ConnectionType = &connectionType
 
-	if outlook != nil {
-		conn.RecommendedConnectionMinutes = recommendedMinutes(outlook.RecommendedConnectionMinutes, connectionType)
-	}
-
-	if conn.LayoverMinutes == nil || conn.RecommendedConnectionMinutes == nil {
+	if outlook == nil {
 		return conn
 	}
 
-	slack := *conn.LayoverMinutes - *conn.RecommendedConnectionMinutes
+	conn.Confidence = outlook.DecisionConfidence()
+
+	minutes := outlook.Connection.ForType(connectionType)
+	if minutes == nil {
+		return conn
+	}
+
+	recommended := minutes.RecommendedMinutes
+	loose := minutes.LooseMinutes
+	conn.RecommendedMinutes = &recommended
+	conn.LooseMinutes = &loose
+
+	if conn.LayoverMinutes == nil {
+		return conn
+	}
+
+	slack := *conn.LayoverMinutes - recommended
 	conn.SlackMinutes = &slack
-
-	if slack >= 0 {
-		conn.Status = model.ConnectionOK
-		return conn
-	}
-
-	conn.Status = model.ConnectionTight
+	conn.Status = model.ConnectionStatus(*conn.LayoverMinutes, minutes)
 
 	return conn
 }
@@ -171,21 +178,6 @@ func localDateTime(date, hhmm string) (time.Time, bool) {
 	}
 
 	return t.Add(time.Duration(mins) * time.Minute), true
-}
-
-func recommendedMinutes(rcm model.RecommendedConnectionMinutes, connectionType string) *int {
-	switch connectionType {
-	case model.ConnectionDomesticToDomestic:
-		return rcm.DomesticToDomestic
-	case model.ConnectionDomesticToInternational:
-		return rcm.DomesticToInternational
-	case model.ConnectionInternationalToDomestic:
-		return rcm.InternationalToDomestic
-	case model.ConnectionInternationalToInternational:
-		return rcm.InternationalToInternational
-	default:
-		return nil
-	}
 }
 
 func airportCountry(countries map[string]string, code string) (string, bool) {

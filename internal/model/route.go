@@ -65,54 +65,58 @@ type RouteStats struct {
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
 
-// RecommendedConnectionMinutes is the smallest same-airport layover to allow
-// after this inbound outlook slot. Null when it cannot be estimated.
-type RecommendedConnectionMinutes struct {
-	DomesticToDomestic           *int `json:"domestic_to_domestic"`
-	DomesticToInternational      *int `json:"domestic_to_international"`
-	InternationalToDomestic      *int `json:"international_to_domestic"`
-	InternationalToInternational *int `json:"international_to_international"`
-}
-
 type RouteOutlook struct {
-	Origin                        string                       `json:"origin"`
-	Dest                          string                       `json:"dest"`
-	Carrier                       string                       `json:"carrier"`
-	DayOfWeek                     int                          `json:"day_of_week"`
-	DepTime                       string                       `json:"dep_time"`
-	DepTimeWindowMinutes          int                          `json:"dep_time_window_minutes"`
-	AnalysisStart                 string                       `json:"analysis_start"`
-	AnalysisEnd                   string                       `json:"analysis_end"`
-	SampleSize                    int                          `json:"sample_size"`
-	InsufficientSample            bool                         `json:"insufficient_sample"`
-	OnTimeProbability             float64                      `json:"on_time_probability"`
-	DelayProbability              float64                      `json:"delay_probability"`
-	CancellationProbability       float64                      `json:"cancellation_probability"`
-	DiversionProbability          float64                      `json:"diversion_probability"`
-	LikelyArrivalDelayMinutes     float64                      `json:"likely_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64                      `json:"median_arrival_delay_minutes"`
-	LikelyArrivalDelayWhenDelayed float64                      `json:"likely_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64                      `json:"median_arrival_delay_when_delayed"`
-	LikelyDepartureDelayMinutes   float64                      `json:"likely_departure_delay_minutes"`
-	RecommendedConnectionMinutes  RecommendedConnectionMinutes `json:"recommended_connection_minutes"`
+	Origin                        string             `json:"origin"`
+	Dest                          string             `json:"dest"`
+	Carrier                       string             `json:"carrier"`
+	DayOfWeek                     int                `json:"day_of_week"`
+	DepTime                       string             `json:"dep_time"`
+	DepTimeWindowMinutes          int                `json:"dep_time_window_minutes"`
+	AnalysisStart                 string             `json:"analysis_start"`
+	AnalysisEnd                   string             `json:"analysis_end"`
+	SampleSize                    int                `json:"sample_size"`
+	InsufficientSample            bool               `json:"insufficient_sample"`
+	Confidence                    string             `json:"confidence" enums:"high,low,unknown"`
+	OnTimeProbability             float64            `json:"on_time_probability"`
+	DelayProbability              float64            `json:"delay_probability"`
+	CancellationProbability       float64            `json:"cancellation_probability"`
+	DiversionProbability          float64            `json:"diversion_probability"`
+	LikelyArrivalDelayMinutes     float64            `json:"likely_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes     float64            `json:"median_arrival_delay_minutes"`
+	LikelyArrivalDelayWhenDelayed float64            `json:"likely_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed float64            `json:"median_arrival_delay_when_delayed"`
+	LikelyDepartureDelayMinutes   float64            `json:"likely_departure_delay_minutes"`
+	Connection                    ConnectionGuidance `json:"connection"`
 }
 
+// TravelWindowMonthBucket is one month-of-year on-time rate.
+// confidence and reliability are seasonal only; they are not connection statuses.
 type TravelWindowMonthBucket struct {
-	Month      int     `json:"month"`
-	OnTimeRate float64 `json:"on_time_rate"`
-	Flights    int     `json:"flights"`
+	Month       int     `json:"month"`
+	OnTimeRate  float64 `json:"on_time_rate"`
+	Flights     int     `json:"flights"`
+	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
+// TravelWindowDayBucket is one weekday on-time rate.
+// confidence and reliability are seasonal only; they are not connection statuses.
 type TravelWindowDayBucket struct {
-	DayOfWeek  int     `json:"day_of_week"`
-	OnTimeRate float64 `json:"on_time_rate"`
-	Flights    int     `json:"flights"`
+	DayOfWeek   int     `json:"day_of_week"`
+	OnTimeRate  float64 `json:"on_time_rate"`
+	Flights     int     `json:"flights"`
+	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
+// TravelWindowHourBucket is one scheduled departure-hour on-time rate.
+// confidence and reliability are seasonal only; they are not connection statuses.
 type TravelWindowHourBucket struct {
-	Hour       int     `json:"hour"`
-	OnTimeRate float64 `json:"on_time_rate"`
-	Flights    int     `json:"flights"`
+	Hour        int     `json:"hour"`
+	OnTimeRate  float64 `json:"on_time_rate"`
+	Flights     int     `json:"flights"`
+	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
 // RouteTravelWindows is typical-year on-time performance for a route (and

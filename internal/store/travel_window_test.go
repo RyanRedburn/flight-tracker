@@ -3,6 +3,8 @@ package store
 import (
 	"testing"
 	"time"
+
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
 const (
@@ -91,16 +93,32 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 		t.Fatalf("by_month len = %d, want 4 (flights >= 1)", len(got.ByMonth))
 	}
 
-	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 {
+	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 || got.ByMonth[0].Confidence != model.ConfidenceHigh || got.ByMonth[0].Reliability != model.ReliabilityReliable {
 		t.Errorf("first month = %+v", got.ByMonth[0])
+	}
+
+	if got.ByMonth[1].Confidence != model.ConfidenceHigh || got.ByMonth[1].Reliability != model.ReliabilityUnreliable {
+		t.Errorf("month 2 = %+v, want high/unreliable", got.ByMonth[1])
+	}
+
+	if got.ByMonth[3].Confidence != model.ConfidenceLow || got.ByMonth[3].Reliability != model.ReliabilityUnknown {
+		t.Errorf("month 4 = %+v, want low/unknown", got.ByMonth[3])
+	}
+
+	if got.BestMonths[0].Confidence != model.ConfidenceHigh || got.BestMonths[0].Reliability != model.ReliabilityReliable {
+		t.Errorf("best month decision = %+v", got.BestMonths[0])
 	}
 
 	if len(got.ByHour) != 2 {
 		t.Fatalf("by_hour len = %d, want 2 (hour 0 and 7; skip flights 0)", len(got.ByHour))
 	}
 
-	if got.ByHour[0].Hour != 0 {
-		t.Errorf("first hour = %d, want 0", got.ByHour[0].Hour)
+	if got.ByHour[0].Hour != 0 || got.ByHour[0].Confidence != model.ConfidenceHigh || got.ByHour[0].Reliability != model.ReliabilityTypical {
+		t.Errorf("first hour = %+v, want hour 0 high/typical", got.ByHour[0])
+	}
+
+	if got.ByHour[1].Confidence != model.ConfidenceLow || got.ByHour[1].Reliability != model.ReliabilityUnknown {
+		t.Errorf("hour 7 = %+v, want low/unknown", got.ByHour[1])
 	}
 
 	// window 200 → 1% = 2; month floor 50. Month 4 (49 flights) is in the series but not best/worst.
@@ -197,6 +215,10 @@ func TestAssembleRouteTravelWindowsEmptyEligible(t *testing.T) {
 		t.Errorf("best/worst months should be empty, got %v / %v", got.BestMonths, got.WorstMonths)
 	}
 
+	if got.ByMonth[0].Confidence != model.ConfidenceLow || got.ByMonth[0].Reliability != model.ReliabilityUnknown {
+		t.Errorf("thin month = %+v, want low/unknown", got.ByMonth[0])
+	}
+
 	if got.BestDays == nil || got.BestHours == nil {
 		t.Fatal("best_days and best_hours must be empty slices, not nil")
 	}
@@ -210,5 +232,9 @@ func TestAssembleRouteTravelWindowsRoundsLikeRouteStats(t *testing.T) {
 	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", "2026-01-01", "2026-01-31", 200, counts)
 	if got.ByMonth[0].OnTimeRate != 0.33 {
 		t.Errorf("on_time_rate = %v, want 0.33", got.ByMonth[0].OnTimeRate)
+	}
+
+	if got.ByMonth[0].Confidence != model.ConfidenceLow || got.ByMonth[0].Reliability != model.ReliabilityUnknown {
+		t.Errorf("rounded thin month = %+v, want low/unknown", got.ByMonth[0])
 	}
 }

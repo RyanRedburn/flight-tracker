@@ -20,6 +20,8 @@ const (
 	testAirportLHR    = "LHR"
 	testAirportCDG    = "CDG"
 	testAirportNCE    = "NCE"
+	testAirportDEN    = "DEN"
+	testArr0900       = "0900"
 	testDateTue       = "2026-10-06"
 	testDateWed       = "2026-10-07"
 	testArr0905       = "0905"
@@ -219,6 +221,7 @@ func TestRoutesOutlook(t *testing.T) {
 				DepTime:            "0700",
 				SampleSize:         3,
 				InsufficientSample: true,
+				Confidence:         model.ConfidenceLow,
 				AnalysisEnd:        testAnalysisEnd,
 			}, nil
 		},
@@ -245,6 +248,10 @@ func TestRoutesOutlook(t *testing.T) {
 
 	if !out.InsufficientSample {
 		t.Fatal("expected insufficient_sample")
+	}
+
+	if out.Confidence != model.ConfidenceLow {
+		t.Errorf("confidence = %q, want low", out.Confidence)
 	}
 
 	if out.AnalysisEnd != testAnalysisEnd {
@@ -741,14 +748,14 @@ func assertNullConnectionMinutesJSON(t *testing.T, body []byte) {
 		t.Fatalf("unmarshal outlook: %v", err)
 	}
 
-	rcm, ok := raw["recommended_connection_minutes"]
+	rcm, ok := raw["connection"]
 	if !ok {
-		t.Fatal("missing recommended_connection_minutes")
+		t.Fatal("missing connection")
 	}
 
-	var buckets map[string]*int
+	var buckets map[string]*model.ConnectionMinutes
 	if err := json.Unmarshal(rcm, &buckets); err != nil {
-		t.Fatalf("unmarshal recommended_connection_minutes: %v", err)
+		t.Fatalf("unmarshal connection: %v", err)
 	}
 
 	for _, key := range []string{

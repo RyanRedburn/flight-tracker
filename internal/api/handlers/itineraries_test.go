@@ -24,7 +24,8 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 		wantLayover int
 		wantSlack   int
 	}{
-		{name: "ok", secondDep: "1100", wantStatus: model.ConnectionOK, wantLayover: 115, wantSlack: 55},
+		{name: "loose", secondDep: "1100", wantStatus: model.ConnectionLoose, wantLayover: 115, wantSlack: 55},
+		{name: "ok", secondDep: "1015", wantStatus: model.ConnectionOK, wantLayover: 70, wantSlack: 10},
 		{name: "tight", secondDep: "0940", wantStatus: model.ConnectionTight, wantLayover: 35, wantSlack: -25},
 	}
 
@@ -89,8 +90,13 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 			}
 
 			assertMinutes(t, "layover", conn.LayoverMinutes, tt.wantLayover)
-			assertMinutes(t, "recommended", conn.RecommendedConnectionMinutes, 60)
+			assertMinutes(t, "recommended", conn.RecommendedMinutes, 60)
+			assertMinutes(t, "loose", conn.LooseMinutes, 90)
 			assertMinutes(t, "slack", conn.SlackMinutes, tt.wantSlack)
+
+			if conn.Confidence != model.ConfidenceHigh {
+				t.Errorf("confidence = %q, want high", conn.Confidence)
+			}
 
 			if len(filters) != 2 {
 				t.Fatalf("outlook calls = %d", len(filters))
@@ -119,7 +125,7 @@ func TestItineraryOutlookOvernight(t *testing.T) {
 	out := decodeItinerary(t, rec)
 	conn := out.Connections[0]
 
-	if conn.Status != model.ConnectionOK {
+	if conn.Status != model.ConnectionLoose {
 		t.Fatalf("status = %s, body = %s", conn.Status, rec.Body.String())
 	}
 
@@ -140,7 +146,7 @@ func TestItineraryOutlookConnectionTypes(t *testing.T) {
 	}, nil)
 
 	rec := postItinerary(t, h, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
-		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: "0900"},
+		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0900},
 		{Origin: testOriginORD, Dest: testAirportLHR, Carrier: "UA", Date: testDateTue, DepTime: "1200", ArrTime: "2200"},
 		{Origin: testAirportLHR, Dest: testAirportCDG, Carrier: "UA", Date: testDateWed, DepTime: "1000", ArrTime: "1200"},
 		{Origin: testAirportCDG, Dest: testAirportNCE, Carrier: "UA", Date: testDateWed, DepTime: "1400", ArrTime: "1530"},
@@ -163,7 +169,7 @@ func TestItineraryOutlookConnectionTypes(t *testing.T) {
 
 	for i, tt := range want {
 		conn := out.Connections[i]
-		if conn.AfterLeg != i || conn.Airport != tt.airport || conn.Status != model.ConnectionOK {
+		if conn.AfterLeg != i || conn.Airport != tt.airport || conn.Status != model.ConnectionLoose {
 			t.Fatalf("connection %d = %+v", i, conn)
 		}
 
@@ -171,27 +177,32 @@ func TestItineraryOutlookConnectionTypes(t *testing.T) {
 			t.Fatalf("connection %d type = %v, want %s", i, conn.ConnectionType, tt.typ)
 		}
 
-		assertMinutes(t, "recommended", conn.RecommendedConnectionMinutes, tt.rcm)
+		assertMinutes(t, "recommended", conn.RecommendedMinutes, tt.rcm)
+		assertMinutes(t, "loose", conn.LooseMinutes, tt.rcm+model.ConnectionLooseSlackMinutes)
 	}
 }
 
 func TestItineraryOutlookMismatch(t *testing.T) {
 	h := itineraryHandler(outlookWithMinutes(45, 60, 120, 180), map[string]string{
-		testOriginBOS: "US",
-		testOriginORD: "US",
-		"DEN":         "US",
-		testDestLAX:   "US",
+		testOriginBOS:  "US",
+		testOriginORD:  "US",
+		testAirportDEN: "US",
+		testDestLAX:    "US",
 	}, nil)
 
 	rec := postItinerary(t, h, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
-		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: "0900"},
-		{Origin: "DEN", Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1200", ArrTime: "1500"},
+		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0900},
+		{Origin: testAirportDEN, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1200", ArrTime: "1500"},
 	}})
 	out := decodeItinerary(t, rec)
 	conn := out.Connections[0]
 
-	if conn.Status != model.ConnectionUnknown || conn.ConnectionType != nil || conn.RecommendedConnectionMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.ConnectionType != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
+	}
+
+	if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Confidence != model.ConfidenceHigh {
+		t.Fatalf("inbound outlook confidence = %+v", out.Legs[0].Outlook)
 	}
 
 	assertMinutes(t, "layover", conn.LayoverMinutes, 180)
@@ -234,7 +245,7 @@ func TestItineraryOutlookMissingLeg(t *testing.T) {
 	}
 
 	conn := out.Connections[0]
-	if conn.Status != model.ConnectionUnknown || conn.RecommendedConnectionMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 
@@ -363,12 +374,9 @@ func decodeItinerary(t *testing.T, rec *httptest.ResponseRecorder) model.Itinera
 
 func outlookWithMinutes(dd, di, id, ii int) *model.RouteOutlook {
 	return &model.RouteOutlook{
-		RecommendedConnectionMinutes: model.RecommendedConnectionMinutes{
-			DomesticToDomestic:           &dd,
-			DomesticToInternational:      &di,
-			InternationalToDomestic:      &id,
-			InternationalToInternational: &ii,
-		},
+		SampleSize: 40,
+		Confidence: model.ConfidenceHigh,
+		Connection: model.ConnectionGuidanceFromRecommended(dd, di, id, ii),
 	}
 }
 
