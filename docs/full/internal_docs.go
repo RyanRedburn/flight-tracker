@@ -243,7 +243,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues an import of airports reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "description": "Queues an import of airports reference data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -318,7 +318,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues an import of countries reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "description": "Queues an import of countries reference data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -468,7 +468,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues an import of regions reference data. An empty body is treated as {\"force\":false}. Set force=true to replace existing data.",
+                "description": "Queues an import of regions reference data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2372,6 +2372,7 @@ const docTemplateinternal = `{
             }
         },
         "model.ForceIngestRequest": {
+            "description": "An empty body is treated as {\"force\":false}. Set force=true to replace existing rows.",
             "type": "object",
             "properties": {
                 "force": {

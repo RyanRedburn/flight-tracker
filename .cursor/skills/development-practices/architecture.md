@@ -17,9 +17,15 @@ cmd/server wires: config → database.NewStore → ingest services → operator.
 
 ## Request vs job
 
-- **Read endpoints** (`/routes/*`, `/carriers/*`, `/jobs*`, health) call the store and return immediately.
+- **Read endpoints** (`/routes/*`, `/itineraries/*`, `/carriers/*`, `/jobs*`, health) call the store and return immediately.
 - **Ingest POST** validates, checks active jobs / existing data, inserts `pending` jobs, returns **201**. Workers do the download.
 - Do not download remote files or run multi-minute imports inside HTTP handlers.
+
+## Multiple replicas
+
+Workers claim with `FOR UPDATE SKIP LOCKED`. The claim sets `lease_expires_at`; a heartbeat refreshes it about every `JOB_LEASE_TTL`/3 while `Process` runs. An expired lease (crash, OOM, SIGKILL, missed heartbeat) is requeued to `pending`. SIGINT/SIGTERM stops claiming, cancels in-flight work, and persists `failed` with `interrupted by shutdown`. A shutdown failure stays `failed` until the job is queued again.
+
+Advertised rate limits are Postgres token buckets shared by every replica (identity × surface: `external`, `internal`, `ingest`). The configured requests/minute is that shared cap.
 
 ## Ingest replace semantics
 

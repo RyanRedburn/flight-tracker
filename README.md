@@ -4,17 +4,13 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go service with a REST API and an in-process background worker for importing flight performance data, airport weather observations, weather station mappings, airport reference data (countries, regions, airports), and airport minimum connection times.
+Go HTTP API and in-process workers. Workers import BTS on-time performance, IEM airport weather, OurAirports reference data, and airport minimum connection times into Postgres. Reads cover route and carrier stats, typical-year travel windows, weather-category stats, and booking outlook for one route or a short itinerary.
 
 ## Features
 
-- `POST /api/v1/ingest` to queue per-month flight performance import jobs
-- `POST /api/v1/ingest/weather` to queue per-month ASOS/METAR weather observation import jobs
-- `POST /api/v1/ingest/weather-stations` to queue IEM ASOS catalog and BTS airport mapping import
-- `POST /api/v1/ingest/countries`, `/regions`, and `/airports` to queue reference data imports
-- `POST /api/v1/ingest/mct` to queue airport minimum connection time imports
-- Poll-based background workers that download, parse, and load data into Postgres
-- REST API for route performance stats, typical-year travel windows, carrier performance stats, booking outlook probabilities, and job status
+Request and response contracts live in Swagger (see [Local development](#local-development)): user-facing stats and outlook, plus admin ingest, job status, data freshness, travel-window and weather-stats rebuilds, and API keys.
+
+- Poll-based workers download, parse, and load Postgres
 - Hashed API keys in Postgres (`consumer`, `subscriber`, `admin`) with shared, multi-replica rate limits
 - SQL migrations via [golang-migrate](https://github.com/golang-migrate/migrate)
 - Docker Compose with Postgres and a migrate sidecar
@@ -73,8 +69,8 @@ make swagger
 
 Visibility is controlled by swag tags on each handler:
 
-- `external` — included in the user-facing `/swagger/` docs (currently route stats, route travel windows, route outlook, and carrier stats)
-- `internal` — operator/admin endpoints; appear only under `/swagger/internal/`
+- `external` — user-facing `/swagger/` (route and carrier stats, travel windows, weather stats, route outlook, itinerary outlook)
+- `internal` — operator/admin endpoints; appear only under `/swagger/internal/` (ingest, jobs, data freshness, rebuilds, keys)
 
 When authentication is enabled, `/swagger/` requires a `consumer`, `subscriber`, or `admin` key, and `/swagger/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
 
@@ -130,7 +126,7 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 
 | Role | Access |
 | --- | --- |
-| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/carriers/*`) and `/swagger/` |
+| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`) and `/swagger/` |
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
 | `admin` | Everything: ingest, jobs, data freshness, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
 
@@ -185,7 +181,7 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 
 ## API examples
 
-When `AUTH_DISABLED=true`, the examples below work as written. With authentication enabled, send the key on every protected request (`/health` and `/ready` never need it): `-H "Authorization: Bearer $API_KEY"`.
+When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. A filter that matches no rows still returns **200** with zeros or a zero sample. A valid itinerary body returns **200**, and a leg with no history has a null outlook. Field rules are in Swagger.
 
 ```bash
 # Liveness
@@ -197,224 +193,124 @@ curl http://localhost:8080/ready
 # Database migration version (admin)
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/db/version
 
-# Queue flight performance data import for a single month
+# Queue one month of flight-performance data
 curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4}'
 
-# Queue import for a month range
+# Queue a month range and replace months that already have data
 curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
-  -d '{"start_year":2026,"start_month":1,"end_year":2026,"end_month":4}'
+  -d '{"start_year":2026,"start_month":1,"end_year":2026,"end_month":4,"force":true}'
 
-# Re-import months that already have data
-curl -X POST http://localhost:8080/api/v1/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"start_year":2026,"start_month":4,"force":true}'
+# Queue countries reference data
+curl -X POST http://localhost:8080/api/v1/ingest/countries -H "Content-Type: application/json" -d '{}'
 
-# Queue reference data imports (recommended order: countries → regions → airports → BTS month → weather-stations → weather)
-curl -X POST http://localhost:8080/api/v1/ingest/countries \
-  -H "Content-Type: application/json" \
-  -d '{}'
+# Queue regions reference data
+curl -X POST http://localhost:8080/api/v1/ingest/regions -H "Content-Type: application/json" -d '{}'
 
-curl -X POST http://localhost:8080/api/v1/ingest/regions \
-  -H "Content-Type: application/json" \
-  -d '{}'
+# Queue airports reference data
+curl -X POST http://localhost:8080/api/v1/ingest/airports -H "Content-Type: application/json" -d '{}'
 
-curl -X POST http://localhost:8080/api/v1/ingest/airports \
-  -H "Content-Type: application/json" \
-  -d '{}'
+# Queue airport minimum connection times
+curl -X POST http://localhost:8080/api/v1/ingest/mct -H "Content-Type: application/json" -d '{}'
 
-# Queue airport minimum connection times (independent of the reference-data order above)
-curl -X POST http://localhost:8080/api/v1/ingest/mct \
-  -H "Content-Type: application/json" \
-  -d '{}'
+# Queue the weather-station catalog and airport mapping
+curl -X POST http://localhost:8080/api/v1/ingest/weather-stations -H "Content-Type: application/json" -d '{}'
 
-# Queue weather station catalog + BTS airport mapping (after at least one BTS month)
-curl -X POST http://localhost:8080/api/v1/ingest/weather-stations \
-  -H "Content-Type: application/json" \
-  -d '{}'
-
-# Queue weather observation import (auto-resolve stations from airport_weather_stations)
+# Queue one month of weather observations, resolving stations from that mapping
 curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1}'
 
-# Or provide an explicit station list
+# Or pass an explicit station list
 curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
-# Re-import weather months already loaded so each row gets ceiling_ft and category.
-# Each successful month rebuilds route weather-stats rollups.
-# Use force when that month already has observations.
-curl -X POST http://localhost:8080/api/v1/ingest/weather \
-  -H "Content-Type: application/json" \
-  -d '{"start_year":2024,"start_month":1,"force":true}'
-
-# Re-import reference data that already exists
-curl -X POST http://localhost:8080/api/v1/ingest/airports \
-  -H "Content-Type: application/json" \
-  -d '{"force":true}'
-
-# Re-import airport MCT rows that already exist
-curl -X POST http://localhost:8080/api/v1/ingest/mct \
-  -H "Content-Type: application/json" \
-  -d '{"force":true}'
-
-# Get job status
+# Job status
 curl http://localhost:8080/api/v1/jobs/<job-id>
 
-# List recent jobs
+# Recent jobs
 curl http://localhost:8080/api/v1/jobs
 
-# Dataset freshness (admin): last successful ingest, how long that job took, and the latest covered period per dataset.
-# Ingest timestamps and periods are null when that dataset has never been loaded.
+# Dataset freshness (admin)
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
 
-# Route performance stats for a date range (required: origin, dest, start_date, end_date;
-# optional: carrier, flight_number [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).
-# Omit carrier to include carrier_on_time (per-marketing-carrier on_time_rate plus flight counts).
-# The field is omitted entirely when carrier is set.
-# 404 when that route (or route+carrier, when carrier is set) has no flight-performance data.
-# A date, weekday, or flight-number filter that matches nothing still returns 200 with zeros.
+# Route performance stats
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
-curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&days_of_week=1,2,3,4,5"
 
-# Booking outlook probabilities for a departure slot (required: origin, dest, carrier, dep_time, and exactly one of day_of_week or date;
-# optional: dep_time_window_minutes, default 30, circular around midnight; uses last 365 days of matching history).
-# date (YYYY-MM-DD) selects that weekday for the same historical sample. Both or neither is 400.
-# recommended_connection_minutes is a same-airport heuristic (arrival-delay p90 plus dest airport MCT or 45/60/120/120); not an official airline MCT.
-# 404 when that route and carrier have no flight-performance data.
-# A day-of-week or departure-time window that matches nothing still returns 200 with a zero sample.
+# Booking outlook for one departure slot
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
-curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700"
 
-# Itinerary outlook for 2–4 ordered legs. Each leg uses the route outlook sample for that date's weekday.
-# A valid body returns 200. A leg with no flight-performance history has a null outlook and an error.
+# Itinerary outlook for ordered legs
 curl -X POST http://localhost:8080/api/v1/itineraries/outlook \
   -H "Content-Type: application/json" \
   -d '{"legs":[{"origin":"BOS","dest":"ORD","carrier":"UA","date":"2026-10-06","dep_time":"0700","arr_time":"0905"},{"origin":"ORD","dest":"LAX","carrier":"UA","date":"2026-10-06","dep_time":"1100","arr_time":"1330"}]}'
 
-# Typical-year travel windows (required: origin, dest; optional: carrier).
-# Pools the last up to 2 years of flight-performance data (shorter if that is all
-# that exists) into month-of-year, day-of-week, and scheduled local departure hour.
-# Rollups are rebuilt after each successful flight-performance ingest.
-# Omit carrier for route-level stats; set carrier for route+carrier. 404 if no data.
+# Typical-year travel windows
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
-curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX&carrier=UA"
 
-# On-time rate by observed weather category at the origin and destination
-# (required: origin, dest, start_date, end_date; optional: carrier, flight_number
-# [requires carrier], days_of_week=1-7 Mon-Sun; max span 366 days).
-# Each side lists category buckets plus flights with no matching observation. Missing weather is not fair.
-# 404 when that route (or route+carrier, when carrier is set) has no flight-performance data.
-# A date, weekday, or flight-number filter that matches nothing still returns 200 with zeros.
+# On-time rate by weather category. Category rules: internal/ingest/iem/documents/asos_observations.md
 curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30"
-curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA"
 
-# Queue a full rebuild of those rollups from flight_performance (admin, empty body).
-# 409 when a rebuild_route_travel_windows job is already pending or running.
-curl -X POST http://localhost:8080/api/v1/rebuild/travel-windows \
-  -H "Authorization: Bearer $API_KEY"
+# Rebuild travel-window rollups (admin, empty body)
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/travel-windows
 
-# Queue a full rebuild of route weather-category rollups (admin, empty body).
-# 409 when a rebuild_route_weather_stats job is already pending or running.
-curl -X POST http://localhost:8080/api/v1/rebuild/weather-stats \
-  -H "Authorization: Bearer $API_KEY"
+# Rebuild weather-stats rollups (admin, empty body)
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/weather-stats
 
-# Carrier performance stats (required: carrier; optional: start_date and end_date together, state;
-# dates default to the trailing 90 days ending at the carrier's latest flight date; max span 366 days).
-# 404 when the carrier has no flight-performance data.
-# A date or state filter that matches nothing still returns 200 with zeros.
+# Carrier performance stats
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
-curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&start_date=2025-01-01&end_date=2025-03-31"
 
-# Create an API key (admin; plaintext secret is returned only once)
+# Create an API key (admin; the plaintext secret is returned once)
 curl -X POST http://localhost:8080/api/v1/keys \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role":"consumer","name":"docs example"}'
 
-# List API keys (hashes and plaintext secrets are never included)
+# List API keys
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys
 
-# Revoke a key (idempotent)
-curl -X POST http://localhost:8080/api/v1/keys/<key-id>/revoke \
-  -H "Authorization: Bearer $API_KEY"
+# Revoke an API key
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys/<key-id>/revoke
 ```
 
 ### Ingest behavior
 
+Month-range imports (flight performance and weather observations) create one job per month. Omit `end_year` and `end_month` for a single month. `start_year` must be >= 2018. A range longer than `MAX_INGEST_MONTHS` (default 24) is rejected.
+
+Every ingest returns **409** when a pending or running job already covers that month or dataset, including when `force` is true. It also returns **409** when the target already has rows and `force` is omitted. `force: true` skips only the exists check. Workers still replace the target month or full table.
+
+Load order for a consistent database (there are no foreign keys): **countries → regions → airports → at least one BTS month → weather-stations → weather observations**. Airport MCT does not depend on that order.
+
+A successful flight-performance load rebuilds travel-window rollups and weather-category rollups. A successful weather-observation or weather-station load rebuilds weather-category rollups only. Admins can queue the same full rebuilds with an empty body: `POST /api/v1/rebuild/travel-windows` and `POST /api/v1/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending or running. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
+
 #### Flight performance (`POST /api/v1/ingest`)
 
-- Creates one `import_flight_performance` job per month in the requested range.
-- Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
-- `start_year` must be >= 2018 (earliest flight performance data supported by this service).
-- Workers poll the database, download the source zip for each month, and load `flight_performance`.
-- After a successful month load, the worker rebuilds `route_travel_window_scopes` and `route_travel_window_buckets` from `flight_performance` (advisory lock, full replace) so `GET /api/v1/routes/travel-windows` can read rollups only.
-- The same load also rebuilds `route_weather_category_buckets` (separate advisory lock) so `GET /api/v1/routes/weather-stats` can read rollups only.
-- Admins can queue that same full rebuild without re-importing a month: `POST /api/v1/rebuild/travel-windows` with an empty body. Returns **409** if a `rebuild_route_travel_windows` job is already pending or running.
-- Admins can queue the weather-category rollup rebuild with `POST /api/v1/rebuild/weather-stats` (empty body). Returns **409** if a `rebuild_route_weather_stats` job is already pending or running. The rebuild uses `category` stored on weather observations. Later flight, weather-observation, and weather-station loads rebuild it themselves.
-- Returns **409** if a pending/running ingest job already exists for a requested month.
-- Returns **409** if flight data already exists and `force` is not set.
-- `force: true` skips the data-exists check; workers always replace the target month on import.
-- Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
-
-Source adapter: BTS TranStats Marketing Carrier On-Time Performance. `internal/ingest/bts/testdata/` contains a small CSV sample (header plus 20 diverse April 2026 rows) used by parser and ingest tests. It is not used in production — imports come from TranStats at runtime.
+Workers download the BTS TranStats Marketing Carrier On-Time Performance zip for the month and load `flight_performance`.
 
 #### Weather observations (`POST /api/v1/ingest/weather`)
 
-- Creates one `import_weather_observations` job per month in the requested range.
-- `stations` is optional. When omitted, the service resolves IEM site ids from `airport_weather_stations` (`matched = true`). Ingest weather-stations first. Explicit lists still override.
-- Provided station values are uppercased and de-duplicated.
-- Omit `end_year` and `end_month` to ingest a single month (`start_year` / `start_month`).
-- `start_year` must be >= 2018 (aligned with flight performance coverage).
-- Workers poll the database, download ASOS/METAR CSV for the month and stations from IEM, and replace `weather_observations` for that month.
-- Each loaded observation stores `ceiling_ft` and one `category`, computed in Go at ingest. Rows with a null `category` are skipped when the rollup is rebuilt. Match rules are in `internal/ingest/iem/documents/asos_observations.md`.
-- After a successful month load, the worker rebuilds `route_weather_category_buckets`.
-- Returns **409** if a pending/running weather ingest job already exists for a requested month.
-- Returns **409** if weather data already exists and `force` is not set.
-- `force: true` skips the data-exists check; workers always replace the target month on import.
-- Requested ranges are capped by `MAX_INGEST_MONTHS` (default 24).
-- IEM requests are throttled to about 1 request/second and retried on HTTP 503.
-- Auto-resolve responses may include `unresolved_airports` for mapping rows with `matched = false`. Unmatched BTS airports are persisted in `airport_weather_stations`.
+`stations` is optional. When omitted, IEM site ids come from `airport_weather_stations` where `matched = true` (ingest weather-stations first). An explicit list overrides that and is uppercased. The response may include `unresolved_airports` for mapping rows with `matched = false`. IEM downloads run at about one request per second and retry HTTP 503. Each stored row gets `ceiling_ft` and `category` at ingest.
 
-Source adapter: Iowa Environmental Mesonet ASOS/METAR archive (`asos.py`). Field notes: `internal/ingest/iem/documents/asos_observations.md`. `internal/ingest/iem/testdata/` holds a small CSV fixture used by parser and ingest tests.
+Source: Iowa Environmental Mesonet ASOS/METAR (`asos.py`).
 
 #### Weather stations (`POST /api/v1/ingest/weather-stations`)
 
-- Creates one `import_weather_stations` job.
-- Workers download US IEM ASOS GeoJSON, full-replace `weather_stations`, and rebuild `airport_weather_stations` from distinct BTS `origin`/`dest` codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. If airports reference data is missing, matching falls back to exact IATA=`sid` only. Unmatched airports are stored as rows with `matched = false`.
-- Empty BTS data still replaces the catalog; the mapping table is empty and the job succeeds.
-- After a successful load, the worker rebuilds `route_weather_category_buckets` because station ids and timezones change which observation matches each flight. Match rules are in `internal/ingest/iem/documents/asos_observations.md`.
-- Returns **409** if a pending/running job already exists for this dataset.
-- Returns **409** if mapping tables already have rows and `force` is not set.
-- `force: true` skips the data-exists check; workers always replace both tables.
+One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty. The weather-stats rebuild runs because station ids and timezones change which observation matches a flight.
 
 #### Reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
 
-- Creates one job per request (`import_countries`, `import_regions`, or `import_airports`).
-- Workers download the CSV and full-replace the matching table.
-- Returns **409** if a pending/running job already exists for that dataset.
-- Returns **409** if the table already has rows and `force` is not set.
-- `force: true` skips the data-exists check; workers always replace the full table on import.
-- Recommended load order: **countries → regions → airports → at least one BTS month → weather-stations → weather observations** (no FK constraints; order is for data consistency only).
+One job per request (`import_countries`, `import_regions`, or `import_airports`) downloads the CSV and replaces that table.
 
-Source adapter: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
+Source: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
 
 #### Airport minimum connection times (`POST /api/v1/ingest/mct`)
 
-- Creates one `import_airport_mct` job.
-- The worker pages `GET /api/airports` on [Minimum Connection Time](https://minimumconnectiontime.com) (about one request per second, with backoff on HTTP 429 and 5xx). It does not use `minimal=true`, because that view omits connection-time fields. Request handlers never call this API.
-- A successful job full-replaces `airport_mct`.
-- These minutes are compiled planning estimates from public sources. They are **not** official OAG or IATA minimum connection times, and they are not airline-, terminal-, or flight-number-specific rules. A carrier can require a longer connection than the stored figure.
-- Attribute the source with a link to [minimumconnectiontime.com](https://minimumconnectiontime.com) if you publish a product that uses these values.
-- Returns **409** if a pending or running job already exists for this dataset, even when `force` is true.
-- Returns **409** if `airport_mct` already has rows and `force` is not set.
-- `force: true` skips the data-exists check. The worker still full-replaces the table.
-- A failed download does not change `airport_mct`. Re-import about once a month; the source revises estimates as airport procedures change.
-- `MCT_BASE_URL` and `MCT_HTTP_TIMEOUT` override the origin and the per-request timeout.
+One `import_airport_mct` job pages `GET /api/airports` on [Minimum Connection Time](https://minimumconnectiontime.com) at about one request per second, backing off on HTTP 429 and 5xx. It does not send `minimal=true`, because that view omits the minute fields. HTTP handlers do not call this API. A successful job replaces `airport_mct`. A failed download leaves the table unchanged.
+
+These minutes are planning estimates from public sources. They are not official OAG or IATA minimum connection times, and they are not airline-, terminal-, or flight-number-specific. Link [minimumconnectiontime.com](https://minimumconnectiontime.com) when a product publishes them. Re-import about once a month. `MCT_BASE_URL` and `MCT_HTTP_TIMEOUT` override the origin and the per-request timeout.
 
 ### Job leases and shutdown
 
@@ -426,7 +322,7 @@ Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LO
 
 ## Migrations
 
-Migrations run automatically on server startup (against `MIGRATIONS_PATH`).
+Migrations run automatically on server startup (against `MIGRATIONS_PATH`). To set the recorded version without running SQL, use the migrate sidecar: `docker compose --profile migrate run --rm migrate force VERSION=N` (`make force` in that image).
 
 ### Via Docker (recommended)
 
@@ -472,6 +368,6 @@ internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAi
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, Postgres implementation, test stub
-docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/psql)
+docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/force/psql)
 migrations/           SQL migrations (postgres/)
 ```

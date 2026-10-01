@@ -20,7 +20,7 @@
 //	@tag.name					freshness
 //	@tag.description			Admin dataset freshness (last successful ingest and latest covered period)
 //	@tag.name					rebuild
-//	@tag.description			Queue a full rebuild of travel-window rollups
+//	@tag.description			Queue a full rebuild of travel-window or weather-stats rollups
 //	@tag.name					routes
 //	@tag.description			Route performance stats, booking outlook, and typical-year travel windows
 //	@tag.name					itineraries

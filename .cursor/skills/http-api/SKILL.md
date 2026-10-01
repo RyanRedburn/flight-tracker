@@ -35,13 +35,18 @@ Decode with `json.NewDecoder(r.Body).Decode`. Invalid JSON → **400** `invalid 
 
 | Code | When |
 | --- | --- |
-| 200 | Successful GET |
+| 200 | Successful read |
 | 201 | Jobs queued |
 | 400 | Bind/validation/range errors |
+| 401 | Missing, invalid, or revoked API key |
+| 403 | Authenticated role cannot access this surface |
 | 404 | `errors.Is(err, store.ErrNotFound)` |
 | 409 | Active ingest job or existing data without `force` |
+| 429 | Shared rate limit or the auth-fail IP bucket |
 | 500 | Store/internal failures with a stable message |
 | 503 | Readiness ping failure |
+
+Protected routes use three shared surfaces: `external` (consumer, subscriber, or admin reads and `/swagger/`), `internal` (admin jobs, freshness, rebuild, keys, `/db/version`, `/swagger/internal/`), and `ingest` (admin ingest POSTs, separate lower RPM). `/health` and `/ready` skip auth and rate limits. Annotate **401**, **403**, and **429** on new protected handlers.
 
 **500** messages must be generic (`failed to compute route stats`). Conflict bodies use the typed structs in `internal/api/handlers/swagger_models.go` (`active_ingest_months`, `existing_data_months`, `job_type`, `dataset`).
 
@@ -51,8 +56,8 @@ Always `writeJSON` (`internal/api/handlers/health.go`). Do not invent a second e
 
 Two generated specs from `cmd/server/main.go` `go:generate`:
 
-- `@Tags foo,external` — user-facing `/swagger/` (`docs/external`). Today: route stats, route outlook, carrier stats.
-- `@Tags foo,internal` — operator `/swagger/internal/` (`docs/full`). Health, ingest, jobs.
+- `@Tags foo,external` — user-facing `/swagger/` (`docs/external`). Today: `/routes/stats`, `/routes/outlook`, `/routes/travel-windows`, `/routes/weather-stats`, `/itineraries/outlook`, `/carriers/stats`.
+- `@Tags foo,internal` — operator `/swagger/internal/` (`docs/full`). Health, ingest, jobs, data freshness, rebuild, keys.
 
 Include both the domain tag (`routes`, `ingest`, `jobs`, …) and `external` or `internal`. New user-facing reads should be `external`; ingest/ops remain `internal`.
 
