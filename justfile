@@ -25,7 +25,7 @@ docker-build:
 docker-run:
     docker compose up
 
-# Run migrations via the migrate sidecar (distroless app image has no shell/make).
+# Run migrations via the migrate sidecar (distroless app image has no shell).
 migrate-up:
     docker compose --profile migrate run --rm migrate up
 

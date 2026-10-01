@@ -472,6 +472,6 @@ internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAi
 internal/model/       Domain types
 internal/operator/    Background worker and job processor
 internal/store/       Store interface, queries, Postgres implementation, test stub
-docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/psql)
+docker/migrate/       Migrate sidecar (Dockerfile + entrypoint for up/down/psql)
 migrations/           SQL migrations (postgres/)
 ```
