@@ -7,7 +7,28 @@ Observations come from the IEM ASOS CSV (`/cgi-bin/request/asos.py`). Stored col
 
 Join observations on `airport_weather_stations.iem_sid`, not the BTS airport code. Weather-stations ingest stores the resolved sid: BTS/IATA first (`ORD`), then OurAirports FAA `local_code` (`AZA`→`IWA`), then ICAO/ident (`HNL`→`PHNL`).
 
-`ceiling_ft` and `category` are computed in Go at weather ingest. They are not IEM columns.
+## Columns
+
+| Column | Meaning |
+| --- | --- |
+| `year`, `month` | Ingest partition (UTC month of `valid`). Not in the IEM CSV. |
+| `station` | IEM site id (3–4 characters). The resolved sid, not the BTS airport code. |
+| `valid` | Observation time, stored as UTC. CSV values look like `YYYY-MM-DD HH:MM` in the requested timezone. |
+| `tmpf` | Air temperature, °F. |
+| `dwpf` | Dew point, °F. |
+| `relh` | Relative humidity, percent. |
+| `drct` | Wind direction, degrees from true north (0–360). |
+| `sknt` | Wind speed, knots. |
+| `gust` | Wind gust, knots. |
+| `vsby` | Visibility, statute miles. |
+| `skyc1`, `skyc2`, `skyc3` | Sky cover at levels 1–3: `CLR` clear, `FEW` few, `SCT` scattered, `BKN` broken, `OVC` overcast, `VV` vertical visibility (obscured sky). |
+| `skyl1`, `skyl2`, `skyl3` | Height of that level, feet above ground. |
+| `wxcodes` | Present-weather tokens from the METAR, space-separated (`-SN`, `BR`, `TSRA`). |
+| `p01i` | Precipitation in the hour ending at the observation, inches. A trace may be a small float (IEM often uses `0.0001`). |
+| `alti` | Altimeter setting, inches of mercury. |
+| `mslp` | Sea-level pressure, millibars. |
+| `metar` | Raw METAR text, including the ICAO id (`KORD`). |
+| `ceiling_ft`, `category` | Computed at ingest. Not in the IEM CSV. See below. |
 
 ## Ceiling and category
 

@@ -184,50 +184,95 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. A filter that matches no rows still returns **200** with zeros or a zero sample. A valid itinerary body returns **200**, and a leg with no history has a null outlook. Field rules are in Swagger.
 
 ```bash
+# Liveness
 curl http://localhost:8080/health
+
+# Readiness (database ping)
 curl http://localhost:8080/ready
+
+# Database migration version (admin)
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/db/version
 
+# Queue one month of flight-performance data
 curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4}'
+
+# Queue a month range and replace months that already have data
 curl -X POST http://localhost:8080/api/v1/ingest \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":1,"end_year":2026,"end_month":4,"force":true}'
 
+# Queue countries reference data
 curl -X POST http://localhost:8080/api/v1/ingest/countries -H "Content-Type: application/json" -d '{}'
+
+# Queue regions reference data
 curl -X POST http://localhost:8080/api/v1/ingest/regions -H "Content-Type: application/json" -d '{}'
+
+# Queue airports reference data
 curl -X POST http://localhost:8080/api/v1/ingest/airports -H "Content-Type: application/json" -d '{}'
+
+# Queue airport minimum connection times
 curl -X POST http://localhost:8080/api/v1/ingest/mct -H "Content-Type: application/json" -d '{}'
+
+# Queue the weather-station catalog and airport mapping
 curl -X POST http://localhost:8080/api/v1/ingest/weather-stations -H "Content-Type: application/json" -d '{}'
+
+# Queue one month of weather observations, resolving stations from that mapping
 curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1}'
+
+# Or pass an explicit station list
 curl -X POST http://localhost:8080/api/v1/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
+# Job status
 curl http://localhost:8080/api/v1/jobs/<job-id>
+
+# Recent jobs
 curl http://localhost:8080/api/v1/jobs
+
+# Dataset freshness (admin)
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
 
+# Route performance stats
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
+
+# Booking outlook for one departure slot
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
+
+# Itinerary outlook for ordered legs
 curl -X POST http://localhost:8080/api/v1/itineraries/outlook \
   -H "Content-Type: application/json" \
   -d '{"legs":[{"origin":"BOS","dest":"ORD","carrier":"UA","date":"2026-10-06","dep_time":"0700","arr_time":"0905"},{"origin":"ORD","dest":"LAX","carrier":"UA","date":"2026-10-06","dep_time":"1100","arr_time":"1330"}]}'
+
+# Typical-year travel windows
 curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
-# Categories and the ±30 minute join: internal/ingest/iem/documents/asos_observations.md
+
+# On-time rate by weather category. Category rules: internal/ingest/iem/documents/asos_observations.md
 curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30"
+
+# Rebuild travel-window rollups (admin, empty body)
 curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/travel-windows
+
+# Rebuild weather-stats rollups (admin, empty body)
 curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/weather-stats
+
+# Carrier performance stats
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
 
+# Create an API key (admin; the plaintext secret is returned once)
 curl -X POST http://localhost:8080/api/v1/keys \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role":"consumer","name":"docs example"}'
+
+# List API keys
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys
+
+# Revoke an API key
 curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys/<key-id>/revoke
 ```
 
