@@ -376,10 +376,8 @@ definitions:
   model.ConnectionMinutes:
     properties:
       floor_only:
-        description: |-
-          FloorOnly is true when the airport MCT minute for this bucket was missing
-          and the static floor was used: 45 domestic-domestic, 60 domestic-international,
-          120 international. False means the airport supplied the minute, including zero.
+        description: FloorOnly means the static floor (45, 60, 120, or 120) replaced
+          a missing airport MCT minute. A stored zero is not missing.
         type: boolean
       loose_minutes:
         type: integer
@@ -470,28 +468,20 @@ definitions:
         - international_to_international
         type: string
       floor_only:
-        description: |-
-          FloorOnly is copied from the inbound outlook bucket. True means that bucket used the static MCT floor.
-          False means the airport minute was present. Null means no bucket was used.
+        description: FloorOnly is null when this hop did not use a connection bucket.
         type: boolean
       layover_minutes:
         type: integer
       loose_minutes:
         type: integer
       overnight:
-        description: |-
-          Overnight is true when a positive layover uses a later outbound local date.
-          It stays true when reason names a different unknown cause.
+        description: Overnight stays true for a later outbound date, including multi-day,
+          when reason names another cause.
         type: boolean
       reason:
-        description: |-
-          Reason explains status. evaluated is a same-day classification.
-          overnight is a classified connection whose outbound local date is later, including multi-day.
-          multi_airport means the airports differ. missing_country means the domestic/international type cannot be determined.
-          missing_outlook means the inbound leg has no outlook, which is the route-outlook 404 case and not empty_sample.
-          empty_sample and insufficient_sample are the inbound sample_reason, so status stays unknown and confidence stays unknown or low.
-          missing_threshold means a sufficient sample has no bucket for this type.
-          negative_layover means departure is before arrival. invalid_schedule means the layover date or clock could not be read.
+        description: Reason is why status is unknown. overnight means a later date
+          was still classified. empty_sample and insufficient_sample match the inbound
+          sample_reason; missing_outlook does not.
         enum:
         - evaluated
         - overnight
@@ -1423,34 +1413,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Historical outlook for each of 2–4 ordered legs, plus connection
-        risk between adjacent legs. Each leg uses the same sample as route outlook,
-        with weekday taken from its date. A valid body always returns 200. A leg whose
-        origin, destination, and carrier have no flight-performance history has a
-        null outlook and an error; that is the route-outlook 404 case, not sample_reason
-        empty_sample. A seen leg embeds the route outlook, including sample_reason:
-        empty_sample (confidence unknown, estimate fields null, insufficient_sample
-        false), insufficient_sample (confidence low, the bool true), or sufficient
-        (confidence high). status is loose when layover_minutes is at least loose_minutes,
-        ok when it meets recommended_minutes but not loose_minutes, tight when shorter,
-        and unknown when the layover or the inbound threshold is missing. Thresholds
-        are missing for empty_sample and insufficient_sample, so status stays unknown;
-        a classified same-airport connection still copies that outlook confidence
-        (unknown or low). recommended_minutes and loose_minutes are copied from the
-        inbound outlook connection bucket for connection_type. confidence matches
-        that outlook for a classified same-airport connection. It stays unknown when
-        the airports differ or the connection type cannot be classified, even if the
-        inbound outlook confidence is high. A negative gap is not a layover, so status
-        stays unknown even when thresholds are present. reason is evaluated for a
-        same-day classification, overnight when the outbound local date is later (including
-        multi-day) and the hop was still classified, multi_airport when the airports
-        differ, missing_country when the domestic/international type cannot be determined,
-        missing_outlook when the inbound leg has no outlook, empty_sample or insufficient_sample
-        from the inbound sample_reason, missing_threshold when a sufficient sample
-        has no bucket for that type, negative_layover when departure is before arrival,
-        and invalid_schedule when the layover cannot be read. overnight is also true
-        for a later outbound date when another reason explains unknown. floor_only
-        is copied from that bucket and is null when no bucket was used.'
+      description: Historical outlook for 2–4 ordered legs and each connection. Always
+        200. A leg with no history has a null outlook and an error, not sample_reason
+        empty_sample.
       parameters:
       - description: Ordered legs
         in: body
@@ -1808,17 +1773,13 @@ paths:
         per connection type and is null for empty_sample and insufficient_sample.
         recommended_minutes is arrival-delay p90 plus the destination airport MCT,
         or 45/60/120/120 when that MCT bucket is missing; it is the smallest layover
-        that is ok. floor_only is true when that static floor was used because the
-        airport minute was missing, and false when the airport minute was present,
-        including zero. A missing MCT minute is still a published bucket. loose_minutes
-        is 30 minutes above recommended_minutes. A shorter layover is tight. A null
-        bucket means that connection type was not estimated (empty_sample, insufficient_sample,
-        or no delay estimate), not a missing MCT minute, so that connection status
-        is unknown. These minutes are not an official airline MCT. Itinerary connections
-        use the same thresholds, floor_only, and confidence. Returns 404 when the
-        origin, destination, and carrier have no flight-performance data. That not-found
-        case is not empty_sample. A day-of-week or departure-time window that matches
-        nothing still returns 200.
+        that is ok. loose_minutes is 30 minutes above recommended_minutes. A shorter
+        layover is tight. A null bucket means that connection status is unknown. These
+        minutes are not an official airline MCT. Itinerary connections use the same
+        thresholds and confidence. Returns 404 when the origin, destination, and carrier
+        have no flight-performance data. That not-found case is not empty_sample.
+        A day-of-week or departure-time window that matches nothing still returns
+        200.
       parameters:
       - description: Origin airport IATA code
         in: query

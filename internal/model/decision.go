@@ -63,17 +63,12 @@ const (
 type ConnectionMinutes struct {
 	RecommendedMinutes int `json:"recommended_minutes"`
 	LooseMinutes       int `json:"loose_minutes"`
-	// FloorOnly is true when the airport MCT minute for this bucket was missing
-	// and the static floor was used: 45 domestic-domestic, 60 domestic-international,
-	// 120 international. False means the airport supplied the minute, including zero.
+	// FloorOnly means the static floor (45, 60, 120, or 120) replaced a missing airport MCT minute. A stored zero is not missing.
 	FloorOnly bool `json:"floor_only"`
 }
 
 // ConnectionGuidance is per connection type for one inbound outlook.
-// A null bucket was not published (empty or thin sample, or no delay estimate),
-// so an itinerary status for that type is unknown.
-// A missing airport MCT minute is not a null bucket: that bucket is published
-// with floor_only true.
+// A null bucket cannot be estimated, so an itinerary status for that type is unknown.
 type ConnectionGuidance struct {
 	DomesticToDomestic           *ConnectionMinutes `json:"domestic_to_domestic"`
 	DomesticToInternational      *ConnectionMinutes `json:"domestic_to_international"`
