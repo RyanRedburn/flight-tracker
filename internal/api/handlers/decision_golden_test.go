@@ -66,6 +66,14 @@ func TestGoldenOutlookItineraryConnection(t *testing.T) {
 	if conn.Confidence != gotOutlook.Confidence {
 		t.Fatalf("itinerary confidence = %q, outlook = %q", conn.Confidence, gotOutlook.Confidence)
 	}
+
+	if conn.Reason != model.ConnectionReasonEvaluated || conn.Overnight {
+		t.Fatalf("reason = %q overnight %v", conn.Reason, conn.Overnight)
+	}
+
+	if bucket.FloorOnly || conn.FloorOnly == nil || *conn.FloorOnly {
+		t.Fatalf("floor_only outlook %v itinerary %v", bucket.FloorOnly, conn.FloorOnly)
+	}
 }
 
 func TestGoldenThinSampleStaysUnknown(t *testing.T) {
@@ -94,12 +102,53 @@ func TestGoldenThinSampleStaysUnknown(t *testing.T) {
 		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1330"},
 	}})
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != gotOutlook.Confidence {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != gotOutlook.Confidence || conn.Reason != model.SampleReasonInsufficientSample || conn.FloorOnly != nil {
 		t.Fatalf("connection = %+v, outlook confidence %q", conn, gotOutlook.Confidence)
 	}
 
 	if conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("thin connection published thresholds: %+v", conn)
+	}
+}
+
+func TestGoldenFloorOnlyCopied(t *testing.T) {
+	outlook := &model.RouteOutlook{
+		Origin:       testOriginBOS,
+		Dest:         testOriginORD,
+		Carrier:      "UA",
+		DayOfWeek:    2,
+		DepTime:      "0700",
+		SampleSize:   40,
+		SampleReason: model.SampleReasonSufficient,
+		Confidence:   model.ConfidenceHigh,
+		Connection:   model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
+	}
+	outlook.Connection.DomesticToDomestic.FloorOnly = true
+	outlook.Connection.DomesticToInternational.FloorOnly = true
+	countries := map[string]string{
+		testOriginBOS: "US",
+		testOriginORD: "US",
+		testDestLAX:   "US",
+	}
+
+	gotOutlook := getOutlook(t, outlook)
+	bucket := gotOutlook.Connection.DomesticToDomestic
+
+	if bucket == nil || !bucket.FloorOnly || gotOutlook.Connection.InternationalToDomestic == nil || gotOutlook.Connection.InternationalToDomestic.FloorOnly {
+		t.Fatalf("outlook connection = %+v", gotOutlook.Connection)
+	}
+
+	conn := postConnection(t, outlook, countries, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
+		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0905},
+		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1330"},
+	}})
+
+	if conn.Status != model.ConnectionLoose || conn.Reason != model.ConnectionReasonEvaluated || conn.FloorOnly == nil || !*conn.FloorOnly {
+		t.Fatalf("connection = %+v", conn)
+	}
+
+	if conn.RecommendedMinutes == nil || *conn.RecommendedMinutes != bucket.RecommendedMinutes {
+		t.Fatalf("recommended_minutes = %v, outlook = %d", conn.RecommendedMinutes, bucket.RecommendedMinutes)
 	}
 }
 
@@ -132,7 +181,7 @@ func TestGoldenItineraryConfidenceUnknownWhenAirportsDiffer(t *testing.T) {
 		t.Fatalf("outlook confidence = %q", gotOutlook.Confidence)
 	}
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.ConnectionType != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMultiAirport || conn.FloorOnly != nil || conn.ConnectionType != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 }

@@ -115,6 +115,36 @@ func TestApplyOutlookSample(t *testing.T) {
 	}
 }
 
+func TestBlockingSampleReason(t *testing.T) {
+	if got := (*RouteOutlook)(nil).BlockingSampleReason(); got != "" {
+		t.Fatalf("nil blocking reason = %q", got)
+	}
+
+	tests := []struct {
+		name    string
+		outlook RouteOutlook
+		want    string
+	}{
+		{name: "explicit sufficient", outlook: RouteOutlook{SampleReason: SampleReasonSufficient, SampleSize: 40, Confidence: ConfidenceHigh}, want: ""},
+		{name: "explicit empty", outlook: RouteOutlook{SampleReason: SampleReasonEmptySample}, want: SampleReasonEmptySample},
+		{name: "explicit thin", outlook: RouteOutlook{SampleReason: SampleReasonInsufficientSample, SampleSize: 4, InsufficientSample: true}, want: SampleReasonInsufficientSample},
+		{name: "explicit empty wins over thresholds", outlook: RouteOutlook{SampleReason: SampleReasonEmptySample, Confidence: ConfidenceHigh, Connection: ConnectionGuidanceFromRecommended(45, 60, 120, 120)}, want: SampleReasonEmptySample},
+		{name: "derived thin", outlook: RouteOutlook{SampleSize: 4, InsufficientSample: true, Confidence: ConfidenceLow}, want: SampleReasonInsufficientSample},
+		{name: "derived low confidence", outlook: RouteOutlook{SampleSize: 40, Confidence: ConfidenceLow}, want: SampleReasonInsufficientSample},
+		{name: "derived empty", outlook: RouteOutlook{Confidence: ConfidenceUnknown}, want: SampleReasonEmptySample},
+		{name: "derived sufficient from size", outlook: RouteOutlook{SampleSize: 40, Confidence: ConfidenceHigh}, want: ""},
+		{name: "explicit high with empty size stays open", outlook: RouteOutlook{Confidence: ConfidenceHigh}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.outlook.BlockingSampleReason(); got != tt.want {
+				t.Errorf("BlockingSampleReason() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDecisionConfidence(t *testing.T) {
 	if got := (*RouteOutlook)(nil).DecisionConfidence(); got != ConfidenceUnknown {
 		t.Errorf("nil outlook confidence = %q", got)

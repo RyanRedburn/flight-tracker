@@ -24,7 +24,9 @@ type AirportConnectionMCT struct {
 
 // ConnectionRecommendation is max(0, round(arrivalDelayP90)) + floor per connection type.
 // floor is the airport MCT minute when that bucket is set, otherwise 45, 60, 120, or 120.
-// loose_minutes is that recommendation plus 30. A nil p90 or an insufficient sample returns nulls.
+// A missing bucket is still published, with floor_only true. A stored minute, including zero, is floor_only false.
+// loose_minutes is that recommendation plus 30. A nil p90 or an insufficient sample returns nulls,
+// which is not floor-only: those buckets were not estimated.
 func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.ConnectionGuidance {
 	if insufficient || arrivalDelayP90 == nil {
 		return model.ConnectionGuidance{}
@@ -46,18 +48,26 @@ func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *
 		internationalToInternational = mct.InternationalToInternational
 	}
 
-	dd := delay + connectionFloor(domesticToDomestic, connectionFloorDomesticToDomestic)
-	di := delay + connectionFloor(domesticToInternational, connectionFloorDomesticToInternational)
-	id := delay + connectionFloor(internationalToDomestic, connectionFloorInternationalToDomestic)
-	ii := delay + connectionFloor(internationalToInternational, connectionFloorInternationalToInternational)
-
-	return model.ConnectionGuidanceFromRecommended(dd, di, id, ii)
+	return model.ConnectionGuidance{
+		DomesticToDomestic:           connectionBucket(delay, domesticToDomestic, connectionFloorDomesticToDomestic),
+		DomesticToInternational:      connectionBucket(delay, domesticToInternational, connectionFloorDomesticToInternational),
+		InternationalToDomestic:      connectionBucket(delay, internationalToDomestic, connectionFloorInternationalToDomestic),
+		InternationalToInternational: connectionBucket(delay, internationalToInternational, connectionFloorInternationalToInternational),
+	}
 }
 
-func connectionFloor(minutes *int, fallback int) int {
+func connectionBucket(delay int, minutes *int, fallback int) *model.ConnectionMinutes {
+	floor, floorOnly := connectionFloor(minutes, fallback)
+	out := model.NewConnectionMinutes(delay + floor)
+	out.FloorOnly = floorOnly
+
+	return out
+}
+
+func connectionFloor(minutes *int, fallback int) (int, bool) {
 	if minutes == nil {
-		return fallback
+		return fallback, true
 	}
 
-	return *minutes
+	return *minutes, false
 }

@@ -117,7 +117,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Historical outlook for each of 2–4 ordered legs, plus connection risk between adjacent legs. Each leg uses the same sample as route outlook, with weekday taken from its date. A valid body always returns 200. A leg whose origin, destination, and carrier have no flight-performance history has a null outlook and an error; that is the route-outlook 404 case, not sample_reason empty_sample. A seen leg embeds the route outlook, including sample_reason: empty_sample (confidence unknown, estimate fields null, insufficient_sample false), insufficient_sample (confidence low, the bool true), or sufficient (confidence high). status is loose when layover_minutes is at least loose_minutes, ok when it meets recommended_minutes but not loose_minutes, tight when shorter, and unknown when the layover or the inbound threshold is missing. Thresholds are missing for empty_sample and insufficient_sample, so status stays unknown; a classified same-airport connection still copies that outlook confidence (unknown or low). recommended_minutes and loose_minutes are copied from the inbound outlook connection bucket for connection_type. confidence matches that outlook for a classified same-airport connection. It stays unknown when the airports differ or the connection type cannot be classified, even if the inbound outlook confidence is high. A negative gap is not a layover, so status stays unknown even when thresholds are present.",
+                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample.",
                 "consumes": [
                     "application/json"
                 ],
@@ -867,6 +867,10 @@ const docTemplateexternal = `{
         "model.ConnectionMinutes": {
             "type": "object",
             "properties": {
+                "floor_only": {
+                    "description": "FloorOnly means the static floor (45, 60, 120, or 120) replaced a missing airport MCT minute. A stored zero is not missing.",
+                    "type": "boolean"
+                },
                 "loose_minutes": {
                     "type": "integer"
                 },
@@ -944,11 +948,35 @@ const docTemplateexternal = `{
                         "international_to_international"
                     ]
                 },
+                "floor_only": {
+                    "description": "FloorOnly is null when this hop did not use a connection bucket.",
+                    "type": "boolean"
+                },
                 "layover_minutes": {
                     "type": "integer"
                 },
                 "loose_minutes": {
                     "type": "integer"
+                },
+                "overnight": {
+                    "description": "Overnight stays true for a later outbound date, including multi-day, when reason names another cause.",
+                    "type": "boolean"
+                },
+                "reason": {
+                    "description": "Reason is why status is unknown. overnight means a later date was still classified. empty_sample and insufficient_sample match the inbound sample_reason; missing_outlook does not.",
+                    "type": "string",
+                    "enum": [
+                        "evaluated",
+                        "overnight",
+                        "multi_airport",
+                        "missing_country",
+                        "missing_outlook",
+                        "empty_sample",
+                        "insufficient_sample",
+                        "missing_threshold",
+                        "negative_layover",
+                        "invalid_schedule"
+                    ]
                 },
                 "recommended_minutes": {
                     "type": "integer"

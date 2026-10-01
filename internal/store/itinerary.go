@@ -11,22 +11,36 @@ import (
 // Each instant is that leg's local date plus clock time, so a later outbound
 // date is an overnight or multi-day connection. A negative gap is not a layover.
 func LayoverMinutes(inboundDate, inboundArr, outboundDate, outboundDep string) (int, bool) {
-	in, ok := localDateTime(inboundDate, inboundArr)
-	if !ok {
-		return 0, false
-	}
-
-	out, ok := localDateTime(outboundDate, outboundDep)
-	if !ok {
-		return 0, false
-	}
-
-	mins := int(out.Sub(in).Minutes())
-	if mins < 0 {
+	mins, _, failure := layoverDetail(inboundDate, inboundArr, outboundDate, outboundDep)
+	if failure != "" {
 		return 0, false
 	}
 
 	return mins, true
+}
+
+// layoverDetail reports a non-negative gap, whether the outbound local date is later,
+// and negative_layover or invalid_schedule when the gap is not a layover.
+func layoverDetail(inboundDate, inboundArr, outboundDate, outboundDep string) (mins int, overnight bool, failure string) {
+	in, okIn := localDateTime(inboundDate, inboundArr)
+	if !okIn {
+		return 0, false, model.ConnectionReasonInvalidSchedule
+	}
+
+	out, okOut := localDateTime(outboundDate, outboundDep)
+	if !okOut {
+		return 0, false, model.ConnectionReasonInvalidSchedule
+	}
+
+	gap := int(out.Sub(in).Minutes())
+	if gap < 0 {
+		return 0, false, model.ConnectionReasonNegativeLayover
+	}
+
+	inDay := time.Date(in.Year(), in.Month(), in.Day(), 0, 0, 0, 0, time.UTC)
+	outDay := time.Date(out.Year(), out.Month(), out.Day(), 0, 0, 0, 0, time.UTC)
+
+	return gap, outDay.After(inDay), ""
 }
 
 // ConnectionType classifies the hop through the connection airport.
@@ -55,6 +69,12 @@ func ConnectionType(originCountry, hubCountry, destCountry string) (string, bool
 	}
 }
 
+// AssessConnection labels one hop between inbound and outbound.
+// Reason is chosen in this order: multi_airport, missing_country, missing_outlook,
+// empty_sample or insufficient_sample, missing_threshold, negative_layover or
+// invalid_schedule, overnight, evaluated.
+// A later outbound date sets overnight even when an earlier reason wins.
+// floor_only is copied only from a published bucket.
 func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.RouteOutlook, countries map[string]string) model.ItineraryConnection {
 	conn := model.ItineraryConnection{
 		Airport:    inbound.Dest,
@@ -62,11 +82,15 @@ func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.Route
 		Confidence: model.ConfidenceUnknown,
 	}
 
-	if mins, ok := LayoverMinutes(inbound.Date, inbound.ArrTime, outbound.Date, outbound.DepTime); ok {
+	mins, overnight, layoverFailure := layoverDetail(inbound.Date, inbound.ArrTime, outbound.Date, outbound.DepTime)
+	if layoverFailure == "" {
 		conn.LayoverMinutes = &mins
+		conn.Overnight = overnight
 	}
 
 	if !sameAirport(inbound.Dest, outbound.Origin) {
+		conn.Reason = model.ConnectionReasonMultiAirport
+
 		return conn
 	}
 
@@ -75,39 +99,65 @@ func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.Route
 	destCountry, okD := airportCountry(countries, outbound.Dest)
 
 	if !okO || !okH || !okD {
+		conn.Reason = model.ConnectionReasonMissingCountry
+
 		return conn
 	}
 
 	connectionType, ok := ConnectionType(originCountry, hubCountry, destCountry)
 	if !ok {
+		conn.Reason = model.ConnectionReasonMissingCountry
+
 		return conn
 	}
 
 	conn.ConnectionType = &connectionType
 
 	if outlook == nil {
+		conn.Reason = model.ConnectionReasonMissingOutlook
+
 		return conn
 	}
 
 	conn.Confidence = outlook.DecisionConfidence()
 
+	if reason := outlook.BlockingSampleReason(); reason != "" {
+		conn.Reason = reason
+
+		return conn
+	}
+
 	minutes := outlook.Connection.ForType(connectionType)
 	if minutes == nil {
+		conn.Reason = model.ConnectionReasonMissingThreshold
+
 		return conn
 	}
 
 	recommended := minutes.RecommendedMinutes
 	loose := minutes.LooseMinutes
+	floorOnly := minutes.FloorOnly
 	conn.RecommendedMinutes = &recommended
 	conn.LooseMinutes = &loose
+	conn.FloorOnly = &floorOnly
 
-	if conn.LayoverMinutes == nil {
+	if layoverFailure != "" {
+		conn.Reason = layoverFailure
+
 		return conn
 	}
 
 	slack := *conn.LayoverMinutes - recommended
 	conn.SlackMinutes = &slack
 	conn.Status = model.ConnectionStatus(*conn.LayoverMinutes, minutes)
+
+	if overnight {
+		conn.Reason = model.ConnectionReasonOvernight
+
+		return conn
+	}
+
+	conn.Reason = model.ConnectionReasonEvaluated
 
 	return conn
 }

@@ -834,7 +834,7 @@ func assertNullConnectionMinutesJSON(t *testing.T, body []byte) {
 		}
 
 		if value != nil {
-			t.Errorf("%s = %d, want null", key, *value)
+			t.Errorf("%s = %+v, want null", key, *value)
 		}
 	}
 }

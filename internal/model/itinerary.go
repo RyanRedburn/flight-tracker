@@ -75,6 +75,12 @@ type ItineraryConnection struct {
 	SlackMinutes       *int    `json:"slack_minutes"`
 	Status             string  `json:"status" enums:"loose,ok,tight,unknown"`
 	Confidence         string  `json:"confidence" enums:"high,low,unknown"`
+	// Reason is why status is unknown. overnight means a later date was still classified. empty_sample and insufficient_sample match the inbound sample_reason; missing_outlook does not.
+	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
+	// Overnight stays true for a later outbound date, including multi-day, when reason names another cause.
+	Overnight bool `json:"overnight"`
+	// FloorOnly is null when this hop did not use a connection bucket.
+	FloorOnly *bool `json:"floor_only"`
 }
 
 func (r *ItineraryOutlookRequest) Validate() error {

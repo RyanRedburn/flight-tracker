@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -82,6 +83,47 @@ func TestItineraryOutlookRequestValidate(t *testing.T) {
 				t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestItineraryConnectionJSON(t *testing.T) {
+	floor := true
+
+	body, err := json.Marshal(ItineraryConnection{
+		Status:     ConnectionUnknown,
+		Confidence: ConfidenceUnknown,
+		Reason:     ConnectionReasonMultiAirport,
+		Overnight:  true,
+		FloorOnly:  &floor,
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if string(got["reason"]) != `"`+ConnectionReasonMultiAirport+`"` || string(got["overnight"]) != "true" || string(got["floor_only"]) != "true" {
+		t.Fatalf("connection JSON = %s", body)
+	}
+
+	unset, err := json.Marshal(ItineraryConnection{
+		Status:     ConnectionUnknown,
+		Confidence: ConfidenceUnknown,
+		Reason:     SampleReasonEmptySample,
+	})
+	if err != nil {
+		t.Fatalf("marshal unset: %v", err)
+	}
+
+	if err := json.Unmarshal(unset, &got); err != nil {
+		t.Fatalf("unmarshal unset: %v", err)
+	}
+
+	if string(got["reason"]) != `"`+SampleReasonEmptySample+`"` || string(got["overnight"]) != "false" || string(got["floor_only"]) != "null" || string(got["status"]) != `"`+ConnectionUnknown+`"` {
+		t.Fatalf("unset connection JSON = %s", unset)
 	}
 }
 
