@@ -14,14 +14,15 @@ import (
 
 func TestGoldenOutlookItineraryConnection(t *testing.T) {
 	outlook := &model.RouteOutlook{
-		Origin:     testOriginBOS,
-		Dest:       testOriginORD,
-		Carrier:    "UA",
-		DayOfWeek:  2,
-		DepTime:    "0700",
-		SampleSize: 40,
-		Confidence: model.ConfidenceHigh,
-		Connection: model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
+		Origin:       testOriginBOS,
+		Dest:         testOriginORD,
+		Carrier:      "UA",
+		DayOfWeek:    2,
+		DepTime:      "0700",
+		SampleSize:   40,
+		SampleReason: model.SampleReasonSufficient,
+		Confidence:   model.ConfidenceHigh,
+		Connection:   model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
 	}
 	countries := map[string]string{
 		testOriginBOS: "US",
@@ -74,6 +75,7 @@ func TestGoldenThinSampleStaysUnknown(t *testing.T) {
 		Carrier:            "UA",
 		SampleSize:         4,
 		InsufficientSample: true,
+		SampleReason:       model.SampleReasonInsufficientSample,
 		Confidence:         model.ConfidenceLow,
 	}
 	countries := map[string]string{
@@ -103,12 +105,13 @@ func TestGoldenThinSampleStaysUnknown(t *testing.T) {
 
 func TestGoldenItineraryConfidenceUnknownWhenAirportsDiffer(t *testing.T) {
 	outlook := &model.RouteOutlook{
-		Origin:     testOriginBOS,
-		Dest:       testOriginORD,
-		Carrier:    "UA",
-		SampleSize: 40,
-		Confidence: model.ConfidenceHigh,
-		Connection: model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
+		Origin:       testOriginBOS,
+		Dest:         testOriginORD,
+		Carrier:      "UA",
+		SampleSize:   40,
+		SampleReason: model.SampleReasonSufficient,
+		Confidence:   model.ConfidenceHigh,
+		Connection:   model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
 	}
 	countries := map[string]string{
 		testOriginBOS:  "US",

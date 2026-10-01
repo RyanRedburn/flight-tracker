@@ -372,11 +372,145 @@ func decodeItinerary(t *testing.T, rec *httptest.ResponseRecorder) model.Itinera
 	return out
 }
 
+func TestItineraryOutlookSparseSamples(t *testing.T) {
+	h := NewItinerariesHandler(&storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			switch filter.Origin {
+			case testOriginBOS:
+				return nil, store.ErrNotFound
+			case testOriginORD:
+				zero := 0.0
+				out := &model.RouteOutlook{Origin: filter.Origin, Dest: filter.Dest, Carrier: filter.Carrier, SampleSize: 0, OnTimeProbability: &zero}
+				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
+				return out, nil
+			case testDestLAX:
+				out := &model.RouteOutlook{
+					Origin:            filter.Origin,
+					Dest:              filter.Dest,
+					Carrier:           filter.Carrier,
+					SampleSize:        4,
+					OnTimeProbability: floatPtr(0),
+				}
+				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
+				return out, nil
+			default:
+				out := outlookWithMinutes(45, 60, 120, 180)
+				out.Origin = filter.Origin
+				out.Dest = filter.Dest
+
+				return out, nil
+			}
+		},
+		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
+			return map[string]string{
+				testOriginBOS:  "US",
+				testOriginORD:  "US",
+				testDestLAX:    "US",
+				testAirportDEN: "US",
+			}, nil
+		},
+	})
+
+	rec := postItinerary(t, h, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
+		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0905},
+		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1400"},
+		{Origin: testDestLAX, Dest: testAirportDEN, Carrier: "UA", Date: testDateTue, DepTime: "1500", ArrTime: "1700"},
+		{Origin: testAirportDEN, Dest: testOriginBOS, Carrier: "UA", Date: testDateTue, DepTime: "1800", ArrTime: "2100"},
+	}})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	out := decodeItinerary(t, rec)
+
+	if out.Legs[0].Outlook != nil || out.Legs[0].Error == nil || *out.Legs[0].Error != errRouteOutlookNotFound {
+		t.Fatalf("never-seen leg = %+v", out.Legs[0])
+	}
+
+	emptyLeg := out.Legs[1]
+	if emptyLeg.Error != nil || emptyLeg.Outlook == nil {
+		t.Fatalf("empty leg = %+v", emptyLeg)
+	}
+
+	if emptyLeg.Outlook.SampleReason != model.SampleReasonEmptySample || emptyLeg.Outlook.Confidence != model.ConfidenceUnknown || emptyLeg.Outlook.InsufficientSample {
+		t.Fatalf("empty outlook = %+v", emptyLeg.Outlook)
+	}
+
+	if outlookJSONField(t, rec.Body.Bytes(), 1, "on_time_probability") != jsonNull {
+		t.Fatalf("empty on_time_probability = %s", outlookJSONField(t, rec.Body.Bytes(), 1, "on_time_probability"))
+	}
+
+	thinLeg := out.Legs[2]
+	if thinLeg.Error != nil || thinLeg.Outlook == nil {
+		t.Fatalf("thin leg = %+v", thinLeg)
+	}
+
+	if thinLeg.Outlook.SampleReason != model.SampleReasonInsufficientSample || !thinLeg.Outlook.InsufficientSample || thinLeg.Outlook.Confidence != model.ConfidenceLow {
+		t.Fatalf("thin outlook = %+v", thinLeg.Outlook)
+	}
+
+	if outlookJSONField(t, rec.Body.Bytes(), 2, "on_time_probability") != "0" {
+		t.Fatalf("thin on_time_probability = %s, want 0", outlookJSONField(t, rec.Body.Bytes(), 2, "on_time_probability"))
+	}
+
+	if out.Legs[3].Outlook == nil || out.Legs[3].Outlook.SampleReason != model.SampleReasonSufficient || out.Legs[3].Outlook.Confidence != model.ConfidenceHigh {
+		t.Fatalf("solid leg = %+v", out.Legs[3])
+	}
+
+	if len(out.Connections) != 3 {
+		t.Fatalf("connections = %d", len(out.Connections))
+	}
+
+	neverSeen := out.Connections[0]
+	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.RecommendedMinutes != nil {
+		t.Fatalf("never-seen connection = %+v", neverSeen)
+	}
+
+	emptyConn := out.Connections[1]
+	if emptyConn.Status != model.ConnectionUnknown || emptyConn.Confidence != model.ConfidenceUnknown || emptyConn.RecommendedMinutes != nil {
+		t.Fatalf("empty-sample connection = %+v", emptyConn)
+	}
+
+	if emptyConn.ConnectionType == nil || *emptyConn.ConnectionType != model.ConnectionDomesticToDomestic {
+		t.Fatalf("empty-sample type = %v", emptyConn.ConnectionType)
+	}
+
+	thinConn := out.Connections[2]
+	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
+		t.Fatalf("thin connection = %+v", thinConn)
+	}
+}
+
+func outlookJSONField(t *testing.T, body []byte, leg int, field string) string {
+	t.Helper()
+
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	var legs []map[string]json.RawMessage
+	if err := json.Unmarshal(root["legs"], &legs); err != nil {
+		t.Fatalf("unmarshal legs: %v", err)
+	}
+
+	var outlook map[string]json.RawMessage
+	if err := json.Unmarshal(legs[leg]["outlook"], &outlook); err != nil {
+		t.Fatalf("unmarshal outlook: %v", err)
+	}
+
+	return string(outlook[field])
+}
+
 func outlookWithMinutes(dd, di, id, ii int) *model.RouteOutlook {
 	return &model.RouteOutlook{
-		SampleSize: 40,
-		Confidence: model.ConfidenceHigh,
-		Connection: model.ConnectionGuidanceFromRecommended(dd, di, id, ii),
+		SampleSize:         40,
+		InsufficientSample: false,
+		SampleReason:       model.SampleReasonSufficient,
+		Confidence:         model.ConfidenceHigh,
+		Connection:         model.ConnectionGuidanceFromRecommended(dd, di, id, ii),
 	}
 }
 
@@ -406,7 +540,7 @@ func assertNullJSON(t *testing.T, body []byte, arrayKey string, index int, field
 		t.Fatalf("missing %s[%d].%s", arrayKey, index, field)
 	}
 
-	if string(value) != "null" {
+	if string(value) != jsonNull {
 		t.Fatalf("%s[%d].%s = %s, want null", arrayKey, index, field, value)
 	}
 }

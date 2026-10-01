@@ -130,6 +130,10 @@ func AssembleRouteTravelWindows(
 
 // labelSeasonalBuckets sets confidence and reliability from the rounded on-time rate.
 // Best and worst copies are labeled with the same grain minimum as the full series.
+// reliability unknown with confidence low is a thin bucket, the seasonal form of
+// outlook insufficient_sample, not a second flag. reliability unreliable is only
+// a high-confidence on-time rate below the typical band. Buckets with no flights
+// are omitted earlier, so they are not published as a zero rate.
 func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourMin int) {
 	for i := range out.ByMonth {
 		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = model.SeasonalDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate, monthMin)
