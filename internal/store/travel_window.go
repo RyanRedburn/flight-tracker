@@ -123,8 +123,49 @@ func AssembleRouteTravelWindows(
 	out.WorstHours = pickTravelWindowBuckets(hours, hourBucketKey, hourBucketRate, hourBucketFlights, hourMin, false)
 
 	out.RoundForResponse()
+	labelSeasonalBuckets(out, monthMin, dayMin, hourMin)
 
 	return out
+}
+
+// labelSeasonalBuckets sets confidence and reliability from the rounded on-time rate.
+// Best and worst copies are labeled with the same grain minimum as the full series.
+func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourMin int) {
+	for i := range out.ByMonth {
+		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = model.SeasonalDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate, monthMin)
+	}
+
+	for i := range out.BestMonths {
+		out.BestMonths[i].Confidence, out.BestMonths[i].Reliability = model.SeasonalDecision(out.BestMonths[i].Flights, out.BestMonths[i].OnTimeRate, monthMin)
+	}
+
+	for i := range out.WorstMonths {
+		out.WorstMonths[i].Confidence, out.WorstMonths[i].Reliability = model.SeasonalDecision(out.WorstMonths[i].Flights, out.WorstMonths[i].OnTimeRate, monthMin)
+	}
+
+	for i := range out.ByDayOfWeek {
+		out.ByDayOfWeek[i].Confidence, out.ByDayOfWeek[i].Reliability = model.SeasonalDecision(out.ByDayOfWeek[i].Flights, out.ByDayOfWeek[i].OnTimeRate, dayMin)
+	}
+
+	for i := range out.BestDays {
+		out.BestDays[i].Confidence, out.BestDays[i].Reliability = model.SeasonalDecision(out.BestDays[i].Flights, out.BestDays[i].OnTimeRate, dayMin)
+	}
+
+	for i := range out.WorstDays {
+		out.WorstDays[i].Confidence, out.WorstDays[i].Reliability = model.SeasonalDecision(out.WorstDays[i].Flights, out.WorstDays[i].OnTimeRate, dayMin)
+	}
+
+	for i := range out.ByHour {
+		out.ByHour[i].Confidence, out.ByHour[i].Reliability = model.SeasonalDecision(out.ByHour[i].Flights, out.ByHour[i].OnTimeRate, hourMin)
+	}
+
+	for i := range out.BestHours {
+		out.BestHours[i].Confidence, out.BestHours[i].Reliability = model.SeasonalDecision(out.BestHours[i].Flights, out.BestHours[i].OnTimeRate, hourMin)
+	}
+
+	for i := range out.WorstHours {
+		out.WorstHours[i].Confidence, out.WorstHours[i].Reliability = model.SeasonalDecision(out.WorstHours[i].Flights, out.WorstHours[i].OnTimeRate, hourMin)
+	}
 }
 
 func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd string) *model.RouteTravelWindows {

@@ -15,10 +15,6 @@ const (
 	ConnectionDomesticToInternational      = "domestic_to_international"
 	ConnectionInternationalToDomestic      = "international_to_domestic"
 	ConnectionInternationalToInternational = "international_to_international"
-
-	ConnectionOK      = "ok"
-	ConnectionTight   = "tight"
-	ConnectionUnknown = "unknown"
 )
 
 var itineraryValidate = validator.New()
@@ -70,13 +66,15 @@ type ItineraryOutlookLeg struct {
 }
 
 type ItineraryConnection struct {
-	AfterLeg                     int     `json:"after_leg"`
-	Airport                      string  `json:"airport"`
-	LayoverMinutes               *int    `json:"layover_minutes"`
-	ConnectionType               *string `json:"connection_type" enums:"domestic_to_domestic,domestic_to_international,international_to_domestic,international_to_international"`
-	RecommendedConnectionMinutes *int    `json:"recommended_connection_minutes"`
-	SlackMinutes                 *int    `json:"slack_minutes"`
-	Status                       string  `json:"status" enums:"ok,tight,unknown"`
+	AfterLeg           int     `json:"after_leg"`
+	Airport            string  `json:"airport"`
+	LayoverMinutes     *int    `json:"layover_minutes"`
+	ConnectionType     *string `json:"connection_type" enums:"domestic_to_domestic,domestic_to_international,international_to_domestic,international_to_international"`
+	RecommendedMinutes *int    `json:"recommended_minutes"`
+	LooseMinutes       *int    `json:"loose_minutes"`
+	SlackMinutes       *int    `json:"slack_minutes"`
+	Status             string  `json:"status" enums:"loose,ok,tight,unknown"`
+	Confidence         string  `json:"confidence" enums:"high,low,unknown"`
 }
 
 func (r *ItineraryOutlookRequest) Validate() error {

@@ -131,6 +131,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	}
 
 	out.InsufficientSample = out.SampleSize > 0 && out.SampleSize < store.MinOutlookSampleSize
+	out.Confidence = model.OutlookConfidence(out.SampleSize, out.InsufficientSample)
+
 	if out.SampleSize == 0 {
 		return out, nil
 	}
@@ -172,7 +174,7 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct = loaded
 	}
 
-	out.RecommendedConnectionMinutes = store.ConnectionRecommendation(out.InsufficientSample, delay, mct)
+	out.Connection = store.ConnectionRecommendation(out.InsufficientSample, delay, mct)
 
 	return nil
 }
@@ -310,6 +312,7 @@ func emptyRouteOutlook(filter store.RouteOutlookFilter) *model.RouteOutlook {
 		DayOfWeek:            filter.DayOfWeek,
 		DepTime:              filter.DepTime,
 		DepTimeWindowMinutes: filter.DepTimeWindowMinutes,
+		Confidence:           model.ConfidenceUnknown,
 	}
 }
 

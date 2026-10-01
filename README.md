@@ -183,6 +183,8 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 
 When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. A filter that matches no rows still returns **200** with zeros or a zero sample. A valid itinerary body returns **200**, and a leg with no history has a null outlook. Field rules are in Swagger.
 
+Outlook and itinerary share connection language. `confidence` is `high`, `low`, or `unknown` from the outlook sample. For each connection type, `recommended_minutes` is the smallest layover that is `ok`, and `loose_minutes` is 30 minutes more (`loose`); a shorter layover is `tight`. Missing thresholds are `unknown`. A classified same-airport connection copies the inbound outlook confidence. When the airports differ or the connection type cannot be classified, itinerary confidence stays `unknown` even if that outlook is `high`. Travel-window buckets use the same confidence words plus seasonal `reliability` (`reliable` at an on-time rate of at least 0.80, `typical` from 0.70, otherwise `unreliable` when the sample is large enough, else `unknown`). Those labels are typical-year on-time only, not connection status.
+
 ```bash
 # Liveness
 curl http://localhost:8080/health
