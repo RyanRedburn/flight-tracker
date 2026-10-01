@@ -1,0 +1,18 @@
+migrations_path := env_var_or_default("MIGRATIONS_PATH", "/migrations/postgres")
+database_url := env_var_or_default("DATABASE_URL", "postgres://flight:flight@postgres:5432/flight_tracker?sslmode=disable")
+
+up:
+    migrate -path {{ quote(migrations_path) }} -database {{ quote(database_url) }} up
+
+down:
+    migrate -path {{ quote(migrations_path) }} -database {{ quote(database_url) }} down 1
+
+version:
+    migrate -path {{ quote(migrations_path) }} -database {{ quote(database_url) }} version
+
+force:
+    if [ -z "${VERSION:-}" ]; then echo "VERSION is required, e.g. docker compose --profile migrate run --rm -e VERSION=1 migrate force" >&2; exit 1; fi
+    migrate -path {{ quote(migrations_path) }} -database {{ quote(database_url) }} force "$VERSION"
+
+shell:
+    psql {{ quote(database_url) }}
