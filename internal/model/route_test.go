@@ -191,33 +191,103 @@ func jsonFieldString(t *testing.T, body []byte, field string) string {
 
 func TestRouteOutlookRoundForResponse(t *testing.T) {
 	out := RouteOutlook{
-		OnTimeProbability:             1.0 / 3.0,
-		DelayProbability:              2.0 / 3.0,
-		CancellationProbability:       0.125,
-		DiversionProbability:          0.5,
-		LikelyArrivalDelayMinutes:     15.4,
-		MedianArrivalDelayMinutes:     15.5,
-		LikelyArrivalDelayWhenDelayed: -1.5,
-		MedianArrivalDelayWhenDelayed: 0.4,
-		LikelyDepartureDelayMinutes:   10.5,
+		OnTimeProbability:             floatPtr(1.0 / 3.0),
+		DelayProbability:              floatPtr(2.0 / 3.0),
+		CancellationProbability:       floatPtr(0.125),
+		DiversionProbability:          floatPtr(0.5),
+		LikelyArrivalDelayMinutes:     floatPtr(15.4),
+		MedianArrivalDelayMinutes:     floatPtr(15.5),
+		LikelyArrivalDelayWhenDelayed: floatPtr(-1.5),
+		MedianArrivalDelayWhenDelayed: floatPtr(0.4),
+		LikelyDepartureDelayMinutes:   floatPtr(10.5),
 		DepTimeWindowMinutes:          30,
 	}
 
 	out.RoundForResponse()
 
-	assertFloat(t, "on_time_probability", out.OnTimeProbability, 0.33)
-	assertFloat(t, "delay_probability", out.DelayProbability, 0.67)
-	assertFloat(t, "cancellation_probability", out.CancellationProbability, 0.13)
-	assertFloat(t, "diversion_probability", out.DiversionProbability, 0.5)
-	assertFloat(t, "likely_arrival_delay_minutes", out.LikelyArrivalDelayMinutes, 15)
-	assertFloat(t, "median_arrival_delay_minutes", out.MedianArrivalDelayMinutes, 16)
-	assertFloat(t, "likely_arrival_delay_when_delayed", out.LikelyArrivalDelayWhenDelayed, -2)
-	assertFloat(t, "median_arrival_delay_when_delayed", out.MedianArrivalDelayWhenDelayed, 0)
-	assertFloat(t, "likely_departure_delay_minutes", out.LikelyDepartureDelayMinutes, 11)
+	assertFloatPtr(t, "on_time_probability", out.OnTimeProbability, 0.33)
+	assertFloatPtr(t, "delay_probability", out.DelayProbability, 0.67)
+	assertFloatPtr(t, "cancellation_probability", out.CancellationProbability, 0.13)
+	assertFloatPtr(t, "diversion_probability", out.DiversionProbability, 0.5)
+	assertFloatPtr(t, "likely_arrival_delay_minutes", out.LikelyArrivalDelayMinutes, 15)
+	assertFloatPtr(t, "median_arrival_delay_minutes", out.MedianArrivalDelayMinutes, 16)
+	assertFloatPtr(t, "likely_arrival_delay_when_delayed", out.LikelyArrivalDelayWhenDelayed, -2)
+	assertFloatPtr(t, "median_arrival_delay_when_delayed", out.MedianArrivalDelayWhenDelayed, 0)
+	assertFloatPtr(t, "likely_departure_delay_minutes", out.LikelyDepartureDelayMinutes, 11)
 
 	if out.DepTimeWindowMinutes != 30 {
 		t.Errorf("dep_time_window_minutes = %d, want 30 (input filter, not rounded as a delay)", out.DepTimeWindowMinutes)
 	}
+
+	var empty RouteOutlook
+	empty.RoundForResponse()
+
+	if empty.OnTimeProbability != nil || empty.LikelyDepartureDelayMinutes != nil {
+		t.Fatal("nil estimates should stay nil")
+	}
+}
+
+func TestRouteOutlookSampleReasonJSON(t *testing.T) {
+	zero := 0.0
+	empty := RouteOutlook{
+		SampleSize:                0,
+		OnTimeProbability:         &zero,
+		LikelyArrivalDelayMinutes: &zero,
+		Connection:                ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+	}
+	empty.ApplyOutlookSample(10)
+
+	body, err := json.Marshal(empty)
+	if err != nil {
+		t.Fatalf("marshal empty: %v", err)
+	}
+
+	if jsonFieldString(t, body, "sample_reason") != SampleReasonEmptySample || jsonFieldString(t, body, "confidence") != ConfidenceUnknown {
+		t.Fatalf("empty labels = %s", body)
+	}
+
+	if string(jsonField(t, body, "insufficient_sample")) != "false" {
+		t.Fatalf("insufficient_sample = %s, want false", jsonField(t, body, "insufficient_sample"))
+	}
+
+	for _, field := range []string{"on_time_probability", "delay_probability", "likely_arrival_delay_minutes", "likely_departure_delay_minutes"} {
+		if string(jsonField(t, body, field)) != "null" {
+			t.Errorf("%s = %s, want null", field, jsonField(t, body, field))
+		}
+	}
+
+	assertNullConnectionMinutes(t, jsonField(t, body, "connection"))
+
+	solid := RouteOutlook{SampleSize: 12, OnTimeProbability: &zero}
+	solid.ApplyOutlookSample(10)
+
+	solidBody, err := json.Marshal(solid)
+	if err != nil {
+		t.Fatalf("marshal solid: %v", err)
+	}
+
+	if jsonFieldString(t, solidBody, "sample_reason") != SampleReasonSufficient {
+		t.Fatalf("sample_reason = %s", jsonField(t, solidBody, "sample_reason"))
+	}
+
+	if string(jsonField(t, solidBody, "on_time_probability")) != "0" {
+		t.Fatalf("on_time_probability = %s, want 0", jsonField(t, solidBody, "on_time_probability"))
+	}
+}
+
+func floatPtr(v float64) *float64 {
+	return &v
+}
+
+func assertFloatPtr(t *testing.T, name string, got *float64, want float64) {
+	t.Helper()
+
+	if got == nil {
+		t.Errorf("%s = nil, want %v", name, want)
+		return
+	}
+
+	assertFloat(t, name, *got, want)
 }
 
 func TestRouteTravelWindowsRoundAndJSON(t *testing.T) {

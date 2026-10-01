@@ -47,7 +47,7 @@ func TestFreshnessGetEmpty(t *testing.T) {
 		}
 
 		for _, key := range []string{"last_successful_ingest_at", "last_successful_ingest_duration", "latest_period", "last_successful_job_id"} {
-			if string(fields[key]) != "null" {
+			if string(fields[key]) != jsonNull {
 				t.Errorf("%s = %s, want null", key, fields[key])
 			}
 		}

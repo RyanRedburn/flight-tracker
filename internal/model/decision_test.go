@@ -53,6 +53,68 @@ func TestOutlookConfidence(t *testing.T) {
 	}
 }
 
+func TestApplyOutlookSample(t *testing.T) {
+	(*RouteOutlook)(nil).ApplyOutlookSample(10)
+
+	zero := 0.0
+	planted := ConnectionGuidanceFromRecommended(45, 60, 90, 120)
+
+	tests := []struct {
+		name               string
+		sampleSize         int
+		minSample          int
+		wantReason         string
+		wantConfidence     string
+		wantInsufficient   bool
+		wantConnectionKept bool
+	}{
+		{name: "empty slot", minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "negative size", sampleSize: -3, minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "thin sample", sampleSize: 4, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow, wantInsufficient: true},
+		{name: "one below minimum", sampleSize: 9, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow, wantInsufficient: true},
+		{name: "meets minimum", sampleSize: 10, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
+		{name: "solid sample", sampleSize: 40, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
+		{name: "no minimum treats non-empty as sufficient", sampleSize: 1, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &RouteOutlook{
+				SampleSize:                tt.sampleSize,
+				OnTimeProbability:         &zero,
+				LikelyArrivalDelayMinutes: &zero,
+				Connection:                planted,
+			}
+			out.ApplyOutlookSample(tt.minSample)
+
+			if out.SampleReason != tt.wantReason || out.Confidence != tt.wantConfidence || out.InsufficientSample != tt.wantInsufficient {
+				t.Fatalf("sample = reason %q confidence %q insufficient %v", out.SampleReason, out.Confidence, out.InsufficientSample)
+			}
+
+			if tt.sampleSize < 0 && out.SampleSize != 0 {
+				t.Fatalf("sample_size = %d, want 0", out.SampleSize)
+			}
+
+			if tt.wantReason == SampleReasonEmptySample {
+				if out.OnTimeProbability != nil || out.LikelyArrivalDelayMinutes != nil || out.Connection.DomesticToDomestic != nil {
+					t.Fatalf("empty estimates = prob %v delay %v connection %+v", out.OnTimeProbability, out.LikelyArrivalDelayMinutes, out.Connection.DomesticToDomestic)
+				}
+
+				return
+			}
+
+			if out.OnTimeProbability == nil || *out.OnTimeProbability != 0 {
+				t.Fatalf("on_time_probability = %v, want 0", out.OnTimeProbability)
+			}
+
+			kept := out.Connection.DomesticToDomestic != nil
+			if kept != tt.wantConnectionKept {
+				t.Fatalf("connection kept = %v, want %v", kept, tt.wantConnectionKept)
+			}
+		})
+	}
+}
+
 func TestDecisionConfidence(t *testing.T) {
 	if got := (*RouteOutlook)(nil).DecisionConfidence(); got != ConfidenceUnknown {
 		t.Errorf("nil outlook confidence = %q", got)

@@ -16,10 +16,20 @@ const (
 
 	// Seasonal reliability is typical-year on-time performance for a travel-window bucket.
 	// It is not a connection status.
+	// Unreliable is a high-confidence verdict. A thin bucket stays reliability unknown.
 	ReliabilityReliable   = "reliable"
 	ReliabilityTypical    = "typical"
 	ReliabilityUnreliable = "unreliable"
 	ReliabilityUnknown    = "unknown"
+
+	// SampleReason names the outlook slot behind confidence and insufficient_sample.
+	// It is the machine-readable sample state for a 200 response. It is not a
+	// second sparse boolean, and it is not a connection status.
+	// A route and carrier that have never been seen are not a sample reason:
+	// route outlook is 404, and an itinerary leg has a null outlook plus error.
+	SampleReasonSufficient         = "sufficient"
+	SampleReasonInsufficientSample = "insufficient_sample"
+	SampleReasonEmptySample        = "empty_sample"
 )
 
 const (
@@ -116,6 +126,52 @@ func OutlookConfidence(sampleSize int, insufficientSample bool) string {
 	}
 
 	return ConfidenceHigh
+}
+
+// ApplyOutlookSample sets insufficient_sample, sample_reason, and confidence from the slot size.
+// sufficient: sample meets minSample. The bool is false and confidence is high.
+// insufficient_sample: some flights fall short of minSample. The bool is true and confidence is low.
+// Estimates stay, and connection thresholds are cleared.
+// empty_sample: no flights in this weekday and departure window. The bool stays false,
+// confidence is unknown, and probability, delay, and connection fields are cleared
+// so a zero is not a forecast.
+// minSample <= 0 treats every non-empty slot as sufficient.
+func (o *RouteOutlook) ApplyOutlookSample(minSample int) {
+	if o == nil {
+		return
+	}
+
+	insufficient := o.SampleSize > 0 && minSample > 0 && o.SampleSize < minSample
+	o.InsufficientSample = insufficient
+	o.Confidence = OutlookConfidence(o.SampleSize, insufficient)
+
+	switch o.Confidence {
+	case ConfidenceHigh:
+		o.SampleReason = SampleReasonSufficient
+	case ConfidenceLow:
+		o.SampleReason = SampleReasonInsufficientSample
+		o.Connection = ConnectionGuidance{}
+	default:
+		if o.SampleSize < 0 {
+			o.SampleSize = 0
+		}
+
+		o.SampleReason = SampleReasonEmptySample
+		o.clearEstimates()
+	}
+}
+
+func (o *RouteOutlook) clearEstimates() {
+	o.OnTimeProbability = nil
+	o.DelayProbability = nil
+	o.CancellationProbability = nil
+	o.DiversionProbability = nil
+	o.LikelyArrivalDelayMinutes = nil
+	o.MedianArrivalDelayMinutes = nil
+	o.LikelyArrivalDelayWhenDelayed = nil
+	o.MedianArrivalDelayWhenDelayed = nil
+	o.LikelyDepartureDelayMinutes = nil
+	o.Connection = ConnectionGuidance{}
 }
 
 // DecisionConfidence is the confidence value an itinerary copies from this outlook.

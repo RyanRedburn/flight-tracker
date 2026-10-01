@@ -29,6 +29,7 @@ const (
 	testWindowStart   = "2024-04-30"
 	testWindowEnd     = "2026-04-30"
 	testAnalysisEnd   = "2026-04-15"
+	jsonNull          = "null"
 )
 
 func TestRoutesStats(t *testing.T) {
@@ -213,17 +214,19 @@ func TestRoutesStatsBadRequest(t *testing.T) {
 func TestRoutesOutlook(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-			return &model.RouteOutlook{
-				Origin:             testOriginORD,
-				Dest:               testDestLAX,
-				Carrier:            "UA",
-				DayOfWeek:          3,
-				DepTime:            "0700",
-				SampleSize:         3,
-				InsufficientSample: true,
-				Confidence:         model.ConfidenceLow,
-				AnalysisEnd:        testAnalysisEnd,
-			}, nil
+			out := &model.RouteOutlook{
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
+				Carrier:           "UA",
+				DayOfWeek:         3,
+				DepTime:           "0700",
+				SampleSize:        3,
+				OnTimeProbability: floatPtr(0),
+				AnalysisEnd:       testAnalysisEnd,
+			}
+			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
+			return out, nil
 		},
 	})
 
@@ -250,8 +253,12 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Fatal("expected insufficient_sample")
 	}
 
-	if out.Confidence != model.ConfidenceLow {
-		t.Errorf("confidence = %q, want low", out.Confidence)
+	if out.Confidence != model.ConfidenceLow || out.SampleReason != model.SampleReasonInsufficientSample {
+		t.Errorf("confidence = %q reason = %q", out.Confidence, out.SampleReason)
+	}
+
+	if string(jsonFieldRaw(t, body, "on_time_probability")) != "0" {
+		t.Errorf("on_time_probability = %s, want 0", jsonFieldRaw(t, body, "on_time_probability"))
 	}
 
 	if out.AnalysisEnd != testAnalysisEnd {
@@ -278,16 +285,21 @@ func TestRoutesOutlookEmpty(t *testing.T) {
 func TestRoutesOutlookEmptyFilters(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-			return &model.RouteOutlook{
-				Origin:        testOriginORD,
-				Dest:          testDestLAX,
-				Carrier:       "UA",
-				DayOfWeek:     3,
-				DepTime:       "0700",
-				SampleSize:    0,
-				AnalysisStart: "2025-04-15",
-				AnalysisEnd:   testAnalysisEnd,
-			}, nil
+			zero := 0.0
+			out := &model.RouteOutlook{
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
+				Carrier:           "UA",
+				DayOfWeek:         3,
+				DepTime:           "0700",
+				SampleSize:        0,
+				OnTimeProbability: &zero,
+				AnalysisStart:     "2025-04-15",
+				AnalysisEnd:       testAnalysisEnd,
+			}
+			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
+			return out, nil
 		},
 	})
 
@@ -310,11 +322,62 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 		t.Fatalf("sample_size = %d, want 0", out.SampleSize)
 	}
 
+	if out.InsufficientSample || out.SampleReason != model.SampleReasonEmptySample || out.Confidence != model.ConfidenceUnknown {
+		t.Fatalf("empty slot = insufficient %v reason %q confidence %q", out.InsufficientSample, out.SampleReason, out.Confidence)
+	}
+
+	if out.OnTimeProbability != nil || string(jsonFieldRaw(t, body, "on_time_probability")) != jsonNull {
+		t.Fatalf("on_time_probability = %s, want null", jsonFieldRaw(t, body, "on_time_probability"))
+	}
+
 	if out.AnalysisEnd != testAnalysisEnd {
 		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
 	}
 
 	assertNullConnectionMinutesJSON(t, body)
+}
+
+func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			out := &model.RouteOutlook{
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
+				Carrier:           "UA",
+				SampleSize:        store.MinOutlookSampleSize,
+				OnTimeProbability: floatPtr(0),
+				Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+			}
+			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
+			return out, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var out model.RouteOutlook
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.SampleReason != model.SampleReasonSufficient || out.Confidence != model.ConfidenceHigh || out.InsufficientSample {
+		t.Fatalf("solid slot = %+v", out)
+	}
+
+	if string(jsonFieldRaw(t, rec.Body.Bytes(), "on_time_probability")) != "0" {
+		t.Fatalf("on_time_probability = %s, want 0", jsonFieldRaw(t, rec.Body.Bytes(), "on_time_probability"))
+	}
+
+	if out.Connection.DomesticToDomestic == nil || out.Connection.DomesticToDomestic.RecommendedMinutes != 45 {
+		t.Fatalf("connection = %+v", out.Connection.DomesticToDomestic)
+	}
 }
 
 func TestRoutesOutlookStoreError(t *testing.T) {
@@ -791,6 +854,26 @@ func assertNotFound(t *testing.T, rec *httptest.ResponseRecorder, want string) {
 	if resp.Error != want {
 		t.Fatalf("error = %q, want %q", resp.Error, want)
 	}
+}
+
+func jsonFieldRaw(t *testing.T, body []byte, field string) json.RawMessage {
+	t.Helper()
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatalf("unmarshal json: %v", err)
+	}
+
+	value, ok := raw[field]
+	if !ok {
+		t.Fatalf("missing %s in %s", field, body)
+	}
+
+	return value
+}
+
+func floatPtr(v float64) *float64 {
+	return &v
 }
 
 func jsonHasKey(t *testing.T, body []byte, field string) bool {

@@ -88,6 +88,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 
 	targetMin, ok := store.HHMMToMinutes(filter.DepTime)
 	if !ok {
+		out.ApplyOutlookSample(store.MinOutlookSampleSize)
+
 		return out, nil
 	}
 
@@ -130,25 +132,28 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, err
 	}
 
-	out.InsufficientSample = out.SampleSize > 0 && out.SampleSize < store.MinOutlookSampleSize
-	out.Confidence = model.OutlookConfidence(out.SampleSize, out.InsufficientSample)
-
-	if out.SampleSize == 0 {
-		return out, nil
+	if out.SampleSize > 0 {
+		onTimeRate := ratio(onTime, out.SampleSize)
+		delayRate := ratio(delayed, out.SampleSize)
+		cancelRate := ratio(cancelled, out.SampleSize)
+		divertRate := ratio(diverted, out.SampleSize)
+		out.OnTimeProbability = &onTimeRate
+		out.DelayProbability = &delayRate
+		out.CancellationProbability = &cancelRate
+		out.DiversionProbability = &divertRate
+		out.LikelyArrivalDelayMinutes = nullFloatPtr(avgArr)
+		out.MedianArrivalDelayMinutes = nullFloatPtr(medianArr)
+		out.LikelyArrivalDelayWhenDelayed = nullFloatPtr(avgArrDelayed)
+		out.MedianArrivalDelayWhenDelayed = nullFloatPtr(medianArrDelayed)
+		out.LikelyDepartureDelayMinutes = nullFloatPtr(avgDep)
 	}
 
-	out.OnTimeProbability = ratio(onTime, out.SampleSize)
-	out.DelayProbability = ratio(delayed, out.SampleSize)
-	out.CancellationProbability = ratio(cancelled, out.SampleSize)
-	out.DiversionProbability = ratio(diverted, out.SampleSize)
-	out.LikelyArrivalDelayMinutes = nullFloat(avgArr)
-	out.MedianArrivalDelayMinutes = nullFloat(medianArr)
-	out.LikelyArrivalDelayWhenDelayed = nullFloat(avgArrDelayed)
-	out.MedianArrivalDelayWhenDelayed = nullFloat(medianArrDelayed)
-	out.LikelyDepartureDelayMinutes = nullFloat(avgDep)
+	out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
-	if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
-		return nil, err
+	if out.SampleReason == model.SampleReasonSufficient {
+		if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
+			return nil, err
+		}
 	}
 
 	out.RoundForResponse()
@@ -347,6 +352,16 @@ func nullFloat(n sql.NullFloat64) float64 {
 	}
 
 	return n.Float64
+}
+
+func nullFloatPtr(n sql.NullFloat64) *float64 {
+	if !n.Valid {
+		return nil
+	}
+
+	v := n.Float64
+
+	return &v
 }
 
 func nullIntPtr(n sql.NullInt64) *int {

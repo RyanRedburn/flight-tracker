@@ -66,31 +66,41 @@ type RouteStats struct {
 }
 
 type RouteOutlook struct {
-	Origin                        string             `json:"origin"`
-	Dest                          string             `json:"dest"`
-	Carrier                       string             `json:"carrier"`
-	DayOfWeek                     int                `json:"day_of_week"`
-	DepTime                       string             `json:"dep_time"`
-	DepTimeWindowMinutes          int                `json:"dep_time_window_minutes"`
-	AnalysisStart                 string             `json:"analysis_start"`
-	AnalysisEnd                   string             `json:"analysis_end"`
-	SampleSize                    int                `json:"sample_size"`
-	InsufficientSample            bool               `json:"insufficient_sample"`
+	Origin               string `json:"origin"`
+	Dest                 string `json:"dest"`
+	Carrier              string `json:"carrier"`
+	DayOfWeek            int    `json:"day_of_week"`
+	DepTime              string `json:"dep_time"`
+	DepTimeWindowMinutes int    `json:"dep_time_window_minutes"`
+	AnalysisStart        string `json:"analysis_start"`
+	AnalysisEnd          string `json:"analysis_end"`
+	SampleSize           int    `json:"sample_size"`
+	// InsufficientSample is true only for sample_reason insufficient_sample.
+	// An empty slot leaves it false; never-seen is not this flag.
+	InsufficientSample bool `json:"insufficient_sample"`
+	// SampleReason is sufficient, insufficient_sample, or empty_sample.
+	// insufficient_sample matches the bool. empty_sample is a seen route and carrier
+	// with no flights in this slot: confidence is unknown and estimate fields are null.
+	// Never-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.
+	SampleReason string `json:"sample_reason" enums:"sufficient,insufficient_sample,empty_sample"`
+	// Confidence is high, low, or unknown for sufficient, insufficient_sample, and empty_sample.
 	Confidence                    string             `json:"confidence" enums:"high,low,unknown"`
-	OnTimeProbability             float64            `json:"on_time_probability"`
-	DelayProbability              float64            `json:"delay_probability"`
-	CancellationProbability       float64            `json:"cancellation_probability"`
-	DiversionProbability          float64            `json:"diversion_probability"`
-	LikelyArrivalDelayMinutes     float64            `json:"likely_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64            `json:"median_arrival_delay_minutes"`
-	LikelyArrivalDelayWhenDelayed float64            `json:"likely_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64            `json:"median_arrival_delay_when_delayed"`
-	LikelyDepartureDelayMinutes   float64            `json:"likely_departure_delay_minutes"`
+	OnTimeProbability             *float64           `json:"on_time_probability"`
+	DelayProbability              *float64           `json:"delay_probability"`
+	CancellationProbability       *float64           `json:"cancellation_probability"`
+	DiversionProbability          *float64           `json:"diversion_probability"`
+	LikelyArrivalDelayMinutes     *float64           `json:"likely_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes     *float64           `json:"median_arrival_delay_minutes"`
+	LikelyArrivalDelayWhenDelayed *float64           `json:"likely_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed *float64           `json:"median_arrival_delay_when_delayed"`
+	LikelyDepartureDelayMinutes   *float64           `json:"likely_departure_delay_minutes"`
 	Connection                    ConnectionGuidance `json:"connection"`
 }
 
 // TravelWindowMonthBucket is one month-of-year on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
+// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
+// Unreliable is a high-confidence on-time rate below 0.70. A month with no flights is omitted.
 type TravelWindowMonthBucket struct {
 	Month       int     `json:"month"`
 	OnTimeRate  float64 `json:"on_time_rate"`
@@ -101,6 +111,8 @@ type TravelWindowMonthBucket struct {
 
 // TravelWindowDayBucket is one weekday on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
+// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
+// Unreliable is a high-confidence on-time rate below 0.70. A weekday with no flights is omitted.
 type TravelWindowDayBucket struct {
 	DayOfWeek   int     `json:"day_of_week"`
 	OnTimeRate  float64 `json:"on_time_rate"`
@@ -111,6 +123,8 @@ type TravelWindowDayBucket struct {
 
 // TravelWindowHourBucket is one scheduled departure-hour on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
+// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
+// Unreliable is a high-confidence on-time rate below 0.70. An hour with no flights is omitted.
 type TravelWindowHourBucket struct {
 	Hour        int     `json:"hour"`
 	OnTimeRate  float64 `json:"on_time_rate"`
@@ -164,17 +178,17 @@ func (s *RouteStats) RoundForResponse() {
 }
 
 // RoundForResponse rounds probabilities to two decimal places and minute
-// values to the nearest minute.
+// values to the nearest minute. Null estimates stay null.
 func (o *RouteOutlook) RoundForResponse() {
-	o.OnTimeProbability = roundRate(o.OnTimeProbability)
-	o.DelayProbability = roundRate(o.DelayProbability)
-	o.CancellationProbability = roundRate(o.CancellationProbability)
-	o.DiversionProbability = roundRate(o.DiversionProbability)
-	o.LikelyArrivalDelayMinutes = math.Round(o.LikelyArrivalDelayMinutes)
-	o.MedianArrivalDelayMinutes = math.Round(o.MedianArrivalDelayMinutes)
-	o.LikelyArrivalDelayWhenDelayed = math.Round(o.LikelyArrivalDelayWhenDelayed)
-	o.MedianArrivalDelayWhenDelayed = math.Round(o.MedianArrivalDelayWhenDelayed)
-	o.LikelyDepartureDelayMinutes = math.Round(o.LikelyDepartureDelayMinutes)
+	o.OnTimeProbability = roundRatePtr(o.OnTimeProbability)
+	o.DelayProbability = roundRatePtr(o.DelayProbability)
+	o.CancellationProbability = roundRatePtr(o.CancellationProbability)
+	o.DiversionProbability = roundRatePtr(o.DiversionProbability)
+	o.LikelyArrivalDelayMinutes = roundMinutesPtr(o.LikelyArrivalDelayMinutes)
+	o.MedianArrivalDelayMinutes = roundMinutesPtr(o.MedianArrivalDelayMinutes)
+	o.LikelyArrivalDelayWhenDelayed = roundMinutesPtr(o.LikelyArrivalDelayWhenDelayed)
+	o.MedianArrivalDelayWhenDelayed = roundMinutesPtr(o.MedianArrivalDelayWhenDelayed)
+	o.LikelyDepartureDelayMinutes = roundMinutesPtr(o.LikelyDepartureDelayMinutes)
 }
 
 // RoundForResponse rounds on-time rates to two decimal places.
@@ -231,4 +245,24 @@ func (s *DelayCausesShare) round() {
 
 func roundRate(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+func roundRatePtr(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+
+	rounded := roundRate(*v)
+
+	return &rounded
+}
+
+func roundMinutesPtr(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+
+	rounded := math.Round(*v)
+
+	return &rounded
 }
