@@ -29,6 +29,9 @@ func init() {
 	ingestValidate.RegisterStructValidation(validateWeatherIngestRequest, WeatherIngestRequest{})
 }
 
+// ForceIngestRequest is the optional body for a full-table import.
+//
+//	@Description	An empty body is treated as {"force":false}. Set force=true to replace existing rows.
 type ForceIngestRequest struct {
 	Force bool `json:"force"`
 }

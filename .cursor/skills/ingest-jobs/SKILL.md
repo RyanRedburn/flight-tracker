@@ -23,9 +23,13 @@ HTTP handlers must not download. Workers must always replace the target month or
 
 | Package | Job type(s) | Replace |
 | --- | --- | --- |
-| `internal/ingest/bts` | `import_flight_performance` | `ReplaceFlightPerformanceByMonth` |
-| `internal/ingest/iem` | `import_weather_observations`, `import_weather_stations` | month observations; full station catalog + mapping |
+| `internal/ingest/bts` | `import_flight_performance` | `ReplaceFlightPerformanceByMonth`, then both rollups below |
+| `internal/ingest/iem` | `import_weather_observations`, `import_weather_stations` | month observations; full station catalog + mapping; weather-stats rollup after either |
 | `internal/ingest/ourairports` | `import_countries`, `import_regions`, `import_airports` | full table |
+| `internal/ingest/mct` | `import_airport_mct` | `ReplaceAirportMCT` (full table) |
+| `internal/operator` | `rebuild_route_travel_windows`, `rebuild_route_weather_stats` | `RebuildRouteTravelWindows` / `RebuildRouteWeatherStats`; no download |
+
+Rebuild handlers only call the store. Flight-performance ingest rebuilds both rollups after a successful month. Weather-observation and weather-station ingests rebuild weather stats only. The rebuild job types are the admin queue when you do not want another import.
 
 Shared helpers:
 
@@ -36,6 +40,8 @@ Shared helpers:
 Earliest supported year is **2018** (`model.MinFlightPerformanceIngestYear` / `MinWeatherIngestYear`).
 
 IEM downloads are throttled (~1 req/s) and retry HTTP 503. Preserve that if you touch the IEM client.
+
+MCT pages `GET /api/airports` at about 1 request/s and backs off on HTTP 429 and 5xx. Do not send `minimal=true` (that view omits the minute fields). A failed download must not replace `airport_mct`.
 
 ## Adding a job type
 

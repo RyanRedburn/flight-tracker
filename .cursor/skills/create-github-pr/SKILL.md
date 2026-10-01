@@ -74,9 +74,7 @@ If checks fail, fix and push; re-wait. Do not hand off a red PR.
    `git diff <base>...HEAD`. Base is the PR target branch, usually `main`.
    Confirm tracking vs origin.
 2. Self-review the diff: focused to one concern, no secrets, no ticket numbers
-   in code, no "what we didn't do" comments. If client GDScript changed, run
-   `make lint` and `make test` from `client/` first (see
-   [gdscript-client-quality](../gdscript-client-quality/SKILL.md)).
+   in code, no "what we didn't do" comments.
 3. Push with `-u` if the branch is not on origin. Do not update git config,
    force-push `main`/`master`, skip hooks, or use `git -i`.
 4. `gh pr create` (or the environment PR API) with the title and body above.

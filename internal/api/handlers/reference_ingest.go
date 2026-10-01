@@ -28,7 +28,7 @@ type ReferenceIngestResponse struct {
 // CreateCountries queues a countries reference data ingest job.
 //
 //	@Summary		Queue countries reference data ingest
-//	@Description	Queues an import of countries reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Description	Queues an import of countries reference data.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json
@@ -49,7 +49,7 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 // CreateRegions queues a regions reference data ingest job.
 //
 //	@Summary		Queue regions reference data ingest
-//	@Description	Queues an import of regions reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Description	Queues an import of regions reference data.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json
@@ -70,7 +70,7 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 // CreateAirports queues an airports reference data ingest job.
 //
 //	@Summary		Queue airports reference data ingest
-//	@Description	Queues an import of airports reference data. An empty body is treated as {"force":false}. Set force=true to replace existing data.
+//	@Description	Queues an import of airports reference data.
 //	@Tags			ingest,internal
 //	@Accept			json
 //	@Produce		json
