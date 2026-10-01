@@ -131,6 +131,11 @@ const (
 		FROM airports
 		WHERE iata_code = ANY($1)`
 
+	QueryListAirportCountriesByIATA = `
+		SELECT iata_code, iso_country
+		FROM airports
+		WHERE iata_code = ANY($1)`
+
 	QueryDeleteAllCountries  = `DELETE FROM countries`
 	QueryDeleteAllRegions    = `DELETE FROM regions`
 	QueryDeleteAllAirports   = `DELETE FROM airports`

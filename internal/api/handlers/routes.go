@@ -63,13 +63,14 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // Outlook returns booking-style probabilities for a specific flight pattern.
 //
 //	@Summary		Route booking outlook
-//	@Description	On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Day of week uses 1=Monday through 7=Sunday. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, plus the destination airport's MCT or 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.
+//	@Description	On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD) is required; sending both or neither is rejected. A date selects that weekday for the same historical sample. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). recommended_connection_minutes is a same-airport heuristic: arrival-delay p90 for arrived flights in this outlook, plus the destination airport's MCT or 45/60/120/120 minutes. It is not an official airline MCT. The four values are null when the sample is insufficient or no arrival delay is available. Returns 404 when the origin, destination, and carrier have no flight-performance data. A day-of-week or departure-time window that matches nothing still returns 200.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin						query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
 //	@Param			dest						query		string	true	"Destination airport IATA code"	minlength(3)	maxlength(3)
 //	@Param			carrier						query		string	true	"Marketing carrier code"	minlength(2)	maxlength(2)
-//	@Param			day_of_week					query		int		true	"Day of week (1=Mon … 7=Sun)"	minimum(1)	maximum(7)
+//	@Param			day_of_week					query		int		false	"Weekday (1=Mon … 7=Sun); exactly one of day_of_week or date"	minimum(1)	maximum(7)
+//	@Param			date						query		string	false	"Calendar date (YYYY-MM-DD); exactly one of day_of_week or date"	Format(date)
 //	@Param			dep_time					query		string	true	"Scheduled departure time (HHmm)"
 //	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 30, max 120)"	minimum(1)	maximum(120)
 //	@Success		200							{object}	model.RouteOutlook
@@ -91,7 +92,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 	outlook, err := h.store.RouteOutlook(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route outlook not found"})
+			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: errRouteOutlookNotFound})
 			return
 		}
 

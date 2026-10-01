@@ -1,9 +1,11 @@
 package store
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
@@ -54,6 +56,41 @@ func HHMMToMinutes(hhmm string) (int, bool) {
 	}
 
 	return h*60 + m, true
+}
+
+func FormatHHMM(raw string) string {
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return raw
+	}
+
+	return fmt.Sprintf("%04d", n)
+}
+
+// ISOWeekday maps a calendar date to 1=Monday … 7=Sunday.
+func ISOWeekday(t time.Time) int {
+	if t.Weekday() == time.Sunday {
+		return 7
+	}
+
+	return int(t.Weekday())
+}
+
+func ISOWeekdayFromDate(date string) (int, bool) {
+	t, err := time.Parse("2006-01-02", strings.TrimSpace(date))
+	if err != nil {
+		return 0, false
+	}
+
+	return ISOWeekday(t), true
+}
+
+func ResolveDepTimeWindowMinutes(minutes *int) int {
+	if minutes == nil {
+		return DefaultDepTimeWindowMinutes
+	}
+
+	return *minutes
 }
 
 func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierOnTime {

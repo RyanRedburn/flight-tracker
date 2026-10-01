@@ -80,6 +80,47 @@ func (s *Store) ListAirportIdentifiersByIATA(ctx context.Context, codes []string
 	return out, nil
 }
 
+func (s *Store) ListAirportCountriesByIATA(ctx context.Context, codes []string) (map[string]string, error) {
+	out := make(map[string]string)
+
+	normalized := uniqueUpperCodes(codes)
+	if len(normalized) == 0 {
+		return out, nil
+	}
+
+	rows, err := s.db.QueryContext(ctx, store.QueryListAirportCountriesByIATA, normalized)
+	if err != nil {
+		return nil, fmt.Errorf("query airport countries: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var iata, country string
+		if err := rows.Scan(&iata, &country); err != nil {
+			return nil, err
+		}
+
+		iata = strings.ToUpper(strings.TrimSpace(iata))
+		country = strings.ToUpper(strings.TrimSpace(country))
+
+		if iata == "" || country == "" {
+			continue
+		}
+
+		if _, exists := out[iata]; exists {
+			continue
+		}
+
+		out[iata] = country
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func uniqueUpperCodes(codes []string) []string {
 	out := make([]string, 0, len(codes))
 	seen := make(map[string]struct{}, len(codes))

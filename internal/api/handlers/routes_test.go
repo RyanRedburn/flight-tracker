@@ -16,6 +16,13 @@ const (
 	testOriginORD     = "ORD"
 	testDestLAX       = "LAX"
 	testDestJFK       = "JFK"
+	testOriginBOS     = "BOS"
+	testAirportLHR    = "LHR"
+	testAirportCDG    = "CDG"
+	testAirportNCE    = "NCE"
+	testDateTue       = "2026-10-06"
+	testDateWed       = "2026-10-07"
+	testArr0905       = "0905"
 	jsonCarrierOnTime = "carrier_on_time"
 	testWindowStart   = "2024-04-30"
 	testWindowEnd     = "2026-04-30"
@@ -258,7 +265,7 @@ func TestRoutesOutlookEmpty(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.Outlook(rec, req)
 
-	assertNotFound(t, rec, "route outlook not found")
+	assertNotFound(t, rec, errRouteOutlookNotFound)
 }
 
 func TestRoutesOutlookEmptyFilters(t *testing.T) {
@@ -463,12 +470,69 @@ func TestRoutesTravelWindowsBadRequest(t *testing.T) {
 func TestRoutesOutlookBadRequest(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3", nil)
+	tests := []string{
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3",
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&dep_time=0700",
+		"/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&date=2026-10-06&dep_time=0700",
+	}
+
+	for _, url := range tests {
+		t.Run(url, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			rec := httptest.NewRecorder()
+			h.Outlook(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400, body = %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+}
+
+func TestRoutesOutlookDate(t *testing.T) {
+	var got store.RouteOutlookFilter
+
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			got = filter
+
+			return &model.RouteOutlook{
+				Origin:    filter.Origin,
+				Dest:      filter.Dest,
+				Carrier:   filter.Carrier,
+				DayOfWeek: filter.DayOfWeek,
+				DepTime:   filter.DepTime,
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=bos&dest=ord&carrier=ua&date=2026-10-06&dep_time=700", nil)
 	rec := httptest.NewRecorder()
 	h.Outlook(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	if got.Origin != testOriginBOS || got.Dest != testOriginORD || got.Carrier != "UA" {
+		t.Fatalf("filter = %+v", got)
+	}
+
+	if got.DayOfWeek != 2 {
+		t.Fatalf("day_of_week = %d, want 2", got.DayOfWeek)
+	}
+
+	if got.DepTime != "0700" {
+		t.Fatalf("dep_time = %q, want 0700", got.DepTime)
+	}
+
+	var out model.RouteOutlook
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.DayOfWeek != 2 {
+		t.Fatalf("response day_of_week = %d, want 2", out.DayOfWeek)
 	}
 }
 

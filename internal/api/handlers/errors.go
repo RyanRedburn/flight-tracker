@@ -4,6 +4,8 @@ import "net/http"
 
 const (
 	errInvalidJSONBody            = "invalid json body"
+	errRouteOutlookNotFound       = "route outlook not found"
+	errFailedItineraryOutlook     = "failed to compute itinerary outlook"
 	errFailedCheckActiveIngest    = "failed to check active ingest jobs"
 	errFailedCreateIngestJob      = "failed to create ingest job"
 	errFailedCheckExistingFlight  = "failed to check existing flight data"
