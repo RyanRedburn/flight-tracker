@@ -49,17 +49,17 @@ In-process Go HTTP API plus poll-based background workers. Handlers queue jobs; 
 3. If `store.Store` gains a method, update `internal/store/storetest/stub.go` in the same change (`var _ store.Store = (*Stub)(nil)` must compile).
 4. If env vars change, update `internal/config/config.go`, the README env table, and `.env.example` when Compose/local defaults are involved.
 5. If user-visible API or ingest behavior changes, update README examples/behavior notes.
-6. Do not bump pinned tool versions (`swag` `v1.16.6` in `cmd/server/main.go` / Makefile / CI; golangci-lint `v2.12.2`) unless the task is to bump them.
+6. Do not bump pinned tool versions (`swag` `v1.16.6` in `cmd/server/main.go` / justfile / CI; golangci-lint `v2.12.2`) unless the task is to bump them.
 
 ## Verify before finishing
 
 Run from the repo root:
 
 ```bash
-make lint
-make test
+just lint
+just test
 ```
 
-Also run `make swagger` when handler swag comments, router paths, or exported API models change. Commit the regenerated files under `docs/`. CI fails on swagger drift.
+Also run `just swagger` when handler swag comments, router paths, or exported API models change. Commit the regenerated files under `docs/`. CI fails on swagger drift.
 
 Do not add `//nolint` to silence a new issue; fix the code unless an existing neighboring exception is clearly the project pattern.

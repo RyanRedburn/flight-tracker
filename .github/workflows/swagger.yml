@@ -17,13 +17,16 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: "1.58.0"
       # Regenerates docs/external and docs/full via go:generate (swag v1.16.6).
       - name: Regenerate OpenAPI docs
-        run: make swagger
+        run: just swagger
       - name: Check swagger docs are up to date
         run: |
           if ! git diff --exit-code -- docs/; then
-            echo "::error::Swagger docs are out of date. Run 'make swagger' and commit the changes under docs/."
+            echo "::error::Swagger docs are out of date. Run 'just swagger' and commit the changes under docs/."
             git --no-pager diff -- docs/
             exit 1
           fi

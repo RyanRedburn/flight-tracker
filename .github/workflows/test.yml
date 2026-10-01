@@ -17,4 +17,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: make test
+      - uses: extractions/setup-just@v4
+        with:
+          just-version: "1.58.0"
+      - run: just test

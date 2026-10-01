@@ -1,6 +1,6 @@
 # Testing
 
-`make test` runs `go test ./...`. There is no live-Postgres integration suite. CI is unit tests only.
+`just test` runs `go test ./...`. There is no live-Postgres integration suite. CI is unit tests only.
 
 ## Style
 

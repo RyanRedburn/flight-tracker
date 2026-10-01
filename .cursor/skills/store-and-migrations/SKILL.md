@@ -62,8 +62,8 @@ migrations/postgres/NNNNNN_short_name.down.sql
 Migrations run automatically in `postgres.Open` on server start (`MIGRATIONS_PATH`). For local Compose:
 
 ```bash
-make migrate-up
-make migrate-version
+just migrate-up
+just migrate-version
 ```
 
 Do not hand-edit already-applied files on `main`; add a new pair.

@@ -1,6 +1,6 @@
 # Style
 
-`.golangci.yml` is authoritative. `make lint` uses golangci-lint v2.12.2 via `go run` (same pin as CI).
+`.golangci.yml` is authoritative. `just lint` uses golangci-lint v2.12.2 via `go run` (same pin as CI).
 
 ## Imports (`gci`)
 

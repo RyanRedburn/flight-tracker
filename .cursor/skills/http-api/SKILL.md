@@ -5,7 +5,7 @@ description: Add or change flight-tracker HTTP endpoints, Chi routes, query pars
 
 # HTTP API
 
-Also follow [development-practices](../development-practices/SKILL.md). After annotation or route changes, run `make swagger` and commit `docs/`.
+Also follow [development-practices](../development-practices/SKILL.md). After annotation or route changes, run `just swagger` and commit `docs/`.
 
 ## Layers
 
@@ -58,7 +58,7 @@ Include both the domain tag (`routes`, `ingest`, `jobs`, …) and `external` or 
 
 Annotate every exported handler. Response types must be exported so swag can see them. Reuse `ErrorResponse` and the conflict structs.
 
-Never edit files under `docs/` except via `make swagger`. Pin stays `swag` `v1.16.6`.
+Never edit files under `docs/` except via `just swagger`. Pin stays `swag` `v1.16.6`.
 
 Internal UI is registered **before** `/swagger/*` in the router.
 

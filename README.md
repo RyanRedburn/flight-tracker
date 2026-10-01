@@ -22,24 +22,24 @@ Go service with a REST API and an in-process background worker for importing fli
 ## Requirements
 
 - Go 1.25+
-- [GNU Make](https://www.gnu.org/software/make/) (Git Bash, WSL, or `choco install make` on Windows)
+- [just](https://github.com/casey/just#installation)
 - Docker & Docker Compose (for Postgres and optional containerized runs)
 
-## Makefile
+## just
 
 | Command | Description |
 | --------- | ------------- |
-| `make lint` | Run pinned golangci-lint `v2.12.2` via `go run` (`.golangci.yml`; no global install) |
-| `make swagger` | Regenerate OpenAPI docs (`docs/external`, `docs/full`) via `go generate` |
-| `make test` | Run all tests |
-| `make test-cover-html` | Full suite with HTML coverage report (`coverage.html`) |
-| `make docker-build` | Build Docker images |
-| `make docker-run` | Start postgres and the app via Docker Compose (migrate sidecar is not part of default `up`) |
-| `make migrate-up` | Apply migrations via the migrate sidecar |
-| `make migrate-down` | Roll back one migration |
-| `make migrate-version` | Show current migration version |
-| `make db-shell` | Interactive `psql` against Compose Postgres |
-| `make clean-cover` | Remove generated coverage files |
+| `just lint` | Run pinned golangci-lint `v2.12.2` via `go run` (`.golangci.yml`; no global install) |
+| `just swagger` | Regenerate OpenAPI docs (`docs/external`, `docs/full`) via `go generate` |
+| `just test` | Run all tests |
+| `just test-cover-html` | Full suite with HTML coverage report (`coverage.html`) |
+| `just docker-build` | Build Docker images |
+| `just docker-run` | Start postgres and the app via Docker Compose (migrate sidecar is not part of default `up`) |
+| `just migrate-up` | Apply migrations via the migrate sidecar |
+| `just migrate-down` | Roll back one migration |
+| `just migrate-version` | Show current migration version |
+| `just db-shell` | Interactive `psql` against Compose Postgres |
+| `just clean-cover` | Remove generated coverage files |
 
 ## Local development
 
@@ -50,7 +50,7 @@ docker compose up -d postgres
 go run ./cmd/server
 ```
 
-Defaults expect Postgres at `localhost:5432` with the credentials in [`.env.example`](.env.example). Or run the full stack with `make docker-run`.
+Defaults expect Postgres at `localhost:5432` with the credentials in [`.env.example`](.env.example). Or run the full stack with `just docker-run`.
 
 Local `go run` does not load `.env`. Auth is **on** by default (`AUTH_DISABLED=false`). For unauthenticated local use:
 
@@ -58,7 +58,7 @@ Local `go run` does not load `.env`. Auth is **on** by default (`AUTH_DISABLED=f
 AUTH_DISABLED=true go run ./cmd/server
 ```
 
-Compose defaults `AUTH_DISABLED=true` so `make docker-run` stays usable without keys. Do not ship that value to production.
+Compose defaults `AUTH_DISABLED=true` so `just docker-run` stays usable without keys. Do not ship that value to production.
 
 Swagger UI (after the server is running):
 
@@ -68,7 +68,7 @@ Swagger UI (after the server is running):
 Regenerate docs after changing swag annotations (uses pinned `swag` `v1.16.6` via `go run`, no global install required):
 
 ```bash
-make swagger
+just swagger
 ```
 
 Visibility is controlled by swag tags on each handler:
@@ -78,12 +78,12 @@ Visibility is controlled by swag tags on each handler:
 
 When authentication is enabled, `/swagger/` requires a `consumer`, `subscriber`, or `admin` key, and `/swagger/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
 
-After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
+After editing annotations, re-run `just swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
 
 ### Tests
 
 ```bash
-make test
+just test
 ```
 
 Environment variables (defaults shown):
@@ -168,14 +168,14 @@ A process-local burst-shield **429** includes `Retry-After` only. It does not se
 
 ## Docker
 
-Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). The app image is `gcr.io/distroless/static-debian12:nonroot` and runs as UID/GID 65532. It reads `/server` and `/migrations` (startup migrations still run inside the app and write only to Postgres) and listens on 8080. Default bring-up (`make docker-run` / `docker compose up`) starts postgres and app only — the app migrates on startup. The migrate sidecar uses the `migrate` profile so it is not started alongside the app (that would double-migrate on first boot). The app image has no shell or extra tools; use the sidecar for manual migrations and database inspection (`make migrate-up`, `make db-shell`).
+Compose defines three services: `postgres`, `app` (distroless API server), and `migrate` (migration CLI and `psql`). The app image is `gcr.io/distroless/static-debian12:nonroot` and runs as UID/GID 65532. It reads `/server` and `/migrations` (startup migrations still run inside the app and write only to Postgres) and listens on 8080. Default bring-up (`just docker-run` / `docker compose up`) starts postgres and app only — the app migrates on startup. The migrate sidecar uses the `migrate` profile so it is not started alongside the app (that would double-migrate on first boot). The app image has no shell or extra tools; use the sidecar for manual migrations and database inspection (`just migrate-up`, `just db-shell`).
 
 Optional local overrides: copy [`.env.example`](.env.example) to `.env` (Compose defaults match the example credentials).
 
 ```bash
-make docker-build          # build images
+just docker-build          # build images
 docker compose up -d postgres   # start Postgres only
-make docker-run            # start the stack (foreground)
+just docker-run            # start the stack (foreground)
 docker compose up --build  # build and start in one step
 ```
 
@@ -434,9 +434,9 @@ Targets the Compose `postgres` service (same database the app uses).
 
 ```bash
 docker compose up -d postgres
-make migrate-up
-make migrate-version
-make db-shell
+just migrate-up
+just migrate-version
+just db-shell
 ```
 
 One-off query without opening a shell:
