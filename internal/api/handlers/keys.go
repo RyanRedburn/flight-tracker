@@ -55,7 +55,7 @@ type CreatedAPIKeyResponse struct {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/keys [post]
+//	@Router			/api/internal/keys [post]
 func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -130,7 +130,7 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/keys [get]
+//	@Router			/api/internal/keys [get]
 func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.store.ListAPIKeys(r.Context())
 	if err != nil {
@@ -161,7 +161,7 @@ func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/keys/{id}/revoke [post]
+//	@Router			/api/internal/keys/{id}/revoke [post]
 func (h *KeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if strings.TrimSpace(id) == "" {

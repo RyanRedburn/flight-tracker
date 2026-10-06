@@ -54,7 +54,7 @@ type JobResponse struct {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/jobs/{id} [get]
+//	@Router			/api/internal/jobs/{id} [get]
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := query.ParseJobID(id); err != nil {
@@ -97,7 +97,7 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/jobs [get]
+//	@Router			/api/internal/jobs [get]
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit, err := query.ParseJobsList(r)
 	if err != nil {

@@ -41,7 +41,7 @@ func TestRebuildWeatherStatsCreate(t *testing.T) {
 				},
 			})
 
-			req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/weather-stats", tt.body)
+			req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/weather-stats", tt.body)
 			rec := httptest.NewRecorder()
 			h.Create(rec, req)
 
@@ -80,7 +80,7 @@ func TestRebuildWeatherStatsActiveConflict(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/weather-stats", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/weather-stats", nil)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -112,7 +112,7 @@ func TestRebuildWeatherStatsCreateConflict(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/weather-stats", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/weather-stats", nil)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -133,7 +133,7 @@ func TestRebuildWeatherStatsCreateConflict(t *testing.T) {
 func TestRebuildWeatherStatsRejectsParameters(t *testing.T) {
 	h := NewRebuildWeatherStatsHandler(&storetest.Stub{})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/weather-stats", bytes.NewBufferString(`{"force":true}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/weather-stats", bytes.NewBufferString(`{"force":true}`))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 

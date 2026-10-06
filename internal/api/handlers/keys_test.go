@@ -36,7 +36,7 @@ func TestKeysCreateReturnsPlaintextOnce(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/keys", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -78,7 +78,7 @@ func TestKeysCreateInvalidRole(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/keys", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -101,7 +101,7 @@ func TestKeysCreateRequiresName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewBufferString(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/api/internal/keys", bytes.NewBufferString(tt.body))
 			rec := httptest.NewRecorder()
 			h.Create(rec, req)
 
@@ -135,7 +135,7 @@ func TestKeysListOmitsHash(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/internal/keys", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/internal/keys", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
@@ -182,7 +182,7 @@ func TestKeysRevoke(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/keys/"+testAPIKeyID+"/revoke", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/keys/"+testAPIKeyID+"/revoke", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", testAPIKeyID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -215,7 +215,7 @@ func TestKeysRevokeNotFound(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/keys/missing/revoke", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/keys/missing/revoke", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "missing")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))

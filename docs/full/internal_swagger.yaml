@@ -955,6 +955,694 @@ info:
   title: flight-tracker API
   version: "1.0"
 paths:
+  /api/internal/data-freshness:
+    get:
+      description: Admin read of how fresh each ingested dataset is. last_successful_ingest_at
+        and last_successful_job_id come from the newest completed job of that type.
+        latest_period is the max year/month present for flight_performance and weather_observations,
+        or a snapshot (as_of plus row_count) for weather_stations, countries, regions,
+        airports, and airport_mct. Timestamps and periods are null when that dataset
+        has never been ingested and, for snapshots, has no rows. weather_stations
+        row_count is the station catalog; that snapshot is also present when airport_weather_stations
+        has rows.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DataFreshnessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Dataset freshness
+      tags:
+      - freshness
+      - internal
+  /api/internal/ingest/airports:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of airports reference data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue airports reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/countries:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of countries reference data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue countries reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/flight-performance:
+    post:
+      consumes:
+      - application/json
+      description: Queues one import job per month in the requested range. Omit end_year/end_month
+        for a single month. Set force=true to re-import months that already have data.
+      parameters:
+      - description: Ingest range
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.IngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue flight performance data ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/mct:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of airport minimum connection times from https://minimumconnectiontime.com.
+        An empty body is treated as {"force":false}. Set force=true to replace existing
+        data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue airport MCT ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/regions:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of regions reference data.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue regions reference data ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/weather:
+    post:
+      consumes:
+      - application/json
+      description: Queues one import job per month in the requested range. Provide
+        stations explicitly, or omit stations to resolve from airport_weather_stations
+        (ingest weather-stations first). Omit end_year/end_month for a single month.
+        Set force=true to re-import months that already have data.
+      parameters:
+      - description: Ingest range and optional stations
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.WeatherIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.WeatherIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue weather observation data ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/ingest/weather-stations:
+    post:
+      consumes:
+      - application/json
+      description: Queues an import of the US IEM ASOS station catalog and a BTS airport
+        mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA,
+        then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty
+        body is treated as {"force":false}. Set force=true to replace existing mapping
+        tables.
+      parameters:
+      - description: Optional force flag
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/model.ForceIngestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue weather station mapping ingest
+      tags:
+      - ingest
+      - internal
+  /api/internal/jobs:
+    get:
+      description: Returns the most recent background jobs, newest first.
+      parameters:
+      - description: Max jobs to return (1-500, default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.JobResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List jobs
+      tags:
+      - jobs
+      - internal
+  /api/internal/jobs/{id}:
+    get:
+      description: Returns status and details for a background job. Flight-performance
+        jobs include year and month. Weather jobs include year, month, and stations.
+      parameters:
+      - description: Job ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.JobResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get job by ID
+      tags:
+      - jobs
+      - internal
+  /api/internal/keys:
+    get:
+      description: Returns all API keys, including revoked keys. Hashes and plaintext
+        secrets are never included.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.APIKeyResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List API keys
+      tags:
+      - keys
+      - internal
+    post:
+      consumes:
+      - application/json
+      description: 'Creates a hashed API key. name is required and must be at most
+        100 characters. The plaintext key is returned once; subsequent authentication
+        uses Authorization: Bearer or X-API-Key.'
+      parameters:
+      - description: Role and name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreatedAPIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create API key
+      tags:
+      - keys
+      - internal
+  /api/internal/keys/{id}/revoke:
+    post:
+      description: Revokes an API key. Already-revoked keys return the current metadata.
+      parameters:
+      - description: API key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Revoke API key
+      tags:
+      - keys
+      - internal
+  /api/internal/rebuild/travel-windows:
+    post:
+      description: Queues a full replace of route_travel_window_scopes and route_travel_window_buckets
+        from flight_performance. The body must be empty. Returns 409 when a rebuild
+        job is already pending or running.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.RebuildTravelWindowsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.RebuildTravelWindowsConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue travel-window rollup rebuild
+      tags:
+      - rebuild
+      - internal
+  /api/internal/rebuild/weather-stats:
+    post:
+      description: Queues a full replace of route weather-category rollups from flight
+        performance and weather observations. The body must be empty. Returns 409
+        when a rebuild job is already pending or running.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.RebuildWeatherStatsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.RebuildWeatherStatsConflictResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Queue route weather-stats rollup rebuild
+      tags:
+      - rebuild
+      - internal
   /api/v1/carriers/stats:
     get:
       description: Aggregated on-time, delay, cancellation, and diversion stats for
@@ -1486,694 +2174,6 @@ paths:
       summary: Liveness probe
       tags:
       - health
-      - internal
-  /internal/data-freshness:
-    get:
-      description: Admin read of how fresh each ingested dataset is. last_successful_ingest_at
-        and last_successful_job_id come from the newest completed job of that type.
-        latest_period is the max year/month present for flight_performance and weather_observations,
-        or a snapshot (as_of plus row_count) for weather_stations, countries, regions,
-        airports, and airport_mct. Timestamps and periods are null when that dataset
-        has never been ingested and, for snapshots, has no rows. weather_stations
-        row_count is the station catalog; that snapshot is also present when airport_weather_stations
-        has rows.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.DataFreshnessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Dataset freshness
-      tags:
-      - freshness
-      - internal
-  /internal/ingest/airports:
-    post:
-      consumes:
-      - application/json
-      description: Queues an import of airports reference data.
-      parameters:
-      - description: Optional force flag
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/model.ForceIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue airports reference data ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/countries:
-    post:
-      consumes:
-      - application/json
-      description: Queues an import of countries reference data.
-      parameters:
-      - description: Optional force flag
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/model.ForceIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue countries reference data ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/flight-performance:
-    post:
-      consumes:
-      - application/json
-      description: Queues one import job per month in the requested range. Omit end_year/end_month
-        for a single month. Set force=true to re-import months that already have data.
-      parameters:
-      - description: Ingest range
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/model.IngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.IngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue flight performance data ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/mct:
-    post:
-      consumes:
-      - application/json
-      description: Queues an import of airport minimum connection times from https://minimumconnectiontime.com.
-        An empty body is treated as {"force":false}. Set force=true to replace existing
-        data.
-      parameters:
-      - description: Optional force flag
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/model.ForceIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue airport MCT ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/regions:
-    post:
-      consumes:
-      - application/json
-      description: Queues an import of regions reference data.
-      parameters:
-      - description: Optional force flag
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/model.ForceIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue regions reference data ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/weather:
-    post:
-      consumes:
-      - application/json
-      description: Queues one import job per month in the requested range. Provide
-        stations explicitly, or omit stations to resolve from airport_weather_stations
-        (ingest weather-stations first). Omit end_year/end_month for a single month.
-        Set force=true to re-import months that already have data.
-      parameters:
-      - description: Ingest range and optional stations
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/model.WeatherIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.WeatherIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.MonthIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue weather observation data ingest
-      tags:
-      - ingest
-      - internal
-  /internal/ingest/weather-stations:
-    post:
-      consumes:
-      - application/json
-      description: Queues an import of the US IEM ASOS station catalog and a BTS airport
-        mapping. Mapping matches BTS origin/dest to IEM sids using OurAirports IATA,
-        then FAA local_code, then ICAO/ident. Unmatched airports are stored. An empty
-        body is treated as {"force":false}. Set force=true to replace existing mapping
-        tables.
-      parameters:
-      - description: Optional force flag
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/model.ForceIngestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.ReferenceIngestConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue weather station mapping ingest
-      tags:
-      - ingest
-      - internal
-  /internal/jobs:
-    get:
-      description: Returns the most recent background jobs, newest first.
-      parameters:
-      - description: Max jobs to return (1-500, default 50)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.JobResponse'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: List jobs
-      tags:
-      - jobs
-      - internal
-  /internal/jobs/{id}:
-    get:
-      description: Returns status and details for a background job. Flight-performance
-        jobs include year and month. Weather jobs include year, month, and stations.
-      parameters:
-      - description: Job ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.JobResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Get job by ID
-      tags:
-      - jobs
-      - internal
-  /internal/keys:
-    get:
-      description: Returns all API keys, including revoked keys. Hashes and plaintext
-        secrets are never included.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.APIKeyResponse'
-            type: array
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: List API keys
-      tags:
-      - keys
-      - internal
-    post:
-      consumes:
-      - application/json
-      description: 'Creates a hashed API key. name is required and must be at most
-        100 characters. The plaintext key is returned once; subsequent authentication
-        uses Authorization: Bearer or X-API-Key.'
-      parameters:
-      - description: Role and name
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/model.CreateAPIKeyRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreatedAPIKeyResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Create API key
-      tags:
-      - keys
-      - internal
-  /internal/keys/{id}/revoke:
-    post:
-      description: Revokes an API key. Already-revoked keys return the current metadata.
-      parameters:
-      - description: API key ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.APIKeyResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Revoke API key
-      tags:
-      - keys
-      - internal
-  /internal/rebuild/travel-windows:
-    post:
-      description: Queues a full replace of route_travel_window_scopes and route_travel_window_buckets
-        from flight_performance. The body must be empty. Returns 409 when a rebuild
-        job is already pending or running.
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.RebuildTravelWindowsResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.RebuildTravelWindowsConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue travel-window rollup rebuild
-      tags:
-      - rebuild
-      - internal
-  /internal/rebuild/weather-stats:
-    post:
-      description: Queues a full replace of route weather-category rollups from flight
-        performance and weather observations. The body must be empty. Returns 409
-        when a rebuild job is already pending or running.
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.RebuildWeatherStatsResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/handlers.RebuildWeatherStatsConflictResponse'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - ApiKeyAuth: []
-      summary: Queue route weather-stats rollup rebuild
-      tags:
-      - rebuild
       - internal
   /ready:
     get:

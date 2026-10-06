@@ -9,7 +9,7 @@ Also follow [development-practices](../development-practices/SKILL.md). After an
 
 ## Layers
 
-1. **Route** — register consumer routes in `internal/api/server.go` under `/api/v1`. Register admin routes (ingest, jobs, freshness, rebuilds, keys) under `/internal` with no version segment. Health and `/db/version` stay top-level.
+1. **Route** — register consumer routes in `internal/api/server.go` under `/api/v1`. Register admin routes (ingest, jobs, freshness, rebuilds, keys) under `/api/internal` with no version segment. Health and `/db/version` stay top-level.
 2. **Parse** — query strings in `internal/api/query` (`query` struct tags + `BindQuery` + `Validate`). JSON bodies on `internal/model` with `Validate()`.
 3. **Handler** — thin: parse → store call → `writeJSON`. No SQL, no remote downloads.
 4. **Swagger** — comment annotations on the handler. Visibility is the swag tag list.

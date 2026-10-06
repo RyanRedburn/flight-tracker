@@ -19,7 +19,7 @@ func TestRequestLogExplicitStatus(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/ingest/flight-performance", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/ingest/flight-performance", nil)
 	rec := httptest.NewRecorder()
 	mw(next).ServeHTTP(rec, req)
 
@@ -30,7 +30,7 @@ func TestRequestLogExplicitStatus(t *testing.T) {
 	logLine := buf.String()
 	for _, want := range []string{
 		`"method":"POST"`,
-		`"path":"/internal/ingest/flight-performance"`,
+		`"path":"/api/internal/ingest/flight-performance"`,
 		`"status":201`,
 		`"msg":"request"`,
 	} {

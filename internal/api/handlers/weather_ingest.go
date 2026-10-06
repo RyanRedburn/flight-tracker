@@ -74,7 +74,7 @@ type WeatherIngestResponse struct {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/weather [post]
+//	@Router			/api/internal/ingest/weather [post]
 func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.WeatherIngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

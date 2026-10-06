@@ -70,7 +70,7 @@ func newRouter(
 		))
 	})
 
-	r.Route("/internal", func(r chi.Router) {
+	r.Route("/api/internal", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceIngest))
 			r.Post("/ingest/flight-performance", ingestHandler.Create)

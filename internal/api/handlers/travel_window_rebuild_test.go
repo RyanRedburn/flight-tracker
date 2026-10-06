@@ -41,7 +41,7 @@ func TestRebuildTravelWindowsCreate(t *testing.T) {
 				},
 			})
 
-			req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/travel-windows", tt.body)
+			req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/travel-windows", tt.body)
 			rec := httptest.NewRecorder()
 			h.Create(rec, req)
 
@@ -80,7 +80,7 @@ func TestRebuildTravelWindowsActiveConflict(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/travel-windows", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/travel-windows", nil)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -112,7 +112,7 @@ func TestRebuildTravelWindowsCreateConflict(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/travel-windows", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/travel-windows", nil)
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -133,7 +133,7 @@ func TestRebuildTravelWindowsCreateConflict(t *testing.T) {
 func TestRebuildTravelWindowsRejectsParameters(t *testing.T) {
 	h := NewRebuildTravelWindowsHandler(&storetest.Stub{})
 
-	req := httptest.NewRequest(http.MethodPost, "/internal/rebuild/travel-windows", bytes.NewBufferString(`{"force":true}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/rebuild/travel-windows", bytes.NewBufferString(`{"force":true}`))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 

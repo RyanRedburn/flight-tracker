@@ -41,7 +41,7 @@ type ReferenceIngestResponse struct {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/countries [post]
+//	@Router			/api/internal/ingest/countries [post]
 func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceCountries)
 }
@@ -62,7 +62,7 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/regions [post]
+//	@Router			/api/internal/ingest/regions [post]
 func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceRegions)
 }
@@ -83,7 +83,7 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/airports [post]
+//	@Router			/api/internal/ingest/airports [post]
 func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
 	h.createReference(w, r, store.ReferenceAirports)
 }
@@ -104,7 +104,7 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/mct [post]
+//	@Router			/api/internal/ingest/mct [post]
 func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, model.JobTypeImportAirportMCT, string(store.ReferenceAirportMCT), func(ctx context.Context) (bool, error) {
 		return h.store.HasReferenceData(ctx, store.ReferenceAirportMCT)
@@ -127,7 +127,7 @@ func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/internal/ingest/weather-stations [post]
+//	@Router			/api/internal/ingest/weather-stations [post]
 func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r *http.Request) {
 	h.create(w, r, model.JobTypeImportWeatherStations, datasetWeatherStations, h.store.HasWeatherStationsData)
 }
