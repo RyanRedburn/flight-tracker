@@ -43,11 +43,11 @@ type CreatedAPIKeyResponse struct {
 // Create issues a new API key. The plaintext secret is returned only in this response.
 //
 //	@Summary		Create API key
-//	@Description	Creates a hashed API key. The plaintext key is returned once; subsequent authentication uses Authorization: Bearer or X-API-Key.
+//	@Description	Creates a hashed API key. name is required and must be at most 100 characters. The plaintext key is returned once; subsequent authentication uses Authorization: Bearer or X-API-Key.
 //	@Tags			keys,internal
 //	@Accept			json
 //	@Produce		json
-//	@Param			body	body		model.CreateAPIKeyRequest	true	"Role and optional name"
+//	@Param			body	body		model.CreateAPIKeyRequest	true	"Role and name"
 //	@Success		201		{object}	CreatedAPIKeyResponse
 //	@Failure		400		{object}	ErrorResponse
 //	@Failure		401		{object}	ErrorResponse
@@ -55,7 +55,7 @@ type CreatedAPIKeyResponse struct {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/keys [post]
+//	@Router			/api/internal/keys [post]
 func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -130,7 +130,7 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/keys [get]
+//	@Router			/api/internal/keys [get]
 func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.store.ListAPIKeys(r.Context())
 	if err != nil {
@@ -161,7 +161,7 @@ func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/keys/{id}/revoke [post]
+//	@Router			/api/internal/keys/{id}/revoke [post]
 func (h *KeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if strings.TrimSpace(id) == "" {

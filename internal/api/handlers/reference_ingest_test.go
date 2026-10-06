@@ -60,15 +60,15 @@ func postReferenceIngest(t *testing.T, h *ReferenceIngestHandler, path string, b
 	rec := httptest.NewRecorder()
 
 	switch path {
-	case "/api/v1/ingest/countries":
+	case "/api/internal/ingest/countries":
 		h.CreateCountries(rec, req)
-	case "/api/v1/ingest/regions":
+	case "/api/internal/ingest/regions":
 		h.CreateRegions(rec, req)
-	case "/api/v1/ingest/airports":
+	case "/api/internal/ingest/airports":
 		h.CreateAirports(rec, req)
-	case "/api/v1/ingest/mct":
+	case "/api/internal/ingest/mct":
 		h.CreateAirportMCT(rec, req)
-	case "/api/v1/ingest/weather-stations":
+	case "/api/internal/ingest/weather-stations":
 		h.CreateWeatherStations(rec, req)
 	default:
 		t.Fatalf("unexpected path %q", path)
@@ -80,7 +80,7 @@ func postReferenceIngest(t *testing.T, h *ReferenceIngestHandler, path string, b
 func TestReferenceIngestCreateCountries(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{})
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -109,8 +109,8 @@ func TestReferenceIngestCreateRegionsAndAirports(t *testing.T) {
 		path    string
 		jobType model.JobType
 	}{
-		{"/api/v1/ingest/regions", model.JobTypeImportRegions},
-		{"/api/v1/ingest/airports", model.JobTypeImportAirports},
+		{"/api/internal/ingest/regions", model.JobTypeImportRegions},
+		{"/api/internal/ingest/airports", model.JobTypeImportAirports},
 	}
 
 	for _, tt := range tests {
@@ -141,7 +141,7 @@ func TestReferenceIngestActiveJobConflict(t *testing.T) {
 		},
 	})
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{})
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
@@ -167,7 +167,7 @@ func TestReferenceIngestExistingDataConflict(t *testing.T) {
 		},
 	})
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{
 		jsonForce: false,
 	})
 
@@ -188,7 +188,7 @@ func TestReferenceIngestExistingDataConflict(t *testing.T) {
 func TestReferenceIngestForceReimport(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{
 		jsonForce: true,
 	})
 
@@ -200,7 +200,7 @@ func TestReferenceIngestForceReimport(t *testing.T) {
 func TestReferenceIngestInvalidJSON(t *testing.T) {
 	h := NewReferenceIngestHandler(&storetest.Stub{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/countries", bytes.NewBufferString("{"))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/ingest/countries", bytes.NewBufferString("{"))
 	rec := httptest.NewRecorder()
 	h.CreateCountries(rec, req)
 
@@ -212,7 +212,7 @@ func TestReferenceIngestInvalidJSON(t *testing.T) {
 func TestReferenceIngestEmptyBody(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", nil)
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", nil)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 for empty body; body = %s", rec.Code, rec.Body.String())
@@ -223,14 +223,14 @@ func TestReferenceIngestCompletedJobDoesNotBlock(t *testing.T) {
 	// Scenario: ActiveIngestJob reports no active job (completed jobs do not block).
 	h := NewReferenceIngestHandler(referenceSuccessStub())
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{})
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 after completed job; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
-const pathWeatherStations = "/api/v1/ingest/weather-stations"
+const pathWeatherStations = "/api/internal/ingest/weather-stations"
 
 func TestWeatherStationsIngestCreate(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())
@@ -311,7 +311,7 @@ func TestReferenceIngestCreateJobActiveConflict(t *testing.T) {
 
 	h := NewReferenceIngestHandler(st)
 
-	rec := postReferenceIngest(t, h, "/api/v1/ingest/countries", map[string]any{})
+	rec := postReferenceIngest(t, h, "/api/internal/ingest/countries", map[string]any{})
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
@@ -331,7 +331,7 @@ func TestReferenceIngestCreateJobActiveConflict(t *testing.T) {
 	}
 }
 
-const pathAirportMCT = "/api/v1/ingest/mct"
+const pathAirportMCT = "/api/internal/ingest/mct"
 
 func TestAirportMCTIngestCreate(t *testing.T) {
 	h := NewReferenceIngestHandler(referenceSuccessStub())

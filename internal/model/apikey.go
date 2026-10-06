@@ -29,6 +29,7 @@ const (
 var (
 	ErrInvalidAPIKeyFormat = errors.New("invalid API key format")
 	ErrInvalidAPIKeyRole   = errors.New("role must be consumer, subscriber, or admin")
+	errAPIKeyNameRequired  = errors.New("name is required")
 	errAPIKeyNameTooLong   = errors.New("name must be at most 100 characters")
 )
 
@@ -69,8 +70,8 @@ func RolePermits(have APIKeyRole, allowed []APIKeyRole) bool {
 }
 
 type CreateAPIKeyRequest struct {
-	Role string `json:"role"`
-	Name string `json:"name"`
+	Role string `json:"role" validate:"required"`
+	Name string `json:"name" validate:"required,max=100"`
 }
 
 func (r CreateAPIKeyRequest) Validate() error {
@@ -78,7 +79,12 @@ func (r CreateAPIKeyRequest) Validate() error {
 		return ErrInvalidAPIKeyRole
 	}
 
-	if len(strings.TrimSpace(r.Name)) > 100 {
+	name := strings.TrimSpace(r.Name)
+	if name == "" {
+		return errAPIKeyNameRequired
+	}
+
+	if len(name) > 100 {
 		return errAPIKeyNameTooLong
 	}
 

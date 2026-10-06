@@ -57,7 +57,7 @@ func NewFreshnessHandler(s store.Store) *FreshnessHandler {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/data-freshness [get]
+//	@Router			/api/internal/data-freshness [get]
 func (h *FreshnessHandler) Get(w http.ResponseWriter, r *http.Request) {
 	freshness, err := h.store.DataFreshness(r.Context())
 	if err != nil {

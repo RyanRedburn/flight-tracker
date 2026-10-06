@@ -21,12 +21,13 @@ import (
 const (
 	pathHealth               = "/health"
 	pathDBVersion            = "/db/version"
-	pathIngestCountries      = "/api/v1/ingest/countries"
+	pathIngestCountries      = "/api/internal/ingest/countries"
 	pathCarrierStatsUA       = "/api/v1/carriers/stats?carrier=UA"
-	pathSwaggerInternalHTML  = "/swagger/internal/index.html"
-	pathDataFreshness        = "/api/v1/data-freshness"
-	pathRebuildTravelWindows = "/api/v1/rebuild/travel-windows"
-	pathRebuildWeatherStats  = "/api/v1/rebuild/weather-stats"
+	pathDocsIndexHTML        = "/docs/index.html"
+	pathDocsInternalHTML     = "/docs/internal/index.html"
+	pathDataFreshness        = "/api/internal/data-freshness"
+	pathRebuildTravelWindows = "/api/internal/rebuild/travel-windows"
+	pathRebuildWeatherStats  = "/api/internal/rebuild/weather-stats"
 )
 
 func testLogger() *slog.Logger {
@@ -134,34 +135,38 @@ func TestNewRouterRoutes(t *testing.T) {
 	handler := newRouter(routerStub(), testLogger(), 24, nil, Security{Disabled: true})
 
 	tests := []struct {
-		method     string
-		path       string
-		wantStatus int
+		method       string
+		path         string
+		wantStatus   int
+		wantLocation string
 	}{
-		{http.MethodGet, pathHealth, http.StatusOK},
-		{http.MethodGet, "/ready", http.StatusOK},
-		{http.MethodGet, pathDBVersion, http.StatusOK},
-		{http.MethodGet, "/api/v1/jobs", http.StatusOK},
-		{http.MethodGet, pathDataFreshness, http.StatusOK},
-		{http.MethodPost, pathRebuildTravelWindows, http.StatusCreated},
-		{http.MethodPost, pathRebuildWeatherStats, http.StatusCreated},
-		{http.MethodPost, pathIngestCountries, http.StatusCreated},
-		{http.MethodPost, "/api/v1/ingest/regions", http.StatusCreated},
-		{http.MethodPost, "/api/v1/ingest/airports", http.StatusCreated},
-		{http.MethodPost, "/api/v1/ingest/mct", http.StatusCreated},
-		{http.MethodPost, "/api/v1/ingest/weather-stations", http.StatusCreated},
-		{http.MethodPost, "/api/v1/ingest/weather", http.StatusBadRequest},
-		{http.MethodGet, "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
-		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", http.StatusOK},
-		{http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700", http.StatusOK},
-		{http.MethodPost, "/api/v1/itineraries/outlook", http.StatusBadRequest},
-		{http.MethodGet, "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", http.StatusOK},
-		{http.MethodGet, "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", http.StatusOK},
-		{http.MethodGet, pathCarrierStatsUA, http.StatusOK},
-		{http.MethodGet, "/api/v1/flights", http.StatusNotFound},
-		{http.MethodGet, "/missing", http.StatusNotFound},
-		{http.MethodGet, "/swagger/index.html", http.StatusOK},
-		{http.MethodGet, pathSwaggerInternalHTML, http.StatusOK},
+		{method: http.MethodGet, path: pathHealth, wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/ready", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: pathDBVersion, wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/api/internal/jobs", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: pathDataFreshness, wantStatus: http.StatusOK},
+		{method: http.MethodPost, path: pathRebuildTravelWindows, wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: pathRebuildWeatherStats, wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: pathIngestCountries, wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: "/api/internal/ingest/regions", wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: "/api/internal/ingest/airports", wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: "/api/internal/ingest/mct", wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: "/api/internal/ingest/weather-stations", wantStatus: http.StatusCreated},
+		{method: http.MethodPost, path: "/api/internal/ingest/flight-performance", wantStatus: http.StatusBadRequest},
+		{method: http.MethodPost, path: "/api/internal/ingest/weather", wantStatus: http.StatusBadRequest},
+		{method: http.MethodGet, path: "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&date=2026-10-06&dep_time=0700", wantStatus: http.StatusOK},
+		{method: http.MethodPost, path: "/api/v1/itineraries/outlook", wantStatus: http.StatusBadRequest},
+		{method: http.MethodGet, path: "/api/v1/routes/travel-windows?origin=ORD&dest=LAX", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2026-01-01&end_date=2026-01-31", wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: pathCarrierStatsUA, wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/api/v1/flights", wantStatus: http.StatusNotFound},
+		{method: http.MethodGet, path: "/missing", wantStatus: http.StatusNotFound},
+		{method: http.MethodGet, path: "/docs/", wantStatus: http.StatusMovedPermanently, wantLocation: pathDocsIndexHTML},
+		{method: http.MethodGet, path: pathDocsIndexHTML, wantStatus: http.StatusOK},
+		{method: http.MethodGet, path: "/docs/internal/", wantStatus: http.StatusMovedPermanently, wantLocation: "/docs/internal/index.html"},
+		{method: http.MethodGet, path: pathDocsInternalHTML, wantStatus: http.StatusOK},
 	}
 
 	for _, tt := range tests {
@@ -173,6 +178,10 @@ func TestNewRouterRoutes(t *testing.T) {
 			if rec.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
+
+			if tt.wantLocation != "" && rec.Header().Get("Location") != tt.wantLocation {
+				t.Fatalf("location = %q, want %q", rec.Header().Get("Location"), tt.wantLocation)
+			}
 		})
 	}
 }
@@ -180,7 +189,7 @@ func TestNewRouterRoutes(t *testing.T) {
 func TestSwaggerSpecSurfaces(t *testing.T) {
 	handler := newRouter(routerStub(), testLogger(), 24, nil, Security{Disabled: true})
 
-	external := fetchSwaggerPaths(t, handler, "/swagger/doc.json")
+	external := fetchSwaggerPaths(t, handler, "/docs/doc.json")
 	if _, ok := external["/api/v1/routes/stats"]; !ok {
 		t.Fatal("external spec missing /api/v1/routes/stats")
 	}
@@ -201,44 +210,44 @@ func TestSwaggerSpecSurfaces(t *testing.T) {
 		t.Fatal("external spec missing /api/v1/carriers/stats")
 	}
 
-	if _, ok := external["/api/v1/ingest"]; ok {
-		t.Fatal("external spec must not include /api/v1/ingest")
+	if _, ok := external["/api/internal/ingest/flight-performance"]; ok {
+		t.Fatal("external spec must not include /api/internal/ingest/flight-performance")
 	}
 
-	if _, ok := external["/api/v1/ingest/weather-stations"]; ok {
-		t.Fatal("external spec must not include /api/v1/ingest/weather-stations")
+	if _, ok := external["/api/internal/ingest/weather-stations"]; ok {
+		t.Fatal("external spec must not include /api/internal/ingest/weather-stations")
 	}
 
-	if _, ok := external["/api/v1/ingest/mct"]; ok {
-		t.Fatal("external spec must not include /api/v1/ingest/mct")
+	if _, ok := external["/api/internal/ingest/mct"]; ok {
+		t.Fatal("external spec must not include /api/internal/ingest/mct")
 	}
 
 	if _, ok := external[pathHealth]; ok {
 		t.Fatal("external spec must not include /health")
 	}
 
-	if _, ok := external["/api/v1/keys"]; ok {
-		t.Fatal("external spec must not include /api/v1/keys")
+	if _, ok := external["/api/internal/keys"]; ok {
+		t.Fatal("external spec must not include /api/internal/keys")
 	}
 
 	if _, ok := external[pathDataFreshness]; ok {
-		t.Fatal("external spec must not include /api/v1/data-freshness")
+		t.Fatal("external spec must not include /api/internal/data-freshness")
 	}
 
 	if _, ok := external[pathRebuildTravelWindows]; ok {
-		t.Fatal("external spec must not include /api/v1/rebuild/travel-windows")
+		t.Fatal("external spec must not include /api/internal/rebuild/travel-windows")
 	}
 
-	internal := fetchSwaggerPaths(t, handler, "/swagger/internal/doc.json")
+	internal := fetchSwaggerPaths(t, handler, "/docs/internal/doc.json")
 	for _, path := range []string{
 		pathHealth,
-		"/api/v1/ingest",
-		"/api/v1/ingest/mct",
-		"/api/v1/ingest/weather-stations",
-		"/api/v1/jobs",
+		"/api/internal/ingest/flight-performance",
+		"/api/internal/ingest/mct",
+		"/api/internal/ingest/weather-stations",
+		"/api/internal/jobs",
 		pathDataFreshness,
 		pathRebuildTravelWindows,
-		"/api/v1/keys",
+		"/api/internal/keys",
 		"/api/v1/routes/stats",
 		"/api/v1/routes/outlook",
 		"/api/v1/itineraries/outlook",
@@ -354,10 +363,10 @@ func TestNewRouterAuthEnabled(t *testing.T) {
 		{name: "rebuild consumer forbidden", stub: consumerStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: consumerPlain, wantStatus: http.StatusForbidden},
 		{name: "rebuild subscriber forbidden", stub: subscriberStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: subscriberPlain, wantStatus: http.StatusForbidden},
 		{name: "rebuild admin", stub: adminStub, method: http.MethodPost, path: pathRebuildTravelWindows, key: adminPlain, wantStatus: http.StatusCreated},
-		{name: "external swagger consumer", stub: consumerStub, method: http.MethodGet, path: "/swagger/index.html", key: consumerPlain, wantStatus: http.StatusOK},
-		{name: "internal swagger consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: consumerPlain, wantStatus: http.StatusForbidden},
-		{name: "internal swagger admin", stub: adminStub, method: http.MethodGet, path: pathSwaggerInternalHTML, key: adminPlain, wantStatus: http.StatusOK},
-		{name: "keys admin", stub: adminStub, method: http.MethodGet, path: "/api/v1/keys", key: adminPlain, wantStatus: http.StatusOK},
+		{name: "external swagger consumer", stub: consumerStub, method: http.MethodGet, path: pathDocsIndexHTML, key: consumerPlain, wantStatus: http.StatusOK},
+		{name: "internal swagger consumer forbidden", stub: consumerStub, method: http.MethodGet, path: pathDocsInternalHTML, key: consumerPlain, wantStatus: http.StatusForbidden},
+		{name: "internal swagger admin", stub: adminStub, method: http.MethodGet, path: pathDocsInternalHTML, key: adminPlain, wantStatus: http.StatusOK},
+		{name: "keys admin", stub: adminStub, method: http.MethodGet, path: "/api/internal/keys", key: adminPlain, wantStatus: http.StatusOK},
 	}
 
 	for _, tt := range tests {

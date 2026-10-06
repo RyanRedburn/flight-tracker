@@ -48,7 +48,7 @@ func postWeatherIngest(t *testing.T, h *WeatherIngestHandler, body any) *httptes
 		t.Fatalf("Marshal() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest/weather", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, "/api/internal/ingest/weather", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()

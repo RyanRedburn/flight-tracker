@@ -58,8 +58,8 @@ Compose defaults `AUTH_DISABLED=true` so `make docker-run` stays usable without 
 
 Swagger UI (after the server is running):
 
-- External (user-facing): [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html)
-- Internal (full API): [http://localhost:8080/swagger/internal/index.html](http://localhost:8080/swagger/internal/index.html)
+- External (user-facing): [http://localhost:8080/docs/index.html](http://localhost:8080/docs/index.html)
+- Internal (full API): [http://localhost:8080/docs/internal/index.html](http://localhost:8080/docs/internal/index.html)
 
 Regenerate docs after changing swag annotations (uses pinned `swag` `v1.16.6` via `go run`, no global install required):
 
@@ -69,10 +69,10 @@ make swagger
 
 Visibility is controlled by swag tags on each handler:
 
-- `external` — user-facing `/swagger/` (route and carrier stats, travel windows, weather stats, route outlook, itinerary outlook)
-- `internal` — operator/admin endpoints; appear only under `/swagger/internal/` (ingest, jobs, data freshness, rebuilds, keys)
+- `external` — user-facing `/docs/` (route and carrier stats, travel windows, weather stats, route outlook, itinerary outlook)
+- `internal` — operator/admin endpoints; appear only under `/docs/internal/` (ingest, jobs, data freshness, rebuilds, keys)
 
-When authentication is enabled, `/swagger/` requires a `consumer`, `subscriber`, or `admin` key, and `/swagger/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
+When authentication is enabled, `/docs/` requires a `consumer`, `subscriber`, or `admin` key, and `/docs/internal/` requires `admin`. `/health` and `/ready` stay unauthenticated.
 
 After editing annotations, re-run `make swagger` (or `go generate ./cmd/server/...`) and commit the updated files under `docs/`. CI runs the same regenerate step and fails if `docs/` drifts.
 
@@ -126,16 +126,16 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 
 | Role | Access |
 | --- | --- |
-| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`) and `/swagger/` |
+| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`) and `/docs/` |
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
-| `admin` | Everything: ingest, jobs, data freshness, `/db/version`, `/swagger/internal/`, key management, and consumer surfaces |
+| `admin` | Everything: `/api/internal/*` (ingest, jobs, data freshness, rebuilds, keys), `/db/version`, `/docs/internal/`, and consumer surfaces |
 
 `/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid/revoked key → **401**, or **429** if the auth-fail IP bucket is exhausted; wrong role → **403**).
 
 **Bootstrap.** Auth enabled with an empty `api_keys` table refuses to start (not fail-open). Either:
 
 1. Set `AUTH_BOOTSTRAP_ADMIN_KEY` to a generated `ftk_…` value for the first process start, then unset it, or
-2. Run once with `AUTH_DISABLED=true`, `POST /api/v1/keys` as below, then restart with auth enabled.
+2. Run once with `AUTH_DISABLED=true`, `POST /api/internal/keys` as below, then restart with auth enabled.
 
 ```bash
 python3 -c "import secrets; print('ftk_' + secrets.token_hex(4) + '_' + secrets.token_hex(16))"
@@ -181,6 +181,8 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 
 ## API examples
 
+Consumer reads stay on `/api/v1`. Operator routes (ingest, jobs, freshness, rebuilds, and keys) are unversioned under `/api/internal`.
+
 When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. Date and flight-number filters that match nothing still return **200** with zero counts. Route outlook is also **200** when that carrier has flown the route but the weekday and departure window are empty: `sample_reason` is `empty_sample`, `insufficient_sample` is false, `confidence` is `unknown`, and probability and delay fields are null. A smaller non-empty outlook sample is `sample_reason` `insufficient_sample` (the bool is true, `confidence` is `low`). A valid itinerary body returns **200**. A leg with no history has a null outlook and `error`; a seen leg carries the same outlook `sample_reason`. Field rules are in Swagger.
 
 Outlook and itinerary share connection status and confidence. Travel-window reliability is seasonal on-time only; a thin bucket stays `unknown` rather than `unreliable`.
@@ -196,48 +198,48 @@ curl http://localhost:8080/ready
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/db/version
 
 # Queue one month of flight-performance data
-curl -X POST http://localhost:8080/api/v1/ingest \
+curl -X POST http://localhost:8080/api/internal/ingest/flight-performance \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":4}'
 
 # Queue a month range and replace months that already have data
-curl -X POST http://localhost:8080/api/v1/ingest \
+curl -X POST http://localhost:8080/api/internal/ingest/flight-performance \
   -H "Content-Type: application/json" \
   -d '{"start_year":2026,"start_month":1,"end_year":2026,"end_month":4,"force":true}'
 
 # Queue countries reference data
-curl -X POST http://localhost:8080/api/v1/ingest/countries -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8080/api/internal/ingest/countries -H "Content-Type: application/json" -d '{}'
 
 # Queue regions reference data
-curl -X POST http://localhost:8080/api/v1/ingest/regions -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8080/api/internal/ingest/regions -H "Content-Type: application/json" -d '{}'
 
 # Queue airports reference data
-curl -X POST http://localhost:8080/api/v1/ingest/airports -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8080/api/internal/ingest/airports -H "Content-Type: application/json" -d '{}'
 
 # Queue airport minimum connection times
-curl -X POST http://localhost:8080/api/v1/ingest/mct -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8080/api/internal/ingest/mct -H "Content-Type: application/json" -d '{}'
 
 # Queue the weather-station catalog and airport mapping
-curl -X POST http://localhost:8080/api/v1/ingest/weather-stations -H "Content-Type: application/json" -d '{}'
+curl -X POST http://localhost:8080/api/internal/ingest/weather-stations -H "Content-Type: application/json" -d '{}'
 
 # Queue one month of weather observations, resolving stations from that mapping
-curl -X POST http://localhost:8080/api/v1/ingest/weather \
+curl -X POST http://localhost:8080/api/internal/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1}'
 
 # Or pass an explicit station list
-curl -X POST http://localhost:8080/api/v1/ingest/weather \
+curl -X POST http://localhost:8080/api/internal/ingest/weather \
   -H "Content-Type: application/json" \
   -d '{"start_year":2024,"start_month":1,"stations":["ORD","JFK","ATL"]}'
 
 # Job status
-curl http://localhost:8080/api/v1/jobs/<job-id>
+curl http://localhost:8080/api/internal/jobs/<job-id>
 
 # Recent jobs
-curl http://localhost:8080/api/v1/jobs
+curl http://localhost:8080/api/internal/jobs
 
 # Dataset freshness (admin)
-curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/data-freshness
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/data-freshness
 
 # Route performance stats
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
@@ -257,25 +259,25 @@ curl "http://localhost:8080/api/v1/routes/travel-windows?origin=ORD&dest=LAX"
 curl "http://localhost:8080/api/v1/routes/weather-stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30"
 
 # Rebuild travel-window rollups (admin, empty body)
-curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/travel-windows
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/rebuild/travel-windows
 
 # Rebuild weather-stats rollups (admin, empty body)
-curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/rebuild/weather-stats
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/rebuild/weather-stats
 
 # Carrier performance stats
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
 
-# Create an API key (admin; the plaintext secret is returned once)
-curl -X POST http://localhost:8080/api/v1/keys \
+# Create an API key (admin; name is required; the plaintext secret is returned once)
+curl -X POST http://localhost:8080/api/internal/keys \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"role":"consumer","name":"docs example"}'
 
 # List API keys
-curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/keys
 
 # Revoke an API key
-curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/v1/keys/<key-id>/revoke
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/keys/<key-id>/revoke
 ```
 
 ### Ingest behavior
@@ -286,29 +288,29 @@ Every ingest returns **409** when a pending or running job already covers that m
 
 Load order for a consistent database (there are no foreign keys): **countries → regions → airports → at least one BTS month → weather-stations → weather observations**. Airport MCT does not depend on that order.
 
-A successful flight-performance load rebuilds travel-window rollups and weather-category rollups. A successful weather-observation or weather-station load rebuilds weather-category rollups only. Admins can queue the same full rebuilds with an empty body: `POST /api/v1/rebuild/travel-windows` and `POST /api/v1/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending or running. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
+A successful flight-performance load rebuilds travel-window rollups and weather-category rollups. A successful weather-observation or weather-station load rebuilds weather-category rollups only. Admins can queue the same full rebuilds with an empty body: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending or running. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
 
-#### Flight performance (`POST /api/v1/ingest`)
+#### Flight performance (`POST /api/internal/ingest/flight-performance`)
 
 Workers download the BTS TranStats Marketing Carrier On-Time Performance zip for the month and load `flight_performance`.
 
-#### Weather observations (`POST /api/v1/ingest/weather`)
+#### Weather observations (`POST /api/internal/ingest/weather`)
 
 `stations` is optional. When omitted, IEM site ids come from `airport_weather_stations` where `matched = true` (ingest weather-stations first). An explicit list overrides that and is uppercased. The response may include `unresolved_airports` for mapping rows with `matched = false`. IEM downloads run at about one request per second and retry HTTP 503. Each stored row gets `ceiling_ft` and `category` at ingest.
 
 Source: Iowa Environmental Mesonet ASOS/METAR (`asos.py`).
 
-#### Weather stations (`POST /api/v1/ingest/weather-stations`)
+#### Weather stations (`POST /api/internal/ingest/weather-stations`)
 
 One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty. The weather-stats rebuild runs because station ids and timezones change which observation matches a flight.
 
-#### Reference data (`POST /api/v1/ingest/{countries|regions|airports}`)
+#### Reference data (`POST /api/internal/ingest/{countries|regions|airports}`)
 
 One job per request (`import_countries`, `import_regions`, or `import_airports`) downloads the CSV and replaces that table.
 
 Source: [OurAirports open data](https://ourairports.com/data/) (public domain), nightly dumps on [davidmegginson/ourairports-data](https://github.com/davidmegginson/ourairports-data).
 
-#### Airport minimum connection times (`POST /api/v1/ingest/mct`)
+#### Airport minimum connection times (`POST /api/internal/ingest/mct`)
 
 One `import_airport_mct` job pages `GET /api/airports` on [Minimum Connection Time](https://minimumconnectiontime.com) at about one request per second, backing off on HTTP 429 and 5xx. It does not send `minimal=true`, because that view omits the minute fields. HTTP handlers do not call this API. A successful job replaces `airport_mct`. A failed download leaves the table unchanged.
 

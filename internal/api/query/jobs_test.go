@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseJobsListDefaultLimit(t *testing.T) {
-	req := httptest.NewRequest("GET", "/api/v1/jobs", nil)
+	req := httptest.NewRequest("GET", "/api/internal/jobs", nil)
 
 	limit, err := ParseJobsList(req)
 	if err != nil {
@@ -19,7 +19,7 @@ func TestParseJobsListDefaultLimit(t *testing.T) {
 }
 
 func TestParseJobsListRejectsLimitAboveMax(t *testing.T) {
-	req := httptest.NewRequest("GET", "/api/v1/jobs?limit=501", nil)
+	req := httptest.NewRequest("GET", "/api/internal/jobs?limit=501", nil)
 
 	_, err := ParseJobsList(req)
 	if err == nil {
