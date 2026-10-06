@@ -10,7 +10,7 @@ Also follow [development-practices](../development-practices/SKILL.md) and [stor
 ## Pipeline
 
 ```text
-POST /api/v1/ingest...  →  validate + 409 checks  →  Create*Job (pending)
+POST /internal/ingest/...  →  validate + 409 checks  →  Create*Job (pending)
 Worker.ClaimNextPendingJob  →  operator.JobHandler.Process
     →  ingest/<provider>.Service.Import*
         →  download (or CSVOpener) → csvparse.Parse → store.Replace*

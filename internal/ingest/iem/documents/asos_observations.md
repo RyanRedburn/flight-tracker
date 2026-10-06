@@ -83,7 +83,7 @@ Each flight is joined to the nearest observation within ±30 minutes. An equal d
 
 A side is `UNMATCHED` when the airport has no matched station, the clock cannot be built, no observation falls in the window, or every observation in the window has a null `category`. Unmatched flights are `flights_unmatched` on that side. They are never counted as `VFR_FAIR`. `UNKNOWN` is only the stored category for a matched observation that lacks visibility, ceiling, and wind.
 
-The worker rebuilds the rollup (advisory lock, full replace) after a successful flight-performance load, weather-observation load, or weather-station load. The rebuild reads stored `category` values only. Admins can queue the same rebuild with `POST /api/v1/rebuild/weather-stats`. Use the POST rebuild when flights or station mappings change and the observations are already classified.
+The worker rebuilds the rollup (advisory lock, full replace) after a successful flight-performance load, weather-observation load, or weather-station load. The rebuild reads stored `category` values only. Admins can queue the same rebuild with `POST /internal/rebuild/weather-stats`. Use the POST rebuild when flights or station mappings change and the observations are already classified.
 
 ## Notes for analysis
 

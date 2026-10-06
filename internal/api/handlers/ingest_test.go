@@ -55,7 +55,7 @@ func postIngest(t *testing.T, h *IngestHandler, body any) *httptest.ResponseReco
 		t.Fatalf("Marshal() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, "/internal/ingest/flight-performance", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 
 	rec := httptest.NewRecorder()
@@ -261,7 +261,7 @@ func TestIngestForceReimport(t *testing.T) {
 func TestIngestInvalidJSON(t *testing.T) {
 	h := NewIngestHandler(&storetest.Stub{}, defaultMaxIngestMonths)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest", bytes.NewBufferString("{"))
+	req := httptest.NewRequest(http.MethodPost, "/internal/ingest/flight-performance", bytes.NewBufferString("{"))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 

@@ -57,23 +57,23 @@ func newRouter(
 	r.Group(func(r chi.Router) {
 		r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceInternal))
 		r.Get("/db/version", health.DatabaseVersion)
-		// More specific internal UI path before /swagger/*.
-		r.Get("/swagger/internal/*", httpSwagger.Handler(
+		// More specific internal UI path before /docs/*.
+		r.Get("/docs/internal/*", httpSwagger.Handler(
 			httpSwagger.InstanceName("internal"),
 		))
 	})
 
 	r.Group(func(r chi.Router) {
 		r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceExternal))
-		r.Get("/swagger/*", httpSwagger.Handler(
+		r.Get("/docs/*", httpSwagger.Handler(
 			httpSwagger.InstanceName("external"),
 		))
 	})
 
-	r.Route("/api/v1", func(r chi.Router) {
+	r.Route("/internal", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceIngest))
-			r.Post("/ingest", ingestHandler.Create)
+			r.Post("/ingest/flight-performance", ingestHandler.Create)
 			r.Post("/ingest/weather", weatherIngest.Create)
 			r.Post("/ingest/countries", referenceIngest.CreateCountries)
 			r.Post("/ingest/regions", referenceIngest.CreateRegions)
@@ -93,7 +93,9 @@ func newRouter(
 			r.Post("/keys", keys.Create)
 			r.Post("/keys/{id}/revoke", keys.Revoke)
 		})
+	})
 
+	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceExternal))
 			r.Get("/routes/stats", routes.Stats)

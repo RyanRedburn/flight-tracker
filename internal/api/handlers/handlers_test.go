@@ -94,7 +94,7 @@ func TestJobsGetNotFound(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs/missing", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "missing")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -127,7 +127,7 @@ func TestJobsGetEnrichedFlightPerformanceIngest(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs/"+jobID, nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", jobID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -178,7 +178,7 @@ func TestJobsGetEnrichedWeatherIngest(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs/"+jobID, nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", jobID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -223,7 +223,7 @@ func TestJobsGetUnknownType(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/job-unknown", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs/job-unknown", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "job-unknown")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -287,7 +287,7 @@ func TestJobsList(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs?limit=2", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
@@ -329,7 +329,7 @@ func TestJobsListInvalidLimit(t *testing.T) {
 	// Invalid limit is rejected before any store call.
 	h := NewJobsHandler(&storetest.Stub{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/jobs?limit=0", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 

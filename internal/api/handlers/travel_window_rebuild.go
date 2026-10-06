@@ -42,7 +42,7 @@ func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler 
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/rebuild/travel-windows [post]
+//	@Router			/internal/rebuild/travel-windows [post]
 func (h *RebuildTravelWindowsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSONBody(r.Body, &struct{}{}, jsonBodyOptions{disallowUnknown: true, rejectTrailing: true}); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})

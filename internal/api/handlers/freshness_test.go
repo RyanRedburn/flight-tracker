@@ -21,7 +21,7 @@ func TestFreshnessGetEmpty(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/data-freshness", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/data-freshness", nil)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 
@@ -91,7 +91,7 @@ func TestFreshnessGetPartial(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/data-freshness", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/data-freshness", nil)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 
@@ -178,7 +178,7 @@ func TestFreshnessGetStoreError(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/data-freshness", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/data-freshness", nil)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 

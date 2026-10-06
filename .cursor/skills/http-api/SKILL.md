@@ -9,7 +9,7 @@ Also follow [development-practices](../development-practices/SKILL.md). After an
 
 ## Layers
 
-1. **Route** — register in `internal/api/server.go` under `/api/v1` (or top-level for health).
+1. **Route** — register consumer routes in `internal/api/server.go` under `/api/v1`. Register admin routes (ingest, jobs, freshness, rebuilds, keys) under `/internal` with no version segment. Health and `/db/version` stay top-level.
 2. **Parse** — query strings in `internal/api/query` (`query` struct tags + `BindQuery` + `Validate`). JSON bodies on `internal/model` with `Validate()`.
 3. **Handler** — thin: parse → store call → `writeJSON`. No SQL, no remote downloads.
 4. **Swagger** — comment annotations on the handler. Visibility is the swag tag list.
@@ -46,7 +46,7 @@ Decode with `json.NewDecoder(r.Body).Decode`. Invalid JSON → **400** `invalid 
 | 500 | Store/internal failures with a stable message |
 | 503 | Readiness ping failure |
 
-Protected routes use three shared surfaces: `external` (consumer, subscriber, or admin reads and `/swagger/`), `internal` (admin jobs, freshness, rebuild, keys, `/db/version`, `/swagger/internal/`), and `ingest` (admin ingest POSTs, separate lower RPM). `/health` and `/ready` skip auth and rate limits. Annotate **401**, **403**, and **429** on new protected handlers.
+Protected routes use three shared surfaces: `external` (consumer, subscriber, or admin reads and `/docs/`), `internal` (admin jobs, freshness, rebuild, keys, `/db/version`, `/docs/internal/`), and `ingest` (admin ingest POSTs, separate lower RPM). `/health` and `/ready` skip auth and rate limits. Annotate **401**, **403**, and **429** on new protected handlers.
 
 **500** messages must be generic (`failed to compute route stats`). Conflict bodies use the typed structs in `internal/api/handlers/swagger_models.go` (`active_ingest_months`, `existing_data_months`, `job_type`, `dataset`).
 
@@ -56,8 +56,8 @@ Always `writeJSON` (`internal/api/handlers/health.go`). Do not invent a second e
 
 Two generated specs from `cmd/server/main.go` `go:generate`:
 
-- `@Tags foo,external` — user-facing `/swagger/` (`docs/external`). Today: `/routes/stats`, `/routes/outlook`, `/routes/travel-windows`, `/routes/weather-stats`, `/itineraries/outlook`, `/carriers/stats`.
-- `@Tags foo,internal` — operator `/swagger/internal/` (`docs/full`). Health, ingest, jobs, data freshness, rebuild, keys.
+- `@Tags foo,external` — user-facing `/docs/` (`docs/external`). Today: `/routes/stats`, `/routes/outlook`, `/routes/travel-windows`, `/routes/weather-stats`, `/itineraries/outlook`, `/carriers/stats`.
+- `@Tags foo,internal` — operator `/docs/internal/` (`docs/full`). Health, ingest, jobs, data freshness, rebuild, keys.
 
 Include both the domain tag (`routes`, `ingest`, `jobs`, …) and `external` or `internal`. New user-facing reads should be `external`; ingest/ops remain `internal`.
 
@@ -65,7 +65,7 @@ Annotate every exported handler. Response types must be exported so swag can see
 
 Never edit files under `docs/` except via `make swagger`. Pin stays `swag` `v1.16.6`.
 
-Internal UI is registered **before** `/swagger/*` in the router.
+Internal UI is registered **before** `/docs/*` in the router.
 
 ## Tests
 

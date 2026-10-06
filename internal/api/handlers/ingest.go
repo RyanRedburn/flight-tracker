@@ -49,7 +49,7 @@ type IngestResponse struct {
 //	@Failure		429		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/api/v1/ingest [post]
+//	@Router			/internal/ingest/flight-performance [post]
 func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.IngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

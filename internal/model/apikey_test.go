@@ -2,6 +2,7 @@ package model
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 )
@@ -105,12 +106,26 @@ func TestRolePermits(t *testing.T) {
 }
 
 func TestCreateAPIKeyRequestValidate(t *testing.T) {
-	if err := (CreateAPIKeyRequest{Role: "consumer"}).Validate(); err != nil {
+	consumer := string(APIKeyRoleConsumer)
+
+	if err := (CreateAPIKeyRequest{Role: consumer, Name: "docs"}).Validate(); err != nil {
 		t.Fatalf("valid consumer: %v", err)
 	}
 
-	if err := (CreateAPIKeyRequest{Role: "nope"}).Validate(); err == nil {
-		t.Fatal("expected invalid role error")
+	if err := (CreateAPIKeyRequest{Role: consumer, Name: "  docs  "}).Validate(); err != nil {
+		t.Fatalf("trimmed name: %v", err)
+	}
+
+	if err := (CreateAPIKeyRequest{Role: consumer}).Validate(); !errors.Is(err, errAPIKeyNameRequired) {
+		t.Fatalf("missing name: %v", err)
+	}
+
+	if err := (CreateAPIKeyRequest{Role: consumer, Name: "   "}).Validate(); !errors.Is(err, errAPIKeyNameRequired) {
+		t.Fatalf("blank name: %v", err)
+	}
+
+	if err := (CreateAPIKeyRequest{Role: "nope", Name: "docs"}).Validate(); !errors.Is(err, ErrInvalidAPIKeyRole) {
+		t.Fatalf("invalid role: %v", err)
 	}
 
 	longName := make([]byte, 101)
@@ -118,8 +133,8 @@ func TestCreateAPIKeyRequestValidate(t *testing.T) {
 		longName[i] = 'a'
 	}
 
-	if err := (CreateAPIKeyRequest{Role: "admin", Name: string(longName)}).Validate(); err == nil {
-		t.Fatal("expected long name error")
+	if err := (CreateAPIKeyRequest{Role: "admin", Name: string(longName)}).Validate(); !errors.Is(err, errAPIKeyNameTooLong) {
+		t.Fatalf("long name: %v", err)
 	}
 }
 

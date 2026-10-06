@@ -36,7 +36,7 @@ func TestKeysCreateReturnsPlaintextOnce(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/keys", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
@@ -73,17 +73,51 @@ func TestKeysCreateReturnsPlaintextOnce(t *testing.T) {
 func TestKeysCreateInvalidRole(t *testing.T) {
 	h := NewKeysHandler(&storetest.Stub{})
 
-	body, err := json.Marshal(model.CreateAPIKeyRequest{Role: "root"})
+	body, err := json.Marshal(model.CreateAPIKeyRequest{Role: "root", Name: "docs"})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/keys", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.Create(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestKeysCreateRequiresName(t *testing.T) {
+	h := NewKeysHandler(&storetest.Stub{})
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "missing", body: `{"role":"consumer"}`},
+		{name: "empty name", body: `{"role":"consumer","name":""}`},
+		{name: "blank", body: `{"role":"consumer","name":"   "}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/internal/keys", bytes.NewBufferString(tt.body))
+			rec := httptest.NewRecorder()
+			h.Create(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+			}
+
+			var resp ErrorResponse
+			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+
+			if resp.Error != "name is required" {
+				t.Fatalf("error = %q", resp.Error)
+			}
+		})
 	}
 }
 
@@ -101,7 +135,7 @@ func TestKeysListOmitsHash(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/keys", nil)
+	req := httptest.NewRequest(http.MethodGet, "/internal/keys", nil)
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
@@ -148,7 +182,7 @@ func TestKeysRevoke(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/keys/"+testAPIKeyID+"/revoke", nil)
+	req := httptest.NewRequest(http.MethodPost, "/internal/keys/"+testAPIKeyID+"/revoke", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", testAPIKeyID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -181,7 +215,7 @@ func TestKeysRevokeNotFound(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/keys/missing/revoke", nil)
+	req := httptest.NewRequest(http.MethodPost, "/internal/keys/missing/revoke", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("id", "missing")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
