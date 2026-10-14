@@ -380,6 +380,72 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 	}
 }
 
+func TestRoutesOutlookWeatherContrast(t *testing.T) {
+	weather := store.AssembleRouteOutlookWeather([]store.WeatherCategoryCount{
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryVFRFair, OnTimeCount: 40, Flights: 50},
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryThunder, OnTimeCount: 5, Flights: 20},
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryIFR, OnTimeCount: 10, Flights: 30},
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryUnknown, OnTimeCount: 1, Flights: 12},
+		{Side: store.WeatherSideDest, Category: model.WeatherCategoryVFRFair, OnTimeCount: 2, Flights: 3},
+		{Side: store.WeatherSideDest, Category: model.WeatherCategoryPrecip, OnTimeCount: 1, Flights: 4},
+	})
+
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return &model.RouteOutlook{
+				Origin:            testOriginORD,
+				Dest:              testDestLAX,
+				Carrier:           "UA",
+				SampleSize:        40,
+				SampleReason:      model.SampleReasonSufficient,
+				Confidence:        model.ConfidenceHigh,
+				OnTimeProbability: floatPtr(0.81),
+				Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+				Weather:           weather,
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=3&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var out model.RouteOutlook
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if out.Confidence != model.ConfidenceHigh || out.SampleReason != model.SampleReasonSufficient {
+		t.Fatalf("outlook decision = confidence %q reason %q", out.Confidence, out.SampleReason)
+	}
+
+	if out.Connection.DomesticToDomestic == nil || out.Connection.DomesticToDomestic.RecommendedMinutes != 45 {
+		t.Fatalf("connection = %+v", out.Connection.DomesticToDomestic)
+	}
+
+	origin := out.Weather.Origin
+	if origin.Confidence != model.ConfidenceHigh || origin.AdverseFlights != 50 {
+		t.Fatalf("origin weather = %+v", origin)
+	}
+
+	if origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.3 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.5 {
+		t.Fatalf("origin rates = %+v", origin)
+	}
+
+	dest := out.Weather.Dest
+	if dest.Confidence != model.ConfidenceLow || dest.AdverseFlights != 4 || dest.FairOnTimeRate == nil || *dest.FairOnTimeRate != 0.67 || dest.AdverseOnTimeRate == nil || *dest.AdverseOnTimeRate != 0.25 {
+		t.Fatalf("dest weather = %+v", dest)
+	}
+
+	if dest.AdverseDelta == nil || *dest.AdverseDelta != -0.42 {
+		t.Fatalf("dest delta = %v", dest.AdverseDelta)
+	}
+}
+
 func TestRoutesOutlookStoreError(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {

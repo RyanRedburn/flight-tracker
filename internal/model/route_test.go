@@ -218,6 +218,12 @@ func TestRouteOutlookRoundForResponse(t *testing.T) {
 		MedianArrivalDelayWhenDelayed: floatPtr(0.4),
 		LikelyDepartureDelayMinutes:   floatPtr(10.5),
 		DepTimeWindowMinutes:          30,
+		Weather: RouteOutlookWeather{
+			Dest: RouteOutlookWeatherSide{
+				FairOnTimeRate:    floatPtr(1.0 / 3.0),
+				AdverseOnTimeRate: floatPtr(0.125),
+			},
+		},
 	}
 
 	out.RoundForResponse()
@@ -234,6 +240,14 @@ func TestRouteOutlookRoundForResponse(t *testing.T) {
 
 	if out.DepTimeWindowMinutes != 30 {
 		t.Errorf("dep_time_window_minutes = %d, want 30 (input filter, not rounded as a delay)", out.DepTimeWindowMinutes)
+	}
+
+	assertFloatPtr(t, "weather.dest.fair_on_time_rate", out.Weather.Dest.FairOnTimeRate, 0.33)
+	assertFloatPtr(t, "weather.dest.adverse_on_time_rate", out.Weather.Dest.AdverseOnTimeRate, 0.13)
+	assertFloatPtr(t, "weather.dest.adverse_delta", out.Weather.Dest.AdverseDelta, -0.2)
+
+	if out.Weather.Origin.FairOnTimeRate != nil || out.Weather.Origin.AdverseDelta != nil {
+		t.Fatal("unset weather rates should stay nil")
 	}
 
 	var empty RouteOutlook

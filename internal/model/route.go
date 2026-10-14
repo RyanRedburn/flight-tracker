@@ -95,6 +95,8 @@ type RouteOutlook struct {
 	MedianArrivalDelayWhenDelayed *float64           `json:"median_arrival_delay_when_delayed"`
 	LikelyDepartureDelayMinutes   *float64           `json:"likely_departure_delay_minutes"`
 	Connection                    ConnectionGuidance `json:"connection"`
+	// Weather is route-level fair and adverse on-time rates, not this departure slot.
+	Weather RouteOutlookWeather `json:"weather"`
 }
 
 // TravelWindowMonthBucket is one month-of-year on-time rate.
@@ -189,6 +191,7 @@ func (o *RouteOutlook) RoundForResponse() {
 	o.LikelyArrivalDelayWhenDelayed = roundMinutesPtr(o.LikelyArrivalDelayWhenDelayed)
 	o.MedianArrivalDelayWhenDelayed = roundMinutesPtr(o.MedianArrivalDelayWhenDelayed)
 	o.LikelyDepartureDelayMinutes = roundMinutesPtr(o.LikelyDepartureDelayMinutes)
+	o.Weather.RoundForResponse()
 }
 
 // RoundForResponse rounds on-time rates to two decimal places.
