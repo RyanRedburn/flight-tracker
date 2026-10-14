@@ -147,7 +147,7 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 // WeatherStats returns on-time performance by METAR category at each end of a route.
 //
 //	@Summary		Route weather category stats
-//	@Description	On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: Thunder, Low IFR, IFR, Marginal VFR, Windy, Precipitation, Fair, and Unknown, plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
+//	@Description	On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, and Unknown, plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

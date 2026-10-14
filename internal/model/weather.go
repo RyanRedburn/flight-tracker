@@ -12,9 +12,9 @@ const (
 
 	// Response labels for the stored category codes. Classification and rollups keep the codes.
 	WeatherLabelThunder = "Thunder"
-	WeatherLabelLIFR    = "Low IFR"
-	WeatherLabelIFR     = "IFR"
-	WeatherLabelMVFR    = "Marginal VFR"
+	WeatherLabelLIFR    = "Very low clouds or visibility"
+	WeatherLabelIFR     = "Low clouds or visibility"
+	WeatherLabelMVFR    = "Somewhat reduced visibility"
 	WeatherLabelWindy   = "Windy"
 	WeatherLabelPrecip  = "Precipitation"
 	WeatherLabelFair    = "Fair"
@@ -23,8 +23,8 @@ const (
 
 // WeatherCategoryStat is on-time performance for one METAR category.
 type WeatherCategoryStat struct {
-	// Category is Thunder, Low IFR, IFR, Marginal VFR, Windy, Precipitation, Fair, or Unknown.
-	Category   string  `json:"category" enums:"Thunder,Low IFR,IFR,Marginal VFR,Windy,Precipitation,Fair,Unknown"`
+	// Category is Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, or Unknown.
+	Category   string  `json:"category" enums:"Thunder,Very low clouds or visibility,Low clouds or visibility,Somewhat reduced visibility,Windy,Precipitation,Fair,Unknown"`
 	Flights    int     `json:"flights"`
 	OnTimeRate float64 `json:"on_time_rate"`
 }
