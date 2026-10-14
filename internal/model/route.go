@@ -32,27 +32,28 @@ type CarrierOnTime struct {
 }
 
 type RouteStats struct {
-	Filters                       Filters               `json:"filters"`
-	Analysis                      Analysis              `json:"analysis"`
-	Flights                       int                   `json:"flights"`
-	OnTime                        int                   `json:"on_time"`
-	Delayed                       int                   `json:"delayed"`
-	Cancelled                     int                   `json:"cancelled"`
-	Diverted                      int                   `json:"diverted"`
-	OnTimeRate                    float64               `json:"on_time_rate"`
-	DelayRate                     float64               `json:"delay_rate"`
-	CancellationRate              float64               `json:"cancellation_rate"`
-	DiversionRate                 float64               `json:"diversion_rate"`
-	AvgArrivalDelayMinutes        float64               `json:"avg_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64               `json:"median_arrival_delay_minutes"`
-	AvgArrivalDelayWhenDelayed    float64               `json:"avg_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64               `json:"median_arrival_delay_when_delayed"`
-	AvgDepartureDelayMinutes      float64               `json:"avg_departure_delay_minutes"`
-	MedianDepartureDelayMinutes   float64               `json:"median_departure_delay_minutes"`
-	AvgDepartureDelayWhenDelayed  float64               `json:"avg_departure_delay_when_delayed"`
-	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
-	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
-	DiversionAirports             []AirportCount        `json:"diversion_airports"`
+	Filters                         Filters               `json:"filters"`
+	Analysis                        Analysis              `json:"analysis"`
+	Flights                         int                   `json:"flights"`
+	OnTime                          int                   `json:"on_time"`
+	Delayed                         int                   `json:"delayed"`
+	Cancelled                       int                   `json:"cancelled"`
+	Diverted                        int                   `json:"diverted"`
+	OnTimeRate                      float64               `json:"on_time_rate"`
+	DelayRate                       float64               `json:"delay_rate"`
+	CancellationRate                float64               `json:"cancellation_rate"`
+	DiversionRate                   float64               `json:"diversion_rate"`
+	AvgArrivalDelayMinutes          float64               `json:"avg_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes       float64               `json:"median_arrival_delay_minutes"`
+	AvgArrivalDelayWhenDelayed      float64               `json:"avg_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed   float64               `json:"median_arrival_delay_when_delayed"`
+	AvgDepartureDelayMinutes        float64               `json:"avg_departure_delay_minutes"`
+	MedianDepartureDelayMinutes     float64               `json:"median_departure_delay_minutes"`
+	AvgDepartureDelayWhenDelayed    float64               `json:"avg_departure_delay_when_delayed"`
+	MedianDepartureDelayWhenDelayed float64               `json:"median_departure_delay_when_delayed"`
+	DelayCausesAvgMinutes           DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
+	DelayCausesShare                DelayCausesShare      `json:"delay_causes_share"`
+	DiversionAirports               []AirportCount        `json:"diversion_airports"`
 	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
@@ -151,6 +152,7 @@ func (s *RouteStats) RoundForResponse() {
 	s.AvgDepartureDelayMinutes = math.Round(s.AvgDepartureDelayMinutes)
 	s.MedianDepartureDelayMinutes = math.Round(s.MedianDepartureDelayMinutes)
 	s.AvgDepartureDelayWhenDelayed = math.Round(s.AvgDepartureDelayWhenDelayed)
+	s.MedianDepartureDelayWhenDelayed = math.Round(s.MedianDepartureDelayWhenDelayed)
 	s.DelayCausesAvgMinutes.Carrier = math.Round(s.DelayCausesAvgMinutes.Carrier)
 	s.DelayCausesAvgMinutes.Weather = math.Round(s.DelayCausesAvgMinutes.Weather)
 	s.DelayCausesAvgMinutes.NAS = math.Round(s.DelayCausesAvgMinutes.NAS)

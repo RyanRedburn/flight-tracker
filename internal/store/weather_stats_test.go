@@ -46,22 +46,22 @@ func TestAssembleRouteWeatherStatsBothSides(t *testing.T) {
 		t.Fatalf("dest side = %+v", got.DestWeather)
 	}
 
-	thunder := categoryStat(t, got.OriginWeather, model.WeatherCategoryThunder)
+	thunder := categoryStat(t, got.OriginWeather, model.WeatherLabelThunder)
 	if thunder.Flights != 4 || thunder.OnTimeRate != 0.25 {
 		t.Fatalf("origin thunder = %+v", thunder)
 	}
 
-	fair := categoryStat(t, got.OriginWeather, model.WeatherCategoryVFRFair)
+	fair := categoryStat(t, got.OriginWeather, model.WeatherLabelFair)
 	if fair.Flights != 3 || fair.OnTimeRate != 0.67 {
 		t.Fatalf("origin vfr = %+v", fair)
 	}
 
-	ifr := categoryStat(t, got.DestWeather, model.WeatherCategoryIFR)
+	ifr := categoryStat(t, got.DestWeather, model.WeatherLabelIFR)
 	if ifr.Flights != 2 || ifr.OnTimeRate != 0.5 {
 		t.Fatalf("dest ifr = %+v", ifr)
 	}
 
-	if categoryStat(t, got.OriginWeather, model.WeatherCategoryIFR).Flights != 0 {
+	if categoryStat(t, got.OriginWeather, model.WeatherLabelIFR).Flights != 0 {
 		t.Fatal("missing origin category should be a zero bucket")
 	}
 
@@ -94,9 +94,14 @@ func TestAssembleRouteWeatherStatsEmpty(t *testing.T) {
 		t.Fatalf("empty shape = %+v", got)
 	}
 
-	for _, stat := range got.DestWeather.Categories {
-		if stat.Flights != 0 || stat.OnTimeRate != 0 {
-			t.Fatalf("zero bucket = %+v", stat)
+	for i, code := range model.WeatherCategoryOrder() {
+		label := model.WeatherCategoryLabel(code)
+		if got.DestWeather.Categories[i].Category != label || got.OriginWeather.Categories[i].Category != label {
+			t.Fatalf("category %d = origin %q dest %q, want %q", i, got.OriginWeather.Categories[i].Category, got.DestWeather.Categories[i].Category, label)
+		}
+
+		if got.DestWeather.Categories[i].Flights != 0 || got.DestWeather.Categories[i].OnTimeRate != 0 {
+			t.Fatalf("zero bucket = %+v", got.DestWeather.Categories[i])
 		}
 	}
 }

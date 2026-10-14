@@ -10,17 +10,18 @@ const jsonCarrierOnTime = "carrier_on_time"
 
 func TestRouteStatsRoundForResponse(t *testing.T) {
 	stats := RouteStats{
-		OnTimeRate:                    1.0 / 3.0,
-		DelayRate:                     2.0 / 3.0,
-		CancellationRate:              0.125,
-		DiversionRate:                 0.5,
-		AvgArrivalDelayMinutes:        15.4,
-		MedianArrivalDelayMinutes:     15.5,
-		AvgArrivalDelayWhenDelayed:    -1.5,
-		MedianArrivalDelayWhenDelayed: 0.4,
-		AvgDepartureDelayMinutes:      10.49,
-		MedianDepartureDelayMinutes:   8.4,
-		AvgDepartureDelayWhenDelayed:  10.5,
+		OnTimeRate:                      1.0 / 3.0,
+		DelayRate:                       2.0 / 3.0,
+		CancellationRate:                0.125,
+		DiversionRate:                   0.5,
+		AvgArrivalDelayMinutes:          15.4,
+		MedianArrivalDelayMinutes:       15.5,
+		AvgArrivalDelayWhenDelayed:      -1.5,
+		MedianArrivalDelayWhenDelayed:   0.4,
+		AvgDepartureDelayMinutes:        10.49,
+		MedianDepartureDelayMinutes:     8.4,
+		AvgDepartureDelayWhenDelayed:    10.5,
+		MedianDepartureDelayWhenDelayed: 12.6,
 		DelayCausesAvgMinutes: DelayCausesAvgMinutes{
 			Carrier:      1.4,
 			Weather:      2.5,
@@ -54,6 +55,7 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 	assertFloat(t, "avg_departure_delay_minutes", stats.AvgDepartureDelayMinutes, 10)
 	assertFloat(t, "median_departure_delay_minutes", stats.MedianDepartureDelayMinutes, 8)
 	assertFloat(t, "avg_departure_delay_when_delayed", stats.AvgDepartureDelayWhenDelayed, 11)
+	assertFloat(t, "median_departure_delay_when_delayed", stats.MedianDepartureDelayWhenDelayed, 13)
 	assertFloat(t, "delay_causes.carrier", stats.DelayCausesAvgMinutes.Carrier, 1)
 	assertFloat(t, "delay_causes.weather", stats.DelayCausesAvgMinutes.Weather, 3)
 	assertFloat(t, "delay_causes.nas", stats.DelayCausesAvgMinutes.NAS, 4)

@@ -232,7 +232,7 @@ func (a *weatherSideAccum) stats() model.WeatherSideStats {
 	for _, category := range order {
 		count := a.byCat[category]
 		out.Categories = append(out.Categories, model.WeatherCategoryStat{
-			Category:   category,
+			Category:   model.WeatherCategoryLabel(category),
 			Flights:    count.flights,
 			OnTimeRate: rate(count.onTime, count.flights),
 		})

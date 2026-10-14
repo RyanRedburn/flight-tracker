@@ -284,6 +284,11 @@ const (
 				WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL
 			) AS median_dep,
 			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
+				FROM classified
+				WHERE is_delayed AND dep_delay_minutes IS NOT NULL
+			) AS median_dep_delayed,
 			AVG(COALESCE(carrier_delay, 0)) FILTER (WHERE is_delayed) AS cause_carrier,
 			AVG(COALESCE(weather_delay, 0)) FILTER (WHERE is_delayed) AS cause_weather,
 			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,
@@ -398,6 +403,11 @@ const (
 				WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL
 			) AS median_dep,
 			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
+			(
+				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
+				FROM classified
+				WHERE is_delayed AND dep_delay_minutes IS NOT NULL
+			) AS median_dep_delayed,
 			AVG(COALESCE(carrier_delay, 0)) FILTER (WHERE is_delayed) AS cause_carrier,
 			AVG(COALESCE(weather_delay, 0)) FILTER (WHERE is_delayed) AS cause_weather,
 			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,

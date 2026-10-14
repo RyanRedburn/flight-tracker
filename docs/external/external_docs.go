@@ -522,7 +522,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: thunderstorms (THUNDER), low ceiling or visibility (LIFR, IFR, MVFR), wind (WINDY), precipitation (PRECIP), fair weather (VFR_FAIR), and an observation too incomplete to classify (UNKNOWN), plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.",
+                "description": "On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: Thunder, Low IFR, IFR, Marginal VFR, Windy, Precipitation, Fair, and Unknown, plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.",
                 "produces": [
                     "application/json"
                 ],
@@ -846,6 +846,9 @@ const docTemplateexternal = `{
                     "type": "number"
                 },
                 "median_departure_delay_minutes": {
+                    "type": "number"
+                },
+                "median_departure_delay_when_delayed": {
                     "type": "number"
                 },
                 "on_time": {
@@ -1412,6 +1415,9 @@ const docTemplateexternal = `{
                 "median_departure_delay_minutes": {
                     "type": "number"
                 },
+                "median_departure_delay_when_delayed": {
+                    "type": "number"
+                },
                 "on_time": {
                     "type": "integer"
                 },
@@ -1602,7 +1608,18 @@ const docTemplateexternal = `{
             "type": "object",
             "properties": {
                 "category": {
-                    "type": "string"
+                    "description": "Category is Thunder, Low IFR, IFR, Marginal VFR, Windy, Precipitation, Fair, or Unknown.",
+                    "type": "string",
+                    "enum": [
+                        "Thunder",
+                        "Low IFR",
+                        "IFR",
+                        "Marginal VFR",
+                        "Windy",
+                        "Precipitation",
+                        "Fair",
+                        "Unknown"
+                    ]
                 },
                 "flights": {
                     "type": "integer"

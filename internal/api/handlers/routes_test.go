@@ -702,15 +702,15 @@ func TestRoutesWeatherStats(t *testing.T) {
 					Flights:          9,
 					FlightsUnmatched: 2,
 					Categories: []model.WeatherCategoryStat{
-						{Category: model.WeatherCategoryThunder, Flights: 4, OnTimeRate: 0.25},
-						{Category: model.WeatherCategoryVFRFair, Flights: 3, OnTimeRate: 0.67},
+						{Category: model.WeatherLabelThunder, Flights: 4, OnTimeRate: 0.25},
+						{Category: model.WeatherLabelFair, Flights: 3, OnTimeRate: 0.67},
 					},
 				},
 				DestWeather: model.WeatherSideStats{
 					Flights:          9,
 					FlightsUnmatched: 1,
 					Categories: []model.WeatherCategoryStat{
-						{Category: model.WeatherCategoryIFR, Flights: 2, OnTimeRate: 0.5},
+						{Category: model.WeatherLabelIFR, Flights: 2, OnTimeRate: 0.5},
 					},
 				},
 			}, nil
@@ -746,11 +746,11 @@ func TestRoutesWeatherStats(t *testing.T) {
 		t.Fatalf("unmatched origin=%d dest=%d", stats.OriginWeather.FlightsUnmatched, stats.DestWeather.FlightsUnmatched)
 	}
 
-	if len(stats.OriginWeather.Categories) != 2 || stats.OriginWeather.Categories[0].Category != model.WeatherCategoryThunder {
+	if len(stats.OriginWeather.Categories) != 2 || stats.OriginWeather.Categories[0].Category != model.WeatherLabelThunder {
 		t.Fatalf("origin categories = %+v", stats.OriginWeather.Categories)
 	}
 
-	if len(stats.DestWeather.Categories) != 1 || stats.DestWeather.Categories[0].Category != model.WeatherCategoryIFR {
+	if len(stats.DestWeather.Categories) != 1 || stats.DestWeather.Categories[0].Category != model.WeatherLabelIFR {
 		t.Fatalf("dest categories = %+v", stats.DestWeather.Categories)
 	}
 }

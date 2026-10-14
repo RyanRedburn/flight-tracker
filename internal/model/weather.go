@@ -9,11 +9,22 @@ const (
 	WeatherCategoryPrecip  = "PRECIP"
 	WeatherCategoryVFRFair = "VFR_FAIR"
 	WeatherCategoryUnknown = "UNKNOWN"
+
+	// Response labels for the stored category codes. Classification and rollups keep the codes.
+	WeatherLabelThunder = "Thunder"
+	WeatherLabelLIFR    = "Low IFR"
+	WeatherLabelIFR     = "IFR"
+	WeatherLabelMVFR    = "Marginal VFR"
+	WeatherLabelWindy   = "Windy"
+	WeatherLabelPrecip  = "Precipitation"
+	WeatherLabelFair    = "Fair"
+	WeatherLabelUnknown = "Unknown"
 )
 
 // WeatherCategoryStat is on-time performance for one METAR category.
 type WeatherCategoryStat struct {
-	Category   string  `json:"category"`
+	// Category is Thunder, Low IFR, IFR, Marginal VFR, Windy, Precipitation, Fair, or Unknown.
+	Category   string  `json:"category" enums:"Thunder,Low IFR,IFR,Marginal VFR,Windy,Precipitation,Fair,Unknown"`
 	Flights    int     `json:"flights"`
 	OnTimeRate float64 `json:"on_time_rate"`
 }
@@ -55,6 +66,30 @@ type RouteOutlookWeatherSide struct {
 	AdverseFlights int `json:"adverse_flights"`
 	// Confidence is unknown when fair or adverse flights are absent, and low when the thinner group is below the outlook minimum. A thin sample keeps its rates.
 	Confidence string `json:"confidence" enums:"high,low,unknown"`
+}
+
+// WeatherCategoryLabel is the response name for a stored category code.
+func WeatherCategoryLabel(category string) string {
+	switch category {
+	case WeatherCategoryThunder:
+		return WeatherLabelThunder
+	case WeatherCategoryLIFR:
+		return WeatherLabelLIFR
+	case WeatherCategoryIFR:
+		return WeatherLabelIFR
+	case WeatherCategoryMVFR:
+		return WeatherLabelMVFR
+	case WeatherCategoryWindy:
+		return WeatherLabelWindy
+	case WeatherCategoryPrecip:
+		return WeatherLabelPrecip
+	case WeatherCategoryVFRFair:
+		return WeatherLabelFair
+	case WeatherCategoryUnknown:
+		return WeatherLabelUnknown
+	default:
+		return category
+	}
 }
 
 // WeatherCategoryOrder is the first-match category priority, then UNKNOWN.
