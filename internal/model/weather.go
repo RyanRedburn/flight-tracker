@@ -35,6 +35,28 @@ type RouteWeatherStats struct {
 	DestWeather   WeatherSideStats `json:"dest_weather"`
 }
 
+// RouteOutlookWeather is informational fair versus adverse on-time history.
+// It does not change connection status or confidence.
+// Fair is VFR_FAIR. Adverse is every other category except UNKNOWN. Unmatched flights are excluded.
+type RouteOutlookWeather struct {
+	Origin RouteOutlookWeatherSide `json:"origin"`
+	Dest   RouteOutlookWeatherSide `json:"dest"`
+}
+
+// RouteOutlookWeatherSide is one airport's fair versus adverse split.
+type RouteOutlookWeatherSide struct {
+	// FairOnTimeRate is null when this side has no VFR_FAIR flights.
+	FairOnTimeRate *float64 `json:"fair_on_time_rate"`
+	// AdverseOnTimeRate is null when this side has no adverse flights.
+	AdverseOnTimeRate *float64 `json:"adverse_on_time_rate"`
+	// AdverseDelta is adverse_on_time_rate minus fair_on_time_rate, or null unless both rates exist.
+	AdverseDelta *float64 `json:"adverse_delta"`
+	// AdverseFlights counts adverse-category flights. UNKNOWN and unmatched flights are excluded.
+	AdverseFlights int `json:"adverse_flights"`
+	// Confidence is unknown when fair or adverse flights are absent, and low when the thinner group is below the outlook minimum. A thin sample keeps its rates.
+	Confidence string `json:"confidence" enums:"high,low,unknown"`
+}
+
 // WeatherCategoryOrder is the first-match category priority, then UNKNOWN.
 func WeatherCategoryOrder() []string {
 	return []string{
@@ -59,4 +81,24 @@ func roundWeatherSide(side *WeatherSideStats) {
 	for i := range side.Categories {
 		side.Categories[i].OnTimeRate = roundRate(side.Categories[i].OnTimeRate)
 	}
+}
+
+// RoundForResponse rounds rates to two decimal places.
+// adverse_delta is recomputed from those rounded rates so it matches the published pair.
+func (w *RouteOutlookWeather) RoundForResponse() {
+	w.Origin.round()
+	w.Dest.round()
+}
+
+func (s *RouteOutlookWeatherSide) round() {
+	s.FairOnTimeRate = roundRatePtr(s.FairOnTimeRate)
+	s.AdverseOnTimeRate = roundRatePtr(s.AdverseOnTimeRate)
+
+	if s.FairOnTimeRate == nil || s.AdverseOnTimeRate == nil {
+		s.AdverseDelta = nil
+		return
+	}
+
+	delta := roundRate(*s.AdverseOnTimeRate - *s.FairOnTimeRate)
+	s.AdverseDelta = &delta
 }

@@ -20,6 +20,15 @@ func (s *Store) RouteWeatherStats(ctx context.Context, filter store.RouteStatsFi
 
 	query, args := buildRouteWeatherStatsQuery(filter)
 
+	counts, err := s.queryWeatherCategoryCounts(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return store.AssembleRouteWeatherStats(filter, counts), nil
+}
+
+func (s *Store) queryWeatherCategoryCounts(ctx context.Context, query string, args ...any) ([]store.WeatherCategoryCount, error) {
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -41,7 +50,7 @@ func (s *Store) RouteWeatherStats(ctx context.Context, filter store.RouteStatsFi
 		return nil, err
 	}
 
-	return store.AssembleRouteWeatherStats(filter, counts), nil
+	return counts, nil
 }
 
 // RebuildRouteWeatherStats replaces per-side route weather rollups from

@@ -410,6 +410,11 @@ definitions:
         type: number
       on_time_probability:
         type: number
+      weather:
+        allOf:
+        - $ref: '#/definitions/model.RouteOutlookWeather'
+        description: Weather is route-level fair and adverse on-time rates, not this
+          departure slot.
     type: object
   model.RouteOutlook:
     properties:
@@ -442,6 +447,44 @@ definitions:
       median_departure_delay_when_delayed:
         type: number
       on_time_probability:
+        type: number
+      weather:
+        allOf:
+        - $ref: '#/definitions/model.RouteOutlookWeather'
+        description: Weather is route-level fair and adverse on-time rates, not this
+          departure slot.
+    type: object
+  model.RouteOutlookWeather:
+    properties:
+      dest:
+        $ref: '#/definitions/model.RouteOutlookWeatherSide'
+      origin:
+        $ref: '#/definitions/model.RouteOutlookWeatherSide'
+    type: object
+  model.RouteOutlookWeatherSide:
+    properties:
+      adverse_delta:
+        description: AdverseDelta is adverse_on_time_rate minus fair_on_time_rate,
+          or null unless both rates exist.
+        type: number
+      adverse_flights:
+        description: AdverseFlights counts adverse-category flights. UNKNOWN and unmatched
+          flights are excluded.
+        type: integer
+      adverse_on_time_rate:
+        description: AdverseOnTimeRate is null when this side has no adverse flights.
+        type: number
+      confidence:
+        description: Confidence is unknown when fair or adverse flights are absent,
+          and low when the thinner group is below the outlook minimum. A thin sample
+          keeps its rates.
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
+      fair_on_time_rate:
+        description: FairOnTimeRate is null when this side has no VFR_FAIR flights.
         type: number
     type: object
   model.RouteStats:
@@ -728,7 +771,8 @@ paths:
       - application/json
       description: Historical outlook for 2–4 ordered legs and each connection. Always
         200. A leg with no history has a null outlook and an error, not sample_reason
-        empty_sample.
+        empty_sample. Each leg outlook includes route-level weather rates, which do
+        not change that connection's status or confidence.
       parameters:
       - description: Ordered legs
         in: body
@@ -789,7 +833,9 @@ paths:
         is the smallest layover that is ok. loose_minutes is 30 minutes above recommended_minutes.
         A shorter layover is tight. A null bucket means that connection status is
         unknown. These minutes are not an official airline MCT. Itinerary connections
-        use the same thresholds and confidence. Returns 404 when the origin, destination,
+        use the same thresholds and confidence. weather is route-level fair and adverse
+        on-time rates for this route and carrier over the analysis window; it does
+        not change confidence or connection status. Returns 404 when the origin, destination,
         and carrier have no flight-performance data. That not-found case is not empty_sample.
         A day-of-week or departure-time window that matches nothing still returns
         200.

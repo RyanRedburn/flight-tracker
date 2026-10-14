@@ -23,6 +23,10 @@ const (
 	WeatherStatsRebuildJobLockKey = "queue_rebuild_route_weather_stats"
 )
 
+// adverseWeatherCategories is every stored category except VFR_FAIR and UNKNOWN.
+// UNMATCHED is a rollup bucket, not a category, so it is absent here too.
+var adverseWeatherCategories = adverseWeatherCategorySet()
+
 // WeatherCategoryCount is one precomputed side/category rollup row summed for a filter.
 type WeatherCategoryCount struct {
 	Side        string
@@ -118,6 +122,103 @@ func (a *weatherSideAccum) add(count WeatherCategoryCount) {
 	slot.flights += count.Flights
 	a.byCat[count.Category] = slot
 	a.flights += count.Flights
+}
+
+// AssembleRouteOutlookWeather folds per-side rollup counts into the outlook modifier.
+// Fair is VFR_FAIR. Adverse is every other category except UNKNOWN.
+// UNMATCHED and unknown category strings are excluded.
+// Confidence uses the thinner of the two groups and the outlook sample minimum:
+// absent fair or adverse flights are unknown, and a short group is low.
+// Rates stay on a low-confidence side. A missing group is a null rate, so adverse_delta is null.
+func AssembleRouteOutlookWeather(counts []WeatherCategoryCount) model.RouteOutlookWeather {
+	origin := &outlookWeatherAccum{}
+	dest := &outlookWeatherAccum{}
+
+	for _, count := range counts {
+		switch count.Side {
+		case WeatherSideOrigin:
+			origin.add(count)
+		case WeatherSideDest:
+			dest.add(count)
+		}
+	}
+
+	out := model.RouteOutlookWeather{
+		Origin: origin.side(),
+		Dest:   dest.side(),
+	}
+	out.RoundForResponse()
+
+	return out
+}
+
+type outlookWeatherAccum struct {
+	fairOnTime     int
+	fairFlights    int
+	adverseOnTime  int
+	adverseFlights int
+}
+
+func (a *outlookWeatherAccum) add(count WeatherCategoryCount) {
+	if count.Flights < 1 {
+		return
+	}
+
+	if count.Category == model.WeatherCategoryVFRFair {
+		a.fairOnTime += count.OnTimeCount
+		a.fairFlights += count.Flights
+
+		return
+	}
+
+	if _, ok := adverseWeatherCategories[count.Category]; !ok {
+		return
+	}
+
+	a.adverseOnTime += count.OnTimeCount
+	a.adverseFlights += count.Flights
+}
+
+func (a *outlookWeatherAccum) side() model.RouteOutlookWeatherSide {
+	return model.RouteOutlookWeatherSide{
+		FairOnTimeRate:    sampleRatePtr(a.fairOnTime, a.fairFlights),
+		AdverseOnTimeRate: sampleRatePtr(a.adverseOnTime, a.adverseFlights),
+		AdverseFlights:    a.adverseFlights,
+		Confidence:        weatherSideConfidence(a.fairFlights, a.adverseFlights),
+	}
+}
+
+func adverseWeatherCategorySet() map[string]struct{} {
+	set := make(map[string]struct{}, len(model.WeatherCategoryOrder()))
+
+	for _, category := range model.WeatherCategoryOrder() {
+		if category == model.WeatherCategoryVFRFair || category == model.WeatherCategoryUnknown {
+			continue
+		}
+
+		set[category] = struct{}{}
+	}
+
+	return set
+}
+
+func weatherSideConfidence(fairFlights, adverseFlights int) string {
+	sample := fairFlights
+	if adverseFlights < sample {
+		sample = adverseFlights
+	}
+
+	return model.SeasonalConfidence(sample, MinOutlookSampleSize)
+}
+
+func sampleRatePtr(onTime, flights int) *float64 {
+	if flights <= 0 {
+		return nil
+	}
+
+	v := rate(onTime, flights)
+
+	return &v
 }
 
 func (a *weatherSideAccum) stats() model.WeatherSideStats {
