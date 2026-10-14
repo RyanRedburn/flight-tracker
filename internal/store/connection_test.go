@@ -163,9 +163,16 @@ func withFloors(g model.ConnectionGuidance, floors [4]bool) model.ConnectionGuid
 	}
 
 	for i, bucket := range buckets {
-		if bucket != nil {
-			bucket.FloorOnly = floors[i]
+		if bucket == nil {
+			continue
 		}
+
+		if floors[i] {
+			bucket.MCTSource = model.MCTSourceDefault
+			continue
+		}
+
+		bucket.MCTSource = model.MCTSourceAirport
 	}
 
 	return g

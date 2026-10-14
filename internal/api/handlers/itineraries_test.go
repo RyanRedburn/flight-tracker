@@ -72,6 +72,12 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Fatalf("first leg = %+v", out.Legs[0])
 			}
 
+			if out.Analysis.SampleSize != 80 || out.Analysis.Start != "2025-10-06" || out.Analysis.End != "2026-10-06" {
+				t.Fatalf("analysis = %+v", out.Analysis)
+			}
+
+			assertNestedOutlookResults(t, rec.Body.Bytes(), 0)
+
 			if out.Legs[0].DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes || out.Legs[1].DepTimeWindowMinutes != 45 {
 				t.Fatalf("windows = %d %d", out.Legs[0].DepTimeWindowMinutes, out.Legs[1].DepTimeWindowMinutes)
 			}
@@ -98,8 +104,8 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Errorf("confidence = %q, want high", conn.Confidence)
 			}
 
-			if conn.Reason != model.ConnectionReasonEvaluated || conn.Overnight || conn.FloorOnly == nil || *conn.FloorOnly {
-				t.Errorf("reason = %q overnight %v floor_only %v", conn.Reason, conn.Overnight, conn.FloorOnly)
+			if conn.Reason != model.ConnectionReasonEvaluated || conn.Overnight || conn.MCTSource == nil || *conn.MCTSource != model.MCTSourceAirport {
+				t.Errorf("reason = %q overnight %v mct_source %v", conn.Reason, conn.Overnight, conn.MCTSource)
 			}
 
 			if len(filters) != 2 {
@@ -133,8 +139,8 @@ func TestItineraryOutlookOvernight(t *testing.T) {
 		t.Fatalf("status = %s reason = %s overnight %v, body = %s", conn.Status, conn.Reason, conn.Overnight, rec.Body.String())
 	}
 
-	if conn.FloorOnly == nil || *conn.FloorOnly {
-		t.Fatalf("floor_only = %v, want false", conn.FloorOnly)
+	if conn.MCTSource == nil || *conn.MCTSource != model.MCTSourceAirport {
+		t.Fatalf("mct_source = %v, want airport", conn.MCTSource)
 	}
 
 	assertMinutes(t, "layover", conn.LayoverMinutes, 540)
@@ -183,8 +189,8 @@ func TestItineraryOutlookConnectionTypes(t *testing.T) {
 			t.Fatalf("connection %d = %+v", i, conn)
 		}
 
-		if conn.FloorOnly == nil || *conn.FloorOnly {
-			t.Fatalf("connection %d floor_only = %v, want false", i, conn.FloorOnly)
+		if conn.MCTSource == nil || *conn.MCTSource != model.MCTSourceAirport {
+			t.Fatalf("connection %d mct_source = %v, want airport", i, conn.MCTSource)
 		}
 
 		if conn.ConnectionType == nil || *conn.ConnectionType != tt.typ {
@@ -211,11 +217,11 @@ func TestItineraryOutlookMismatch(t *testing.T) {
 	out := decodeItinerary(t, rec)
 	conn := out.Connections[0]
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMultiAirport || conn.FloorOnly != nil || conn.ConnectionType != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMultiAirport || conn.MCTSource != nil || conn.ConnectionType != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 
-	if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Confidence != model.ConfidenceHigh {
+	if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Analysis.Confidence != model.ConfidenceHigh {
 		t.Fatalf("inbound outlook confidence = %+v", out.Legs[0].Outlook)
 	}
 
@@ -234,8 +240,8 @@ func TestItineraryOutlookMissingLeg(t *testing.T) {
 			}
 
 			out := outlookWithMinutes(45, 60, 120, 180)
-			out.Origin = filter.Origin
-			out.Dest = filter.Dest
+			out.Filters.Origin = filter.Origin
+			out.Filters.Dest = filter.Dest
 
 			return out, nil
 		},
@@ -259,7 +265,7 @@ func TestItineraryOutlookMissingLeg(t *testing.T) {
 	}
 
 	conn := out.Connections[0]
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMissingOutlook || conn.FloorOnly != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
+	if conn.Status != model.ConnectionUnknown || conn.Confidence != model.ConfidenceUnknown || conn.Reason != model.ConnectionReasonMissingOutlook || conn.MCTSource != nil || conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
 		t.Fatalf("connection = %+v", conn)
 	}
 
@@ -394,25 +400,31 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 				return nil, store.ErrNotFound
 			case testOriginORD:
 				zero := 0.0
-				out := &model.RouteOutlook{Origin: filter.Origin, Dest: filter.Dest, Carrier: filter.Carrier, SampleSize: 0, OnTimeProbability: &zero}
+				out := &model.RouteOutlook{
+					Filters: model.Filters{Origin: filter.Origin, Dest: filter.Dest, Carrier: filter.Carrier},
+					OutlookResult: model.OutlookResult{
+						Analysis:          model.Analysis{SampleSize: 0},
+						OnTimeProbability: &zero,
+					},
+				}
 				out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
 				return out, nil
 			case testDestLAX:
 				out := &model.RouteOutlook{
-					Origin:            filter.Origin,
-					Dest:              filter.Dest,
-					Carrier:           filter.Carrier,
-					SampleSize:        4,
-					OnTimeProbability: floatPtr(0),
+					Filters: model.Filters{Origin: filter.Origin, Dest: filter.Dest, Carrier: filter.Carrier},
+					OutlookResult: model.OutlookResult{
+						Analysis:          model.Analysis{SampleSize: 4},
+						OnTimeProbability: floatPtr(0),
+					},
 				}
 				out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
 				return out, nil
 			default:
 				out := outlookWithMinutes(45, 60, 120, 180)
-				out.Origin = filter.Origin
-				out.Dest = filter.Dest
+				out.Filters.Origin = filter.Origin
+				out.Filters.Dest = filter.Dest
 
 				return out, nil
 			}
@@ -448,7 +460,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("empty leg = %+v", emptyLeg)
 	}
 
-	if emptyLeg.Outlook.SampleReason != model.SampleReasonEmptySample || emptyLeg.Outlook.Confidence != model.ConfidenceUnknown || emptyLeg.Outlook.InsufficientSample {
+	if emptyLeg.Outlook.Analysis.SampleReason != model.SampleReasonEmptySample || emptyLeg.Outlook.Analysis.Confidence != model.ConfidenceUnknown {
 		t.Fatalf("empty outlook = %+v", emptyLeg.Outlook)
 	}
 
@@ -461,7 +473,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("thin leg = %+v", thinLeg)
 	}
 
-	if thinLeg.Outlook.SampleReason != model.SampleReasonInsufficientSample || !thinLeg.Outlook.InsufficientSample || thinLeg.Outlook.Confidence != model.ConfidenceLow {
+	if thinLeg.Outlook.Analysis.SampleReason != model.SampleReasonInsufficientSample || thinLeg.Outlook.Analysis.Confidence != model.ConfidenceLow {
 		t.Fatalf("thin outlook = %+v", thinLeg.Outlook)
 	}
 
@@ -469,7 +481,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("thin on_time_probability = %s, want 0", outlookJSONField(t, rec.Body.Bytes(), 2, "on_time_probability"))
 	}
 
-	if out.Legs[3].Outlook == nil || out.Legs[3].Outlook.SampleReason != model.SampleReasonSufficient || out.Legs[3].Outlook.Confidence != model.ConfidenceHigh {
+	if out.Legs[3].Outlook == nil || out.Legs[3].Outlook.Analysis.SampleReason != model.SampleReasonSufficient || out.Legs[3].Outlook.Analysis.Confidence != model.ConfidenceHigh {
 		t.Fatalf("solid leg = %+v", out.Legs[3])
 	}
 
@@ -478,12 +490,12 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	neverSeen := out.Connections[0]
-	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.Reason != model.ConnectionReasonMissingOutlook || neverSeen.FloorOnly != nil || neverSeen.RecommendedMinutes != nil {
+	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.Reason != model.ConnectionReasonMissingOutlook || neverSeen.MCTSource != nil || neverSeen.RecommendedMinutes != nil {
 		t.Fatalf("never-seen connection = %+v", neverSeen)
 	}
 
 	emptyConn := out.Connections[1]
-	if emptyConn.Status != model.ConnectionUnknown || emptyConn.Confidence != model.ConfidenceUnknown || emptyConn.Reason != model.SampleReasonEmptySample || emptyConn.FloorOnly != nil || emptyConn.RecommendedMinutes != nil {
+	if emptyConn.Status != model.ConnectionUnknown || emptyConn.Confidence != model.ConfidenceUnknown || emptyConn.Reason != model.SampleReasonEmptySample || emptyConn.MCTSource != nil || emptyConn.RecommendedMinutes != nil {
 		t.Fatalf("empty-sample connection = %+v", emptyConn)
 	}
 
@@ -492,12 +504,27 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	thinConn := out.Connections[2]
-	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.SampleReasonInsufficientSample || thinConn.FloorOnly != nil || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
+	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.SampleReasonInsufficientSample || thinConn.MCTSource != nil || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
 		t.Fatalf("thin connection = %+v", thinConn)
 	}
 }
 
-func outlookJSONField(t *testing.T, body []byte, leg int, field string) string {
+func assertNestedOutlookResults(t *testing.T, body []byte, leg int) {
+	t.Helper()
+
+	outlook := nestedOutlookObject(t, body, leg)
+	for _, field := range []string{"origin", "dest", "carrier", "dep_time", "day_of_week", "filters"} {
+		if _, ok := outlook[field]; ok {
+			t.Fatalf("nested outlook repeated %s: %s", field, outlook[field])
+		}
+	}
+
+	if _, ok := outlook["analysis"]; !ok {
+		t.Fatal("nested outlook missing analysis")
+	}
+}
+
+func nestedOutlookObject(t *testing.T, body []byte, leg int) map[string]json.RawMessage {
 	t.Helper()
 
 	var root map[string]json.RawMessage
@@ -515,16 +542,39 @@ func outlookJSONField(t *testing.T, body []byte, leg int, field string) string {
 		t.Fatalf("unmarshal outlook: %v", err)
 	}
 
-	return string(outlook[field])
+	return outlook
+}
+
+func outlookJSONField(t *testing.T, body []byte, leg int, field string) string {
+	t.Helper()
+
+	return string(nestedOutlookObject(t, body, leg)[field])
 }
 
 func outlookWithMinutes(dd, di, id, ii int) *model.RouteOutlook {
+	guidance := model.ConnectionGuidanceFromRecommended(dd, di, id, ii)
+	for _, bucket := range []*model.ConnectionMinutes{
+		guidance.DomesticToDomestic,
+		guidance.DomesticToInternational,
+		guidance.InternationalToDomestic,
+		guidance.InternationalToInternational,
+	} {
+		if bucket != nil {
+			bucket.MCTSource = model.MCTSourceAirport
+		}
+	}
+
 	return &model.RouteOutlook{
-		SampleSize:         40,
-		InsufficientSample: false,
-		SampleReason:       model.SampleReasonSufficient,
-		Confidence:         model.ConfidenceHigh,
-		Connection:         model.ConnectionGuidanceFromRecommended(dd, di, id, ii),
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				Start:        "2025-10-06",
+				End:          "2026-10-06",
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			},
+			Connection: guidance,
+		},
 	}
 }
 

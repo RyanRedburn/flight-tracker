@@ -47,22 +47,26 @@ type ItineraryLeg struct {
 }
 
 type ItineraryOutlookResponse struct {
+	// Filters is empty. The request is the legs.
+	Filters Filters `json:"filters"`
+	// Analysis spans the leg outlook windows. sample_size is the sum of those samples.
+	Analysis    Analysis              `json:"analysis"`
 	Legs        []ItineraryOutlookLeg `json:"legs"`
 	Connections []ItineraryConnection `json:"connections"`
 }
 
 type ItineraryOutlookLeg struct {
-	Index                int           `json:"index"`
-	Origin               string        `json:"origin"`
-	Dest                 string        `json:"dest"`
-	Carrier              string        `json:"carrier"`
-	Date                 string        `json:"date"`
-	DepTime              string        `json:"dep_time"`
-	ArrTime              string        `json:"arr_time"`
-	DepTimeWindowMinutes int           `json:"dep_time_window_minutes"`
-	DayOfWeek            int           `json:"day_of_week"`
-	Outlook              *RouteOutlook `json:"outlook"`
-	Error                *string       `json:"error"`
+	Index                int            `json:"index"`
+	Origin               string         `json:"origin"`
+	Dest                 string         `json:"dest"`
+	Carrier              string         `json:"carrier"`
+	Date                 string         `json:"date"`
+	DepTime              string         `json:"dep_time"`
+	ArrTime              string         `json:"arr_time"`
+	DepTimeWindowMinutes int            `json:"dep_time_window_minutes"`
+	DayOfWeek            int            `json:"day_of_week"`
+	Outlook              *OutlookResult `json:"outlook"`
+	Error                *string        `json:"error"`
 }
 
 type ItineraryConnection struct {
@@ -79,8 +83,8 @@ type ItineraryConnection struct {
 	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
 	// Overnight stays true for a later outbound date, including multi-day, when reason names another cause.
 	Overnight bool `json:"overnight"`
-	// FloorOnly is null when this hop did not use a connection bucket.
-	FloorOnly *bool `json:"floor_only"`
+	// MCTSource is airport or default when this hop used a connection bucket, and null otherwise.
+	MCTSource *string `json:"mct_source" enums:"airport,default"`
 }
 
 func (r *ItineraryOutlookRequest) Validate() error {

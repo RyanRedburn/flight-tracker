@@ -28,14 +28,11 @@ type WeatherSideStats struct {
 
 // RouteWeatherStats is on-time performance by observed METAR category for a route.
 type RouteWeatherStats struct {
-	Origin        string            `json:"origin"`
-	Dest          string            `json:"dest"`
-	StartDate     string            `json:"start_date"`
-	EndDate       string            `json:"end_date"`
-	Filters       RouteStatsFilters `json:"filters"`
-	Flights       int               `json:"flights"`
-	OriginWeather WeatherSideStats  `json:"origin_weather"`
-	DestWeather   WeatherSideStats  `json:"dest_weather"`
+	Filters       Filters          `json:"filters"`
+	Analysis      Analysis         `json:"analysis"`
+	Flights       int              `json:"flights"`
+	OriginWeather WeatherSideStats `json:"origin_weather"`
+	DestWeather   WeatherSideStats `json:"dest_weather"`
 }
 
 // WeatherCategoryOrder is the first-match category priority, then UNKNOWN.

@@ -87,14 +87,14 @@ func TestItineraryOutlookRequestValidate(t *testing.T) {
 }
 
 func TestItineraryConnectionJSON(t *testing.T) {
-	floor := true
+	source := MCTSourceDefault
 
 	body, err := json.Marshal(ItineraryConnection{
 		Status:     ConnectionUnknown,
 		Confidence: ConfidenceUnknown,
 		Reason:     ConnectionReasonMultiAirport,
 		Overnight:  true,
-		FloorOnly:  &floor,
+		MCTSource:  &source,
 	})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
@@ -105,7 +105,7 @@ func TestItineraryConnectionJSON(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	if string(got["reason"]) != `"`+ConnectionReasonMultiAirport+`"` || string(got["overnight"]) != "true" || string(got["floor_only"]) != "true" {
+	if string(got["reason"]) != `"`+ConnectionReasonMultiAirport+`"` || string(got["overnight"]) != "true" || string(got["mct_source"]) != `"`+MCTSourceDefault+`"` {
 		t.Fatalf("connection JSON = %s", body)
 	}
 
@@ -122,7 +122,7 @@ func TestItineraryConnectionJSON(t *testing.T) {
 		t.Fatalf("unmarshal unset: %v", err)
 	}
 
-	if string(got["reason"]) != `"`+SampleReasonEmptySample+`"` || string(got["overnight"]) != "false" || string(got["floor_only"]) != "null" || string(got["status"]) != `"`+ConnectionUnknown+`"` {
+	if string(got["reason"]) != `"`+SampleReasonEmptySample+`"` || string(got["overnight"]) != "false" || string(got["mct_source"]) != "null" || string(got["status"]) != `"`+ConnectionUnknown+`"` {
 		t.Fatalf("unset connection JSON = %s", unset)
 	}
 }

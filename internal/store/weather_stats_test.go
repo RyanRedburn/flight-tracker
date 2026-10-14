@@ -26,7 +26,7 @@ func TestAssembleRouteWeatherStatsBothSides(t *testing.T) {
 		{Side: WeatherSideDest, Category: WeatherUnmatched, OnTimeCount: 1, Flights: 1},
 	})
 
-	if got.Origin != testTravelOrigin || got.Dest != testTravelDest || got.Filters.Carrier != "UA" || got.Filters.FlightNumber != "100" {
+	if got.Filters.Origin != testTravelOrigin || got.Filters.Dest != testTravelDest || got.Filters.Carrier != "UA" || got.Filters.FlightNumber != "100" {
 		t.Fatalf("identity = %+v", got)
 	}
 
@@ -90,7 +90,7 @@ func TestAssembleRouteWeatherStatsEmpty(t *testing.T) {
 		t.Fatalf("empty = %+v", got)
 	}
 
-	if got.Filters.DaysOfWeek == nil || len(got.OriginWeather.Categories) != len(model.WeatherCategoryOrder()) {
+	if len(got.Filters.DaysOfWeek) != 0 || len(got.OriginWeather.Categories) != len(model.WeatherCategoryOrder()) {
 		t.Fatalf("empty shape = %+v", got)
 	}
 

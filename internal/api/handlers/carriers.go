@@ -19,7 +19,7 @@ func NewCarriersHandler(s store.Store) *CarriersHandler {
 // Stats returns historical on-time performance for a marketing carrier.
 //
 //	@Summary		Carrier performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). State is a 2-letter code matching origin or dest. Returns 404 when the carrier has no flight-performance data. Date and state filters that match nothing still return 200.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). When dates are omitted, that default window is analysis.start and analysis.end, and filters does not repeat it. State is a 2-letter code matching origin or dest. Returns 404 when the carrier has no flight-performance data. Date and state filters that match nothing still return 200.
 //	@Tags			carriers,external
 //	@Produce		json
 //	@Param			carrier		query		string	true	"Marketing carrier code"	minlength(2)	maxlength(2)

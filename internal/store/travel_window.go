@@ -69,7 +69,7 @@ func AssembleRouteTravelWindows(
 	windowFlights int,
 	counts []TravelWindowBucketCount,
 ) *model.RouteTravelWindows {
-	out := emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd)
+	out := emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd, windowFlights)
 
 	months := make([]model.TravelWindowMonthBucket, 0)
 	days := make([]model.TravelWindowDayBucket, 0)
@@ -172,13 +172,18 @@ func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourM
 	}
 }
 
-func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd string) *model.RouteTravelWindows {
+func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd string, windowFlights int) *model.RouteTravelWindows {
 	return &model.RouteTravelWindows{
-		Origin:      origin,
-		Dest:        dest,
-		Carrier:     carrier,
-		WindowStart: windowStart,
-		WindowEnd:   windowEnd,
+		Filters: model.Filters{
+			Origin:  origin,
+			Dest:    dest,
+			Carrier: carrier,
+		},
+		Analysis: model.Analysis{
+			Start:      windowStart,
+			End:        windowEnd,
+			SampleSize: windowFlights,
+		},
 		ByMonth:     []model.TravelWindowMonthBucket{},
 		ByDayOfWeek: []model.TravelWindowDayBucket{},
 		ByHour:      []model.TravelWindowHourBucket{},

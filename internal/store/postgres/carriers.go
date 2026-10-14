@@ -42,9 +42,10 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 
 		filter.StartDate = start
 		filter.EndDate = end
-		stats.StartDate = start
-		stats.EndDate = end
 	}
+
+	stats.Analysis.Start = filter.StartDate
+	stats.Analysis.End = filter.EndDate
 
 	if err := s.scanCarrierOverall(ctx, filter, stats); err != nil {
 		return nil, err
@@ -70,10 +71,12 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 
 func emptyCarrierStats(filter store.CarrierStatsFilter) *model.CarrierStats {
 	return &model.CarrierStats{
-		Carrier:       filter.Carrier,
-		StartDate:     filter.StartDate,
-		EndDate:       filter.EndDate,
-		Filters:       model.CarrierStatsFilters{State: filter.State},
+		Filters: model.Filters{
+			Carrier:   filter.Carrier,
+			State:     filter.State,
+			StartDate: filter.StartDate,
+			EndDate:   filter.EndDate,
+		},
 		BestRoutes:    []model.CarrierRouteStat{},
 		WorstRoutes:   []model.CarrierRouteStat{},
 		BestAirports:  []model.CarrierAirportStat{},
@@ -91,6 +94,7 @@ func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStat
 	}
 
 	applyDelayStats(scanned, carrierDelayFields(stats))
+	stats.Analysis.SampleSize = stats.Flights
 
 	return nil
 }

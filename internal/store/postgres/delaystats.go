@@ -18,6 +18,7 @@ type delayStatsScan struct {
 	avgArrDelayed     sql.NullFloat64
 	medianArrDelayed  sql.NullFloat64
 	avgDep            sql.NullFloat64
+	medianDep         sql.NullFloat64
 	avgDepDelayed     sql.NullFloat64
 	causeCarrier      sql.NullFloat64
 	causeWeather      sql.NullFloat64
@@ -44,6 +45,7 @@ func (row *delayStatsScan) args() []any {
 		&row.avgArrDelayed,
 		&row.medianArrDelayed,
 		&row.avgDep,
+		&row.medianDep,
 		&row.avgDepDelayed,
 		&row.causeCarrier,
 		&row.causeWeather,
@@ -74,6 +76,7 @@ type delayStatFields struct {
 	avgArrivalDelayWhenDelayed    *float64
 	medianArrivalDelayWhenDelayed *float64
 	avgDepartureDelayMinutes      *float64
+	medianDepartureDelayMinutes   *float64
 	avgDepartureDelayWhenDelayed  *float64
 	causes                        *model.DelayCausesAvgMinutes
 	share                         *model.DelayCausesShare
@@ -94,6 +97,7 @@ func applyDelayStats(row delayStatsScan, dst delayStatFields) {
 	*dst.avgArrivalDelayWhenDelayed = nullFloat(row.avgArrDelayed)
 	*dst.medianArrivalDelayWhenDelayed = nullFloat(row.medianArrDelayed)
 	*dst.avgDepartureDelayMinutes = nullFloat(row.avgDep)
+	*dst.medianDepartureDelayMinutes = nullFloat(row.medianDep)
 	*dst.avgDepartureDelayWhenDelayed = nullFloat(row.avgDepDelayed)
 
 	if row.delayed == 0 {
@@ -134,6 +138,7 @@ func routeDelayFields(stats *model.RouteStats) delayStatFields {
 		avgArrivalDelayWhenDelayed:    &stats.AvgArrivalDelayWhenDelayed,
 		medianArrivalDelayWhenDelayed: &stats.MedianArrivalDelayWhenDelayed,
 		avgDepartureDelayMinutes:      &stats.AvgDepartureDelayMinutes,
+		medianDepartureDelayMinutes:   &stats.MedianDepartureDelayMinutes,
 		avgDepartureDelayWhenDelayed:  &stats.AvgDepartureDelayWhenDelayed,
 		causes:                        &stats.DelayCausesAvgMinutes,
 		share:                         &stats.DelayCausesShare,
@@ -156,6 +161,7 @@ func carrierDelayFields(stats *model.CarrierStats) delayStatFields {
 		avgArrivalDelayWhenDelayed:    &stats.AvgArrivalDelayWhenDelayed,
 		medianArrivalDelayWhenDelayed: &stats.MedianArrivalDelayWhenDelayed,
 		avgDepartureDelayMinutes:      &stats.AvgDepartureDelayMinutes,
+		medianDepartureDelayMinutes:   &stats.MedianDepartureDelayMinutes,
 		avgDepartureDelayWhenDelayed:  &stats.AvgDepartureDelayWhenDelayed,
 		causes:                        &stats.DelayCausesAvgMinutes,
 		share:                         &stats.DelayCausesShare,
