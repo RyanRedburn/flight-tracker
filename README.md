@@ -185,7 +185,7 @@ Consumer reads stay on `/api/v1`. Operator routes (ingest, jobs, freshness, rebu
 
 When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. Date and flight-number filters that match nothing still return **200** with zero counts. Route outlook is also **200** when that carrier has flown the route but the weekday and departure window are empty: `sample_reason` is `empty_sample`, `insufficient_sample` is false, `confidence` is `unknown`, and probability and delay fields are null. A smaller non-empty outlook sample is `sample_reason` `insufficient_sample` (the bool is true, `confidence` is `low`). A valid itinerary body returns **200**. A leg with no history has a null outlook and `error`; a seen leg carries the same outlook `sample_reason`. Field rules are in Swagger.
 
-Outlook and itinerary share connection status and confidence. Travel-window reliability is seasonal on-time only; a thin bucket stays `unknown` rather than `unreliable`.
+Outlook and itinerary share connection status and confidence. Travel-window reliability is seasonal on-time only; a thin bucket stays `unknown` rather than `unreliable`. Outlook `weather` is route-level fair versus adverse on-time history and does not change connection status or confidence.
 
 ```bash
 # Liveness

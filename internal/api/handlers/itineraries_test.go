@@ -115,6 +115,51 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 	}
 }
 
+func TestItineraryOutlookWeatherDoesNotChangeConnection(t *testing.T) {
+	weather := store.AssembleRouteOutlookWeather([]store.WeatherCategoryCount{
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryVFRFair, OnTimeCount: 40, Flights: 50},
+		{Side: store.WeatherSideOrigin, Category: model.WeatherCategoryIFR, OnTimeCount: 10, Flights: 40},
+		{Side: store.WeatherSideDest, Category: model.WeatherCategoryVFRFair, OnTimeCount: 1, Flights: 2},
+		{Side: store.WeatherSideDest, Category: model.WeatherCategoryMVFR, OnTimeCount: 1, Flights: 2},
+	})
+	outlook := outlookWithMinutes(60, 70, 80, 90)
+	outlook.Weather = weather
+
+	h := itineraryHandler(outlook, map[string]string{
+		testOriginBOS: "US",
+		testOriginORD: "US",
+		testDestLAX:   "US",
+	}, nil)
+
+	rec := postItinerary(t, h, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
+		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0905},
+		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1400"},
+	}})
+	out := decodeItinerary(t, rec)
+
+	if out.Legs[0].Outlook == nil || out.Legs[1].Outlook == nil {
+		t.Fatal("expected both leg outlooks")
+	}
+
+	origin := out.Legs[0].Outlook.Weather.Origin
+	if origin.Confidence != model.ConfidenceHigh || origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.25 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.55 || origin.AdverseFlights != 40 {
+		t.Fatalf("leg weather origin = %+v", origin)
+	}
+
+	if out.Legs[0].Outlook.Weather.Dest.Confidence != model.ConfidenceLow {
+		t.Fatalf("leg weather dest confidence = %q", out.Legs[0].Outlook.Weather.Dest.Confidence)
+	}
+
+	if out.Legs[0].Outlook.Confidence != model.ConfidenceHigh {
+		t.Fatalf("outlook confidence = %q", out.Legs[0].Outlook.Confidence)
+	}
+
+	conn := out.Connections[0]
+	if conn.Status != model.ConnectionLoose || conn.Confidence != model.ConfidenceHigh || conn.Reason != model.ConnectionReasonEvaluated {
+		t.Fatalf("connection = %+v", conn)
+	}
+}
+
 func TestItineraryOutlookOvernight(t *testing.T) {
 	h := itineraryHandler(outlookWithMinutes(45, 60, 120, 180), map[string]string{
 		testOriginBOS: "US",
