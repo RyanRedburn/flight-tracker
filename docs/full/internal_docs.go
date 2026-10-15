@@ -1198,7 +1198,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.unknown_connections counts connections with status unknown.",
+                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.origin and summary.destination are the first origin and the last destination. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.connection_risk is the worst connection status, from loose through ok and unknown to tight, and is omitted when there are no connections.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2678,7 +2678,7 @@ const docTemplateinternal = `{
                     }
                 },
                 "summary": {
-                    "description": "Summary is the lowest leg confidence and how many connections are unknown.",
+                    "description": "Summary is the trip endpoints, the lowest leg confidence, and the worst connection.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.ItineraryOutlookSummary"
@@ -2699,9 +2699,23 @@ const docTemplateinternal = `{
                         "unknown"
                     ]
                 },
-                "unknown_connections": {
-                    "description": "UnknownConnections counts connections whose status is unknown.",
-                    "type": "integer"
+                "connection_risk": {
+                    "description": "ConnectionRisk is the worst connection status: loose, then ok, then unknown, then tight.\nOmitted when the itinerary has no connections.",
+                    "type": "string",
+                    "enum": [
+                        "loose",
+                        "ok",
+                        "tight",
+                        "unknown"
+                    ]
+                },
+                "destination": {
+                    "description": "Destination is the last leg's destination airport.",
+                    "type": "string"
+                },
+                "origin": {
+                    "description": "Origin is the first leg's origin airport.",
+                    "type": "string"
                 }
             }
         },

@@ -204,12 +204,12 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 		out.Connections = append(out.Connections, conn)
 	}
 
-	out.Summary = itinerarySummary(out.Legs, out.Connections)
+	out.Summary = itinerarySummary(legs, out.Legs, out.Connections)
 
 	return out
 }
 
-func itinerarySummary(legs []model.ItineraryOutlookLeg, connections []model.ItineraryConnection) model.ItineraryOutlookSummary {
+func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutlookLeg, connections []model.ItineraryConnection) model.ItineraryOutlookSummary {
 	confidence := model.ConfidenceHigh
 	if len(legs) == 0 {
 		confidence = model.ConfidenceUnknown
@@ -226,18 +226,23 @@ func itinerarySummary(legs []model.ItineraryOutlookLeg, connections []model.Itin
 		}
 	}
 
-	unknown := 0
+	connectionRisk := ""
 
 	for _, conn := range connections {
-		if conn.Status == model.ConnectionUnknown {
-			unknown++
-		}
+		connectionRisk = model.WorstConnectionStatus(connectionRisk, conn.Status)
 	}
 
-	return model.ItineraryOutlookSummary{
-		Confidence:         confidence,
-		UnknownConnections: unknown,
+	summary := model.ItineraryOutlookSummary{
+		Confidence:     confidence,
+		ConnectionRisk: connectionRisk,
 	}
+
+	if n := len(requested); n > 0 {
+		summary.Origin = requested[0].Origin
+		summary.Destination = requested[n-1].Dest
+	}
+
+	return summary
 }
 
 func confidenceRank(confidence string) int {

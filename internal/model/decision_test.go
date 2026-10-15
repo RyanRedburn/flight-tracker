@@ -31,6 +31,29 @@ func TestConnectionStatus(t *testing.T) {
 	}
 }
 
+func TestWorstConnectionStatus(t *testing.T) {
+	tests := []struct {
+		name     string
+		statuses []string
+		want     string
+	}{
+		{name: "none", want: ""},
+		{name: "loose", statuses: []string{ConnectionLoose}, want: ConnectionLoose},
+		{name: "ok worse than loose", statuses: []string{ConnectionLoose, ConnectionOK}, want: ConnectionOK},
+		{name: "unknown worse than ok", statuses: []string{ConnectionOK, ConnectionUnknown}, want: ConnectionUnknown},
+		{name: "tight worse than unknown", statuses: []string{ConnectionUnknown, ConnectionTight, ConnectionLoose}, want: ConnectionTight},
+		{name: "unrecognized ignored", statuses: []string{"", ConnectionOK, "at-risk"}, want: ConnectionOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := WorstConnectionStatus(tt.statuses...); got != tt.want {
+				t.Errorf("WorstConnectionStatus(%q) = %q, want %q", tt.statuses, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOutlookConfidence(t *testing.T) {
 	tests := []struct {
 		name         string

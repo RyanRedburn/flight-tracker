@@ -1,7 +1,9 @@
 package store
 
 import (
+	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -483,7 +485,7 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		t.Fatalf("first leg = %+v", got.Legs[0])
 	}
 
-	if got.Summary.Confidence != model.ConfidenceUnknown || got.Summary.UnknownConnections != 1 {
+	if got.Summary.Origin != "bos" || got.Summary.Destination != testAirportLAX || got.Summary.Confidence != model.ConfidenceUnknown || got.Summary.ConnectionRisk != model.ConnectionUnknown {
 		t.Fatalf("summary = %+v", got.Summary)
 	}
 
@@ -501,6 +503,54 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 
 	if got.Connections[0].Reason != model.ConnectionReasonMissingOutlook || got.Connections[0].Confidence != model.ConfidenceUnknown {
 		t.Fatalf("connection reason = %q confidence %q", got.Connections[0].Reason, got.Connections[0].Confidence)
+	}
+}
+
+func TestItinerarySummaryConnectionRisk(t *testing.T) {
+	outlook := &model.RouteOutlook{
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			},
+			Connection: testRecommended(),
+		},
+	}
+	legs := []model.ItineraryLeg{
+		testLeg(testAirportBOS, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+		testLeg(testTravelOrigin, testAirportLAX, testDateTue, "0930", "1200"),
+		testLeg(testAirportLAX, testLHR, testDateTue, "1400", "1600"),
+	}
+
+	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{outlook, outlook, outlook}, nil, map[string]string{
+		testAirportBOS:   "US",
+		testTravelOrigin: "US",
+		testAirportLAX:   "US",
+		testLHR:          "GB",
+	})
+
+	if got.Summary.Origin != testAirportBOS || got.Summary.Destination != testLHR || got.Summary.Confidence != model.ConfidenceHigh || got.Summary.ConnectionRisk != model.ConnectionTight {
+		t.Fatalf("summary = %+v connections = %+v", got.Summary, got.Connections)
+	}
+}
+
+func TestItinerarySummaryOmitsConnectionRiskWithoutConnections(t *testing.T) {
+	got := BuildItineraryOutlook([]model.ItineraryLeg{
+		testLeg(testAirportBOS, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+	}, nil, nil, nil)
+
+	if got.Summary.Origin != testAirportBOS || got.Summary.Destination != testTravelOrigin || got.Summary.ConnectionRisk != "" {
+		t.Fatalf("summary = %+v", got.Summary)
+	}
+
+	raw, err := json.Marshal(got.Summary)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	if strings.Contains(string(raw), "connection_risk") {
+		t.Fatalf("summary json = %s", raw)
 	}
 }
 

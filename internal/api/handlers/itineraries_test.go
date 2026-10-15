@@ -75,7 +75,7 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Fatalf("first leg = %+v", out.Legs[0])
 			}
 
-			if out.Summary.Confidence != model.ConfidenceHigh || out.Summary.UnknownConnections != 0 {
+			if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testDestLAX || out.Summary.Confidence != model.ConfidenceHigh || out.Summary.ConnectionRisk != tt.wantStatus {
 				t.Fatalf("summary = %+v", out.Summary)
 			}
 
@@ -544,7 +544,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("connections = %d", len(out.Connections))
 	}
 
-	if out.Summary.Confidence != model.ConfidenceUnknown || out.Summary.UnknownConnections != 3 {
+	if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testOriginBOS || out.Summary.Confidence != model.ConfidenceUnknown || out.Summary.ConnectionRisk != model.ConnectionUnknown {
 		t.Fatalf("summary = %+v", out.Summary)
 	}
 
