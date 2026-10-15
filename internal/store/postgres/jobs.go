@@ -290,7 +290,33 @@ func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMo
 	return s.monthsWithData(ctx, store.QueryMonthsWithWeatherData, months)
 }
 
-const monthsInPlaceholder = "/*months*/"
+const (
+	monthsInPlaceholder           = "/*months*/"
+	listJobsOpenStatusPlaceholder = "/*open_status*/"
+	listJobsLimitPlaceholder      = "/*limit*/"
+	listJobsOpenStatusSQL         = "WHERE j.status IN ($1, $2)"
+)
+
+func buildListJobsQuery(filter store.JobListFilter) (string, []any) {
+	statusSQL := ""
+	limitParam := "$1"
+
+	args := make([]any, 0, 3)
+
+	if filter.OpenJobsOnly {
+		statusSQL = listJobsOpenStatusSQL
+		limitParam = "$3"
+
+		args = append(args, string(model.JobStatusPending), string(model.JobStatusRunning))
+	}
+
+	args = append(args, filter.Limit)
+
+	query := strings.Replace(store.QueryListJobs, listJobsOpenStatusPlaceholder, statusSQL, 1)
+	query = strings.Replace(query, listJobsLimitPlaceholder, limitParam, 1)
+
+	return query, args
+}
 
 func (s *Store) monthsWithData(ctx context.Context, query string, months []model.YearMonth) ([]model.YearMonth, error) {
 	if len(months) == 0 {

@@ -86,10 +86,11 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 // List returns recent jobs.
 //
 //	@Summary		List jobs
-//	@Description	Returns the most recent background jobs, newest first.
+//	@Description	Returns the most recent background jobs, newest first. open_jobs_only=true keeps only pending and running jobs in that page.
 //	@Tags			jobs,internal
 //	@Produce		json
-//	@Param			limit	query		int	false	"Max jobs to return (1-500, default 50)"
+//	@Param			limit			query		int		false	"Max jobs to return (1-500, default 50)"
+//	@Param			open_jobs_only	query		bool	false	"When true, return only pending and running jobs"
 //	@Success		200		{array}		JobResponse
 //	@Failure		400		{object}	ErrorResponse
 //	@Failure		401		{object}	ErrorResponse
@@ -99,13 +100,16 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/jobs [get]
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
-	limit, err := query.ParseJobsList(r)
+	params, err := query.ParseJobsList(r)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
 
-	jobs, err := h.store.ListJobs(r.Context(), limit)
+	jobs, err := h.store.ListJobs(r.Context(), store.JobListFilter{
+		Limit:        params.Limit,
+		OpenJobsOnly: params.OpenJobsOnly,
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list jobs"})
 		return

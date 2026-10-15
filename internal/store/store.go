@@ -21,13 +21,19 @@ type MigrationVersion struct {
 	Dirty   bool `json:"dirty"`
 }
 
+// JobListFilter is one page of the jobs list. OpenJobsOnly keeps pending and running rows.
+type JobListFilter struct {
+	Limit        int
+	OpenJobsOnly bool
+}
+
 type Store interface {
 	CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error)
 	CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJob(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
-	ListJobs(ctx context.Context, limit int) ([]*model.Job, error)
+	ListJobs(ctx context.Context, filter JobListFilter) ([]*model.Job, error)
 	ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJob(ctx context.Context, id string, result json.RawMessage) error
 	FailJob(ctx context.Context, id, errMsg string) error

@@ -649,7 +649,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Returns the most recent background jobs, newest first.",
+                "description": "Returns the most recent background jobs, newest first. open_jobs_only=true keeps only pending and running jobs in that page.",
                 "produces": [
                     "application/json"
                 ],
@@ -663,6 +663,12 @@ const docTemplateinternal = `{
                         "type": "integer",
                         "description": "Max jobs to return (1-500, default 50)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "When true, return only pending and running jobs",
+                        "name": "open_jobs_only",
                         "in": "query"
                     }
                 ],

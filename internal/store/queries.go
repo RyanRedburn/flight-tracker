@@ -11,6 +11,8 @@ const (
 		WHERE id = $1`
 
 	// Detail tables are 1:1 with jobs. The joins load year, month, and stations with the page.
+	// /*open_status*/ is empty, or WHERE j.status IN ($1, $2) when listing open jobs.
+	// /*limit*/ is the LIMIT placeholder ($1, or $3 when the status filter is present).
 	QueryListJobs = `
 		SELECT j.id, j.type, j.status, j.result, j.error,
 			j.created_at, j.updated_at, j.started_at, j.ended_at,
@@ -18,8 +20,9 @@ const (
 		FROM jobs j
 		LEFT JOIN flight_performance_ingest_jobs fp ON fp.job_id = j.id
 		LEFT JOIN weather_ingest_jobs w ON w.job_id = j.id
+		/*open_status*/
 		ORDER BY j.created_at DESC
-		LIMIT $1`
+		LIMIT /*limit*/`
 
 	// Ingest jobs are rank 0. /*rebuild_types*/ is the rank-1 list (rollup rebuilds).
 	// Oldest created_at wins within a rank. A pending rebuild is not claimable

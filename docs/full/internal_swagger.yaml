@@ -1422,12 +1422,17 @@ paths:
       - internal
   /api/internal/jobs:
     get:
-      description: Returns the most recent background jobs, newest first.
+      description: Returns the most recent background jobs, newest first. open_jobs_only=true
+        keeps only pending and running jobs in that page.
       parameters:
       - description: Max jobs to return (1-500, default 50)
         in: query
         name: limit
         type: integer
+      - description: When true, return only pending and running jobs
+        in: query
+        name: open_jobs_only
+        type: boolean
       produces:
       - application/json
       responses:

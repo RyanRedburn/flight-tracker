@@ -18,7 +18,7 @@ type Stub struct {
 	GetJobFn                              func(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJobFn       func(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJobFn                 func(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
-	ListJobsFn                            func(ctx context.Context, limit int) ([]*model.Job, error)
+	ListJobsFn                            func(ctx context.Context, filter store.JobListFilter) ([]*model.Job, error)
 	ClaimNextPendingJobFn                 func(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJobFn                         func(ctx context.Context, id string, result json.RawMessage) error
 	FailJobFn                             func(ctx context.Context, id, errMsg string) error
@@ -109,12 +109,12 @@ func (s *Stub) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.We
 	return s.GetWeatherIngestJobFn(ctx, jobID)
 }
 
-func (s *Stub) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
+func (s *Stub) ListJobs(ctx context.Context, filter store.JobListFilter) ([]*model.Job, error) {
 	if s.ListJobsFn == nil {
 		panic("unexpected call: ListJobs")
 	}
 
-	return s.ListJobsFn(ctx, limit)
+	return s.ListJobsFn(ctx, filter)
 }
 
 func (s *Stub) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error) {

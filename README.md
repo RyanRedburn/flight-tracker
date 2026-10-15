@@ -235,6 +235,7 @@ curl http://localhost:8080/api/internal/jobs/<job-id>
 
 # Recent jobs
 curl http://localhost:8080/api/internal/jobs
+curl "http://localhost:8080/api/internal/jobs?open_jobs_only=true"
 
 # Dataset freshness (admin)
 curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/data-freshness
