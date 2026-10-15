@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -63,7 +63,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // Outlook returns booking-style probabilities for a specific flight pattern.
 //
 //	@Summary		Route booking outlook
-//	@Description	On-time, delay, cancellation, and diversion probabilities for one carrier, route, weekday, and departure window. A date selects that weekday in the same historical sample. A null delay on a non-empty sample means that delay was not observed. A route and carrier with no history are 404, not empty_sample.
+//	@Description	On-time, delay, cancellation, and diversion probabilities for one carrier, route, weekday, and departure window. A date selects that weekday in the same historical sample. A null delay on a non-empty sample means that delay was not observed.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin						query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
