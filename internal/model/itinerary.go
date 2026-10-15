@@ -47,26 +47,27 @@ type ItineraryLeg struct {
 }
 
 type ItineraryOutlookResponse struct {
-	// Filters is empty. The request is the legs.
-	Filters Filters `json:"filters"`
-	// Analysis spans the leg outlook windows. sample_size is the sum of those samples.
-	Analysis    Analysis              `json:"analysis"`
-	Legs        []ItineraryOutlookLeg `json:"legs"`
-	Connections []ItineraryConnection `json:"connections"`
+	// Summary is the lowest leg confidence and how many connections are unknown.
+	Summary     ItineraryOutlookSummary `json:"summary"`
+	Legs        []ItineraryOutlookLeg   `json:"legs"`
+	Connections []ItineraryConnection   `json:"connections"`
 }
 
+// ItineraryOutlookSummary reads the leg outlooks and connection statuses together.
+type ItineraryOutlookSummary struct {
+	// Confidence is the lowest leg outlook confidence. A leg with no outlook is unknown.
+	Confidence string `json:"confidence" enums:"high,low,unknown"`
+	// UnknownConnections counts connections whose status is unknown.
+	UnknownConnections int `json:"unknown_connections"`
+}
+
+// ItineraryOutlookLeg keeps the itinerary date and position.
+// The outlook is the route outlook for that leg, including filters and analysis.
 type ItineraryOutlookLeg struct {
-	Index                int            `json:"index"`
-	Origin               string         `json:"origin"`
-	Dest                 string         `json:"dest"`
-	Carrier              string         `json:"carrier"`
-	Date                 string         `json:"date"`
-	DepTime              string         `json:"dep_time"`
-	ArrTime              string         `json:"arr_time"`
-	DepTimeWindowMinutes int            `json:"dep_time_window_minutes"`
-	DayOfWeek            int            `json:"day_of_week"`
-	Outlook              *OutlookResult `json:"outlook"`
-	Error                *string        `json:"error"`
+	Index   int           `json:"index"`
+	Date    string        `json:"date"`
+	Outlook *RouteOutlook `json:"outlook"`
+	Error   *string       `json:"error"`
 }
 
 type ItineraryConnection struct {

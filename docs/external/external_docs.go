@@ -117,7 +117,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook includes route-level weather rates, which do not change that connection's status or confidence.",
+                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.unknown_connections counts connections with status unknown.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1107,25 +1107,7 @@ const docTemplateexternal = `{
         "model.ItineraryOutlookLeg": {
             "type": "object",
             "properties": {
-                "arr_time": {
-                    "type": "string"
-                },
-                "carrier": {
-                    "type": "string"
-                },
                 "date": {
-                    "type": "string"
-                },
-                "day_of_week": {
-                    "type": "integer"
-                },
-                "dep_time": {
-                    "type": "string"
-                },
-                "dep_time_window_minutes": {
-                    "type": "integer"
-                },
-                "dest": {
                     "type": "string"
                 },
                 "error": {
@@ -1134,11 +1116,8 @@ const docTemplateexternal = `{
                 "index": {
                     "type": "integer"
                 },
-                "origin": {
-                    "type": "string"
-                },
                 "outlook": {
-                    "$ref": "#/definitions/model.OutlookResult"
+                    "$ref": "#/definitions/model.RouteOutlook"
                 }
             }
         },
@@ -1161,88 +1140,43 @@ const docTemplateexternal = `{
         "model.ItineraryOutlookResponse": {
             "type": "object",
             "properties": {
-                "analysis": {
-                    "description": "Analysis spans the leg outlook windows. sample_size is the sum of those samples.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.Analysis"
-                        }
-                    ]
-                },
                 "connections": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/model.ItineraryConnection"
                     }
                 },
-                "filters": {
-                    "description": "Filters is empty. The request is the legs.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.Filters"
-                        }
-                    ]
-                },
                 "legs": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/model.ItineraryOutlookLeg"
                     }
+                },
+                "summary": {
+                    "description": "Summary is the lowest leg confidence and how many connections are unknown.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ItineraryOutlookSummary"
+                        }
+                    ]
                 }
             }
         },
-        "model.OutlookResult": {
+        "model.ItineraryOutlookSummary": {
             "type": "object",
             "properties": {
-                "analysis": {
-                    "$ref": "#/definitions/model.Analysis"
-                },
-                "cancellation_probability": {
-                    "type": "number"
-                },
-                "connection": {
-                    "$ref": "#/definitions/model.ConnectionGuidance"
-                },
-                "delay_probability": {
-                    "type": "number"
-                },
-                "diversion_probability": {
-                    "type": "number"
-                },
-                "likely_arrival_delay_minutes": {
-                    "type": "number"
-                },
-                "likely_arrival_delay_when_delayed": {
-                    "type": "number"
-                },
-                "likely_departure_delay_minutes": {
-                    "type": "number"
-                },
-                "likely_departure_delay_when_delayed": {
-                    "type": "number"
-                },
-                "median_arrival_delay_minutes": {
-                    "type": "number"
-                },
-                "median_arrival_delay_when_delayed": {
-                    "type": "number"
-                },
-                "median_departure_delay_minutes": {
-                    "type": "number"
-                },
-                "median_departure_delay_when_delayed": {
-                    "type": "number"
-                },
-                "on_time_probability": {
-                    "type": "number"
-                },
-                "weather": {
-                    "description": "Weather is route-level fair and adverse on-time rates, not this departure slot.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.RouteOutlookWeather"
-                        }
+                "confidence": {
+                    "description": "Confidence is the lowest leg outlook confidence. A leg with no outlook is unknown.",
+                    "type": "string",
+                    "enum": [
+                        "high",
+                        "low",
+                        "unknown"
                     ]
+                },
+                "unknown_connections": {
+                    "description": "UnknownConnections counts connections whose status is unknown.",
+                    "type": "integer"
                 }
             }
         },

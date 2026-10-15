@@ -456,9 +456,16 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		},
 	}
 	outlook := &model.RouteOutlook{
-		Filters: model.Filters{Origin: testTravelOrigin, Dest: testAirportLAX, DepTime: testTime1100},
+		Filters: model.Filters{
+			Origin:               testTravelOrigin,
+			Dest:                 testAirportLAX,
+			Carrier:              "UA",
+			DayOfWeek:            2,
+			DepTime:              testTime1100,
+			DepTimeWindowMinutes: window,
+		},
 		OutlookResult: model.OutlookResult{
-			Analysis: model.Analysis{Start: "2024-03-01", End: "2025-03-01", SampleSize: 12},
+			Analysis: model.Analysis{Start: "2024-03-01", End: "2025-03-01", SampleSize: 12, Confidence: model.ConfidenceHigh},
 		},
 	}
 
@@ -472,19 +479,19 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		t.Fatalf("legs=%d connections=%d", len(got.Legs), len(got.Connections))
 	}
 
-	if got.Legs[0].Index != 0 || got.Legs[0].DayOfWeek != 2 || got.Legs[0].Outlook != nil {
+	if got.Legs[0].Index != 0 || got.Legs[0].Date != testDateTue || got.Legs[0].Outlook != nil {
 		t.Fatalf("first leg = %+v", got.Legs[0])
+	}
+
+	if got.Summary.Confidence != model.ConfidenceUnknown || got.Summary.UnknownConnections != 1 {
+		t.Fatalf("summary = %+v", got.Summary)
 	}
 
 	if got.Legs[0].Error == nil || *got.Legs[0].Error != "route outlook not found" {
 		t.Fatalf("error = %v", got.Legs[0].Error)
 	}
 
-	if got.Legs[0].DepTime != testTime0700 || got.Legs[0].ArrTime != testTime0905 || got.Legs[0].DepTimeWindowMinutes != DefaultDepTimeWindowMinutes {
-		t.Fatalf("echo = %+v", got.Legs[0])
-	}
-
-	if got.Legs[1].Error != nil || got.Legs[1].Outlook == nil || got.Legs[1].Outlook.Analysis.SampleSize != 12 || got.Legs[1].DepTimeWindowMinutes != 45 {
+	if got.Legs[1].Error != nil || got.Legs[1].Outlook == nil || got.Legs[1].Outlook.Analysis.SampleSize != 12 || got.Legs[1].Outlook.Filters.DepTimeWindowMinutes != 45 {
 		t.Fatalf("second leg = %+v", got.Legs[1])
 	}
 

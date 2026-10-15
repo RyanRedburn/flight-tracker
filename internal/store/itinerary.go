@@ -173,8 +173,6 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 	}
 
 	for i, leg := range legs {
-		day, _ := ISOWeekdayFromDate(leg.Date)
-
 		var errMsg *string
 
 		if i < len(legErrors) && legErrors[i] != "" {
@@ -182,27 +180,18 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 			errMsg = &msg
 		}
 
-		var result *model.OutlookResult
+		var outlook *model.RouteOutlook
 		if errMsg == nil && i < len(outlooks) && outlooks[i] != nil {
-			result = &outlooks[i].OutlookResult
+			outlook = outlooks[i]
 		}
 
 		out.Legs[i] = model.ItineraryOutlookLeg{
-			Index:                i,
-			Origin:               leg.Origin,
-			Dest:                 leg.Dest,
-			Carrier:              leg.Carrier,
-			Date:                 leg.Date,
-			DepTime:              FormatHHMM(leg.DepTime),
-			ArrTime:              FormatHHMM(leg.ArrTime),
-			DepTimeWindowMinutes: ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
-			DayOfWeek:            day,
-			Outlook:              result,
-			Error:                errMsg,
+			Index:   i,
+			Date:    leg.Date,
+			Outlook: outlook,
+			Error:   errMsg,
 		}
 	}
-
-	out.Analysis = spanLegAnalysis(out.Legs)
 
 	for i := 0; i < len(legs)-1; i++ {
 		var inbound *model.RouteOutlook
@@ -215,30 +204,51 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 		out.Connections = append(out.Connections, conn)
 	}
 
+	out.Summary = itinerarySummary(out.Legs, out.Connections)
+
 	return out
 }
 
-func spanLegAnalysis(legs []model.ItineraryOutlookLeg) model.Analysis {
-	var analysis model.Analysis
-
-	for _, leg := range legs {
-		if leg.Outlook == nil {
-			continue
-		}
-
-		sample := leg.Outlook.Analysis
-		if sample.Start != "" && (analysis.Start == "" || sample.Start < analysis.Start) {
-			analysis.Start = sample.Start
-		}
-
-		if sample.End > analysis.End {
-			analysis.End = sample.End
-		}
-
-		analysis.SampleSize += sample.SampleSize
+func itinerarySummary(legs []model.ItineraryOutlookLeg, connections []model.ItineraryConnection) model.ItineraryOutlookSummary {
+	confidence := model.ConfidenceHigh
+	if len(legs) == 0 {
+		confidence = model.ConfidenceUnknown
 	}
 
-	return analysis
+	for _, leg := range legs {
+		legConfidence := model.ConfidenceUnknown
+		if leg.Outlook != nil {
+			legConfidence = leg.Outlook.DecisionConfidence()
+		}
+
+		if confidenceRank(legConfidence) < confidenceRank(confidence) {
+			confidence = legConfidence
+		}
+	}
+
+	unknown := 0
+
+	for _, conn := range connections {
+		if conn.Status == model.ConnectionUnknown {
+			unknown++
+		}
+	}
+
+	return model.ItineraryOutlookSummary{
+		Confidence:         confidence,
+		UnknownConnections: unknown,
+	}
+}
+
+func confidenceRank(confidence string) int {
+	switch confidence {
+	case model.ConfidenceHigh:
+		return 2
+	case model.ConfidenceLow:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func localDateTime(date, hhmm string) (time.Time, bool) {

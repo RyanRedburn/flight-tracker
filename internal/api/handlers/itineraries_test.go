@@ -43,7 +43,10 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 					filters = append(filters, filter)
 					mu.Unlock()
 
-					return outlookWithMinutes(60, 70, 80, 90), nil
+					out := outlookWithMinutes(60, 70, 80, 90)
+					out.Filters = outlookFilters(filter)
+
+					return out, nil
 				},
 				ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
 					return map[string]string{testOriginBOS: "US", testOriginORD: "US", testDestLAX: "US"}, nil
@@ -68,18 +71,18 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Fatalf("legs=%d connections=%d", len(out.Legs), len(out.Connections))
 			}
 
-			if out.Legs[0].Origin != testOriginBOS || out.Legs[0].DayOfWeek != 2 || out.Legs[0].DepTime != "0700" || out.Legs[0].ArrTime != testArr0905 {
+			if out.Legs[0].Index != 0 || out.Legs[0].Date != testDateTue {
 				t.Fatalf("first leg = %+v", out.Legs[0])
 			}
 
-			if out.Analysis.SampleSize != 80 || out.Analysis.Start != "2025-10-06" || out.Analysis.End != "2026-10-06" {
-				t.Fatalf("analysis = %+v", out.Analysis)
+			if out.Summary.Confidence != model.ConfidenceHigh || out.Summary.UnknownConnections != 0 {
+				t.Fatalf("summary = %+v", out.Summary)
 			}
 
 			assertNestedOutlookResults(t, rec.Body.Bytes(), 0)
 
-			if out.Legs[0].DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes || out.Legs[1].DepTimeWindowMinutes != 45 {
-				t.Fatalf("windows = %d %d", out.Legs[0].DepTimeWindowMinutes, out.Legs[1].DepTimeWindowMinutes)
+			if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Filters.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes || out.Legs[1].Outlook == nil || out.Legs[1].Outlook.Filters.DepTimeWindowMinutes != 45 {
+				t.Fatalf("windows = %+v %+v", out.Legs[0].Outlook, out.Legs[1].Outlook)
 			}
 
 			if out.Legs[0].Error != nil || out.Legs[0].Outlook == nil || out.Legs[1].Error != nil {
@@ -190,8 +193,8 @@ func TestItineraryOutlookOvernight(t *testing.T) {
 
 	assertMinutes(t, "layover", conn.LayoverMinutes, 540)
 
-	if out.Legs[1].DayOfWeek != 3 {
-		t.Fatalf("outbound weekday = %d, want 3", out.Legs[1].DayOfWeek)
+	if out.Legs[1].Outlook == nil || out.Legs[1].Outlook.Filters.DayOfWeek != 3 || out.Legs[1].Date != testDateWed {
+		t.Fatalf("outbound leg = %+v", out.Legs[1])
 	}
 }
 
@@ -394,8 +397,15 @@ func TestItineraryOutlookStoreError(t *testing.T) {
 
 func itineraryHandler(outlook *model.RouteOutlook, countries map[string]string, countryErr error) *ItinerariesHandler {
 	return NewItinerariesHandler(&storetest.Stub{
-		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-			return outlook, nil
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			if outlook == nil {
+				return nil, nil
+			}
+
+			out := *outlook
+			out.Filters = outlookFilters(filter)
+
+			return &out, nil
 		},
 		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
 			if countryErr != nil {
@@ -534,6 +544,10 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("connections = %d", len(out.Connections))
 	}
 
+	if out.Summary.Confidence != model.ConfidenceUnknown || out.Summary.UnknownConnections != 3 {
+		t.Fatalf("summary = %+v", out.Summary)
+	}
+
 	neverSeen := out.Connections[0]
 	if neverSeen.Status != model.ConnectionUnknown || neverSeen.Confidence != model.ConfidenceUnknown || neverSeen.Reason != model.ConnectionReasonMissingOutlook || neverSeen.MCTSource != nil || neverSeen.RecommendedMinutes != nil {
 		t.Fatalf("never-seen connection = %+v", neverSeen)
@@ -557,15 +571,61 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 func assertNestedOutlookResults(t *testing.T, body []byte, leg int) {
 	t.Helper()
 
-	outlook := nestedOutlookObject(t, body, leg)
-	for _, field := range []string{"origin", "dest", "carrier", "dep_time", "day_of_week", "filters"} {
-		if _, ok := outlook[field]; ok {
-			t.Fatalf("nested outlook repeated %s: %s", field, outlook[field])
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	for _, field := range []string{"filters", "analysis"} {
+		if _, ok := root[field]; ok {
+			t.Fatalf("itinerary repeated %s", field)
 		}
+	}
+
+	if _, ok := root["summary"]; !ok {
+		t.Fatal("itinerary missing summary")
+	}
+
+	var legs []map[string]json.RawMessage
+	if err := json.Unmarshal(root["legs"], &legs); err != nil {
+		t.Fatalf("unmarshal legs: %v", err)
+	}
+
+	for _, field := range []string{"origin", "dest", "carrier", "dep_time", "arr_time", "day_of_week", "dep_time_window_minutes"} {
+		if _, ok := legs[leg][field]; ok {
+			t.Fatalf("leg repeated %s", field)
+		}
+	}
+
+	outlook := nestedOutlookObject(t, body, leg)
+
+	filtersRaw, ok := outlook["filters"]
+	if !ok {
+		t.Fatal("nested outlook missing filters")
+	}
+
+	var filters model.Filters
+	if err := json.Unmarshal(filtersRaw, &filters); err != nil {
+		t.Fatalf("decode filters: %v", err)
+	}
+
+	if filters.Origin == "" || filters.Dest == "" || filters.Carrier == "" || filters.DepTime == "" || filters.DayOfWeek == 0 || filters.DepTimeWindowMinutes == 0 {
+		t.Fatalf("outlook filters = %+v", filters)
 	}
 
 	if _, ok := outlook["analysis"]; !ok {
 		t.Fatal("nested outlook missing analysis")
+	}
+}
+
+func outlookFilters(filter store.RouteOutlookFilter) model.Filters {
+	return model.Filters{
+		Origin:               filter.Origin,
+		Dest:                 filter.Dest,
+		Carrier:              filter.Carrier,
+		DayOfWeek:            filter.DayOfWeek,
+		DepTime:              filter.DepTime,
+		DepTimeWindowMinutes: filter.DepTimeWindowMinutes,
 	}
 }
 
