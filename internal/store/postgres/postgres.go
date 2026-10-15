@@ -86,8 +86,10 @@ func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
 	return job, err
 }
 
-func (s *Store) ListJobs(ctx context.Context, limit int) ([]*model.Job, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryListJobs, limit)
+func (s *Store) ListJobs(ctx context.Context, filter store.JobListFilter) ([]*model.Job, error) {
+	query, args := buildListJobsQuery(filter)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

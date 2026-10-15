@@ -244,9 +244,9 @@ func TestJobsList(t *testing.T) {
 	var flightDetailGets, weatherDetailGets int
 
 	h := NewJobsHandler(&storetest.Stub{
-		ListJobsFn: func(_ context.Context, limit int) ([]*model.Job, error) {
-			if limit != 2 {
-				t.Errorf("limit = %d, want 2", limit)
+		ListJobsFn: func(_ context.Context, filter store.JobListFilter) ([]*model.Job, error) {
+			if filter.Limit != 2 || filter.OpenJobsOnly {
+				t.Errorf("filter = %+v, want limit 2 and open jobs off", filter)
 			}
 
 			return []*model.Job{
@@ -335,5 +335,63 @@ func TestJobsListInvalidLimit(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestJobsListOpenJobsOnly(t *testing.T) {
+	now := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+
+	h := NewJobsHandler(&storetest.Stub{
+		ListJobsFn: func(_ context.Context, filter store.JobListFilter) ([]*model.Job, error) {
+			if filter.Limit != 2 || !filter.OpenJobsOnly {
+				t.Errorf("filter = %+v, want limit 2 and open jobs only", filter)
+			}
+
+			return []*model.Job{{
+				ID:        testJobID,
+				Type:      model.JobTypeRebuildRouteTravelWindows,
+				Status:    model.JobStatusRunning,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/internal/jobs?limit=2&open_jobs_only=true", nil)
+	rec := httptest.NewRecorder()
+	h.List(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var jobs []JobResponse
+	if err := json.NewDecoder(rec.Body).Decode(&jobs); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+
+	if len(jobs) != 1 || jobs[0].Status != model.JobStatusRunning {
+		t.Fatalf("jobs = %+v, want one running job", jobs)
+	}
+}
+
+func TestJobsListInvalidOpenJobsOnly(t *testing.T) {
+	h := NewJobsHandler(&storetest.Stub{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/internal/jobs?open_jobs_only=yes", nil)
+	rec := httptest.NewRecorder()
+	h.List(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+
+	var body ErrorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+
+	if body.Error != "open_jobs_only is invalid" {
+		t.Errorf("error = %q, want open_jobs_only is invalid", body.Error)
 	}
 }

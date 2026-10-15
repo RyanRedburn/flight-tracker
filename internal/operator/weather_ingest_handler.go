@@ -34,10 +34,11 @@ func (h *WeatherIngestHandler) Process(ctx context.Context, job *model.Job) (jso
 		return nil, err
 	}
 
-	// Observations are committed. Rebuild route weather rollups so the nearest
-	// ±30 minute match uses the new month. The advisory lock serializes replicas.
-	if err := h.store.RebuildRouteWeatherStats(ctx); err != nil {
-		return nil, fmt.Errorf("rebuild route weather stats: %w", err)
+	// Observations are committed. Queue a weather-stats rebuild so the nearest
+	// ±30 minute match includes this month. The queue lock skips an insert
+	// when one is already pending; a running rebuild does not block.
+	if err := enqueueRebuildJob(ctx, h.store.CreateRebuildRouteWeatherStatsJob); err != nil {
+		return nil, fmt.Errorf("enqueue route weather stats rebuild: %w", err)
 	}
 
 	return json.Marshal(result)

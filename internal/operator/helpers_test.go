@@ -26,4 +26,5 @@ func mustNewProcessor(t *testing.T, s store.Store, handlers ...JobHandler) *Proc
 var (
 	errRebuildFailed = errors.New("rebuild failed")
 	errImportFailed  = errors.New("import failed")
+	errEnqueueFailed = errors.New("enqueue failed")
 )

@@ -11,6 +11,8 @@ const (
 		WHERE id = $1`
 
 	// Detail tables are 1:1 with jobs. The joins load year, month, and stations with the page.
+	// /*open_status*/ is empty, or WHERE j.status IN ($1, $2) when listing open jobs.
+	// /*limit*/ is the LIMIT placeholder ($1, or $3 when the status filter is present).
 	QueryListJobs = `
 		SELECT j.id, j.type, j.status, j.result, j.error,
 			j.created_at, j.updated_at, j.started_at, j.ended_at,
@@ -18,16 +20,30 @@ const (
 		FROM jobs j
 		LEFT JOIN flight_performance_ingest_jobs fp ON fp.job_id = j.id
 		LEFT JOIN weather_ingest_jobs w ON w.job_id = j.id
+		/*open_status*/
 		ORDER BY j.created_at DESC
-		LIMIT $1`
+		LIMIT /*limit*/`
 
+	// Ingest jobs are rank 0. /*rebuild_types*/ is the rank-1 list (rollup rebuilds).
+	// Oldest created_at wins within a rank. A pending rebuild is not claimable
+	// while another row of that same type is running ($2). FOR UPDATE OF
+	// candidate SKIP LOCKED locks only the chosen pending row.
 	QueryClaimNextPendingJobSelect = `
 		SELECT id, type, status, result, error, created_at, updated_at, started_at, ended_at
-		FROM jobs
-		WHERE status = $1
-		ORDER BY created_at ASC
+		FROM jobs AS candidate
+		WHERE candidate.status = $1
+			AND NOT (
+				candidate.type IN (/*rebuild_types*/)
+				AND EXISTS (
+					SELECT 1
+					FROM jobs AS running
+					WHERE running.type = candidate.type
+						AND running.status = $2
+				)
+			)
+		ORDER BY CASE WHEN candidate.type IN (/*rebuild_types*/) THEN 1 ELSE 0 END ASC, candidate.created_at ASC
 		LIMIT 1
-		FOR UPDATE SKIP LOCKED`
+		FOR UPDATE OF candidate SKIP LOCKED`
 
 	QueryClaimNextPendingJobUpdate = `
 		UPDATE jobs
@@ -77,6 +93,14 @@ const (
 		SELECT 1
 		FROM jobs
 		WHERE type = $1 AND status IN ($2, $3)
+		LIMIT 1`
+
+	// Pending only. Rebuild queueing uses this under the advisory lock so a
+	// running rebuild does not block a new pending job.
+	QueryPendingJobByType = `
+		SELECT 1
+		FROM jobs
+		WHERE type = $1 AND status = $2
 		LIMIT 1`
 
 	// /*months*/ is replaced with ($1, $2), ($3, $4), ... for the requested pairs.

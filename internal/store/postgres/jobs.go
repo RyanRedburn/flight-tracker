@@ -98,7 +98,10 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	row := tx.QueryRowContext(ctx, store.QueryClaimNextPendingJobSelect, string(model.JobStatusPending))
+	row := tx.QueryRowContext(ctx, store.ClaimNextPendingJobQuery(),
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
 
 	job, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -261,6 +264,24 @@ func (s *Store) ActiveIngestJob(ctx context.Context, jobType model.JobType) (boo
 	return true, nil
 }
 
+func (s *Store) PendingIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
+	var exists int
+
+	err := s.db.QueryRowContext(ctx, store.QueryPendingJobByType,
+		jobType,
+		string(model.JobStatusPending),
+	).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
 	return s.monthsWithData(ctx, store.QueryMonthsWithFlightPerformanceData, months)
 }
@@ -269,7 +290,33 @@ func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMo
 	return s.monthsWithData(ctx, store.QueryMonthsWithWeatherData, months)
 }
 
-const monthsInPlaceholder = "/*months*/"
+const (
+	monthsInPlaceholder           = "/*months*/"
+	listJobsOpenStatusPlaceholder = "/*open_status*/"
+	listJobsLimitPlaceholder      = "/*limit*/"
+	listJobsOpenStatusSQL         = "WHERE j.status IN ($1, $2)"
+)
+
+func buildListJobsQuery(filter store.JobListFilter) (string, []any) {
+	statusSQL := ""
+	limitParam := "$1"
+
+	args := make([]any, 0, 3)
+
+	if filter.OpenJobsOnly {
+		statusSQL = listJobsOpenStatusSQL
+		limitParam = "$3"
+
+		args = append(args, string(model.JobStatusPending), string(model.JobStatusRunning))
+	}
+
+	args = append(args, filter.Limit)
+
+	query := strings.Replace(store.QueryListJobs, listJobsOpenStatusPlaceholder, statusSQL, 1)
+	query = strings.Replace(query, listJobsLimitPlaceholder, limitParam, 1)
+
+	return query, args
+}
 
 func (s *Store) monthsWithData(ctx context.Context, query string, months []model.YearMonth) ([]model.YearMonth, error) {
 	if len(months) == 0 {

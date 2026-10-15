@@ -43,13 +43,16 @@ func routerStub() *storetest.Stub {
 		MigrationVersionFn: func(context.Context) (store.MigrationVersion, error) {
 			return store.MigrationVersion{}, nil
 		},
-		ListJobsFn: func(context.Context, int) ([]*model.Job, error) {
+		ListJobsFn: func(context.Context, store.JobListFilter) ([]*model.Job, error) {
 			return []*model.Job{}, nil
 		},
 		DataFreshnessFn: func(context.Context) (model.DataFreshness, error) {
 			return store.AssembleDataFreshness(nil), nil
 		},
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+			return false, nil
+		},
+		PendingIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -57,8 +58,8 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 
 			return nil
 		},
-		RebuildRouteWeatherStatsFn: func(context.Context) error {
-			return nil
+		CreateRebuildRouteWeatherStatsJobFn: func(context.Context) (*model.Job, error) {
+			return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
 		},
 	}
 
@@ -89,36 +90,72 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 	}
 }
 
-func TestWeatherIngestHandlerRebuildsWeatherStats(t *testing.T) {
+func TestWeatherIngestHandlerEnqueuesWeatherStats(t *testing.T) {
 	ctx := context.Background()
 
-	rebuilds := 0
-	st := &storetest.Stub{
-		GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
-			return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
+	tests := []struct {
+		name    string
+		create  func(context.Context) (*model.Job, error)
+		wantErr bool
+	}{
+		{
+			name: "queued",
+			create: func(context.Context) (*model.Job, error) {
+				return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
+			},
 		},
-		ReplaceWeatherObservationsByMonthFn: func(context.Context, int, int, []string, [][]string) error {
-			return nil
+		{
+			name: "pending",
+			create: func(context.Context) (*model.Job, error) {
+				return nil, store.ErrActiveIngestConflict
+			},
 		},
-		RebuildRouteWeatherStatsFn: func(context.Context) error {
-			rebuilds++
-
-			return nil
+		{
+			name: "error",
+			create: func(context.Context) (*model.Job, error) {
+				return nil, errEnqueueFailed
+			},
+			wantErr: true,
 		},
 	}
 
-	path := iemFixtureCSVPath(t)
-	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
-		return path, func() {}, nil
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			st := &storetest.Stub{
+				GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
+					return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
+				},
+				ReplaceWeatherObservationsByMonthFn: func(context.Context, int, int, []string, [][]string) error {
+					return nil
+				},
+				CreateRebuildRouteWeatherStatsJobFn: func(ctx context.Context) (*model.Job, error) {
+					calls++
 
-	h := NewWeatherIngestHandler(st, svc)
-	if _, err := h.Process(ctx, &model.Job{ID: testJobID}); err != nil {
-		t.Fatalf("Process() error = %v", err)
-	}
+					return tt.create(ctx)
+				},
+			}
 
-	if rebuilds != 1 {
-		t.Fatalf("rebuilds = %d, want 1", rebuilds)
+			path := iemFixtureCSVPath(t)
+			svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
+				return path, func() {}, nil
+			})
+
+			h := NewWeatherIngestHandler(st, svc)
+			_, err := h.Process(ctx, &model.Job{ID: testJobID})
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected enqueue error")
+				}
+			} else if err != nil {
+				t.Fatalf("Process() error = %v", err)
+			}
+
+			if calls != 1 {
+				t.Fatalf("enqueue calls = %d, want 1", calls)
+			}
+		})
 	}
 }
 

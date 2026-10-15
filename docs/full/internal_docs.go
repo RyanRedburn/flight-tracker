@@ -649,7 +649,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Returns the most recent background jobs, newest first.",
+                "description": "Returns the most recent background jobs, newest first. open_jobs_only=true keeps only pending and running jobs in that page.",
                 "produces": [
                     "application/json"
                 ],
@@ -663,6 +663,12 @@ const docTemplateinternal = `{
                         "type": "integer",
                         "description": "Max jobs to return (1-500, default 50)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "When true, return only pending and running jobs",
+                        "name": "open_jobs_only",
                         "in": "query"
                     }
                 ],
@@ -979,7 +985,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild job is already pending or running.",
+                "description": "Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild of this type is already pending. A running rebuild does not block a new pending job.",
                 "produces": [
                     "application/json"
                 ],
@@ -1041,7 +1047,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Queues a full replace of route weather-category rollups from flight performance and weather observations. The body must be empty. Returns 409 when a rebuild job is already pending or running.",
+                "description": "Queues a full replace of route weather-category rollups from flight performance and weather observations. The body must be empty. Returns 409 when a rebuild of this type is already pending. A running rebuild does not block a new pending job.",
                 "produces": [
                     "application/json"
                 ],

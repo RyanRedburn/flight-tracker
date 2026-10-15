@@ -30,8 +30,8 @@ func (h *WeatherStationsIngestHandler) Process(ctx context.Context, _ *model.Job
 	}
 
 	// Station mapping and timezones change which observation matches a flight.
-	if err := h.store.RebuildRouteWeatherStats(ctx); err != nil {
-		return nil, fmt.Errorf("rebuild route weather stats: %w", err)
+	if err := enqueueRebuildJob(ctx, h.store.CreateRebuildRouteWeatherStatsJob); err != nil {
+		return nil, fmt.Errorf("enqueue route weather stats rebuild: %w", err)
 	}
 
 	return json.Marshal(result)

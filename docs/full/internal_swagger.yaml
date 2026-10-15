@@ -1422,12 +1422,17 @@ paths:
       - internal
   /api/internal/jobs:
     get:
-      description: Returns the most recent background jobs, newest first.
+      description: Returns the most recent background jobs, newest first. open_jobs_only=true
+        keeps only pending and running jobs in that page.
       parameters:
       - description: Max jobs to return (1-500, default 50)
         in: query
         name: limit
         type: integer
+      - description: When true, return only pending and running jobs
+        in: query
+        name: open_jobs_only
+        type: boolean
       produces:
       - application/json
       responses:
@@ -1641,7 +1646,8 @@ paths:
     post:
       description: Queues a full replace of route_travel_window_scopes and route_travel_window_buckets
         from flight_performance. The body must be empty. Returns 409 when a rebuild
-        job is already pending or running.
+        of this type is already pending. A running rebuild does not block a new pending
+        job.
       produces:
       - application/json
       responses:
@@ -1683,7 +1689,8 @@ paths:
     post:
       description: Queues a full replace of route weather-category rollups from flight
         performance and weather observations. The body must be empty. Returns 409
-        when a rebuild job is already pending or running.
+        when a rebuild of this type is already pending. A running rebuild does not
+        block a new pending job.
       produces:
       - application/json
       responses:

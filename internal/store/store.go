@@ -21,13 +21,19 @@ type MigrationVersion struct {
 	Dirty   bool `json:"dirty"`
 }
 
+// JobListFilter is one page of the jobs list. OpenJobsOnly keeps pending and running rows.
+type JobListFilter struct {
+	Limit        int
+	OpenJobsOnly bool
+}
+
 type Store interface {
 	CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error)
 	CreateWeatherIngestJob(ctx context.Context, year, month int, stations []string) (*model.Job, error)
 	GetJob(ctx context.Context, id string) (*model.Job, error)
 	GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error)
 	GetWeatherIngestJob(ctx context.Context, jobID string) (*model.WeatherIngestJob, error)
-	ListJobs(ctx context.Context, limit int) ([]*model.Job, error)
+	ListJobs(ctx context.Context, filter JobListFilter) ([]*model.Job, error)
 	ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (*model.Job, error)
 	CompleteJob(ctx context.Context, id string, result json.RawMessage) error
 	FailJob(ctx context.Context, id, errMsg string) error
@@ -36,6 +42,7 @@ type Store interface {
 	ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
+	PendingIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
 	CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
 	CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error)

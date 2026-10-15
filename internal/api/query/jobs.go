@@ -10,24 +10,32 @@ const (
 )
 
 type jobsListQuery struct {
-	Limit *int `query:"limit" validate:"omitempty,list_limit"`
+	Limit        *int   `query:"limit" validate:"omitempty,list_limit"`
+	OpenJobsOnly string `query:"open_jobs_only" validate:"omitempty,oneof=true false"`
 }
 
-func ParseJobsList(r *http.Request) (int, error) {
+// JobsList is the parsed jobs list query. OpenJobsOnly is false when omitted.
+type JobsList struct {
+	Limit        int
+	OpenJobsOnly bool
+}
+
+func ParseJobsList(r *http.Request) (JobsList, error) {
 	var q jobsListQuery
 	if err := BindQuery(r, &q); err != nil {
-		return 0, err
+		return JobsList{}, err
 	}
 
 	if err := Validate(q); err != nil {
-		return 0, err
+		return JobsList{}, err
 	}
 
-	if q.Limit == nil {
-		return DefaultListLimit, nil
+	parsed := JobsList{Limit: DefaultListLimit, OpenJobsOnly: q.OpenJobsOnly == "true"}
+	if q.Limit != nil {
+		parsed.Limit = *q.Limit
 	}
 
-	return *q.Limit, nil
+	return parsed, nil
 }
 
 type jobIDParam struct {
