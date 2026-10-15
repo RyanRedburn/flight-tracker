@@ -13,7 +13,10 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-const routeStatsExtraPlaceholder = "/*extra*/"
+const (
+	routeStatsExtraPlaceholder         = "/*extra*/"
+	routeStatsCarrierOnTimePlaceholder = "/*carrier_on_time*/"
+)
 
 func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 	// COUNT(*) without GROUP BY is one row of zeros when nothing matches, so a
@@ -29,9 +32,10 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	var (
 		scanned       delayStatsScan
 		diversionJSON []byte
+		carrierJSON   []byte
 	)
 
-	err := s.db.QueryRowContext(ctx, query, args...).Scan(append(scanned.args(), &diversionJSON)...)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(append(scanned.args(), &diversionJSON, &carrierJSON)...)
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +51,9 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	stats.DiversionAirports = airports
 
 	if filter.Carrier == "" {
-		rows, err := s.listRouteCarrierOnTime(ctx, filter)
+		rows, err := unmarshalCarrierOnTime(carrierJSON)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode carrier on time: %w", err)
 		}
 
 		stats.CarrierOnTime = rows
@@ -236,39 +240,6 @@ func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*store.A
 	}, nil
 }
 
-func (s *Store) listRouteCarrierOnTime(ctx context.Context, filter store.RouteStatsFilter) ([]model.CarrierOnTime, error) {
-	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, filter)
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := make([]model.CarrierOnTime, 0)
-
-	for rows.Next() {
-		var (
-			carrier string
-			onTime  int
-			flights int
-		)
-		if err := rows.Scan(&carrier, &onTime, &flights); err != nil {
-			return nil, err
-		}
-
-		out = append(out, store.CarrierOnTimeFromCounts(carrier, onTime, flights))
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	store.SortCarrierOnTime(out)
-
-	return out, nil
-}
-
 func (s *Store) ensureRouteIdentity(ctx context.Context, origin, dest, carrier string) error {
 	query, args := routeIdentityQuery(origin, dest, carrier)
 
@@ -316,7 +287,13 @@ func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (strin
 		args = append(args, filter.DaysOfWeek)
 	}
 
+	carrierOnTime := "NULL::json"
+	if filter.Carrier == "" {
+		carrierOnTime = store.RouteStatsCarrierOnTimeJSON
+	}
+
 	query := strings.Replace(template, routeStatsExtraPlaceholder, extra.String(), 1)
+	query = strings.Replace(query, routeStatsCarrierOnTimePlaceholder, carrierOnTime, 1)
 
 	return query, args
 }
@@ -356,6 +333,32 @@ func emptyRouteOutlook(filter store.RouteOutlookFilter) *model.RouteOutlook {
 			},
 		},
 	}
+}
+
+func unmarshalCarrierOnTime(raw []byte) ([]model.CarrierOnTime, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return []model.CarrierOnTime{}, nil
+	}
+
+	var rows []struct {
+		Carrier string `json:"carrier"`
+		OnTime  int    `json:"on_time"`
+		Flights int    `json:"flights"`
+	}
+
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+
+	out := make([]model.CarrierOnTime, 0, len(rows))
+
+	for _, row := range rows {
+		out = append(out, store.CarrierOnTimeFromCounts(row.Carrier, row.OnTime, row.Flights))
+	}
+
+	store.SortCarrierOnTime(out)
+
+	return out, nil
 }
 
 func unmarshalAirportCounts(raw []byte) ([]model.AirportCount, error) {
