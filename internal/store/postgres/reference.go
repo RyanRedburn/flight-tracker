@@ -18,28 +18,49 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType model.JobT
 		return nil, fmt.Errorf("unsupported reference job type %q", jobType)
 	}
 
-	return s.insertPendingTypeJob(ctx, jobType, string(jobType))
-}
-
-func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error) {
 	return s.insertPendingTypeJob(
 		ctx,
-		model.JobTypeRebuildRouteTravelWindows,
-		store.TravelWindowRebuildJobLockKey,
+		jobType,
+		string(jobType),
+		store.QueryActiveIngestJob,
+		jobType,
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
 	)
 }
 
+func (s *Store) CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error) {
+	return s.insertPendingRebuildJob(ctx, model.JobTypeRebuildRouteTravelWindows, store.TravelWindowRebuildJobLockKey)
+}
+
 func (s *Store) CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error) {
+	return s.insertPendingRebuildJob(ctx, model.JobTypeRebuildRouteWeatherStats, store.WeatherStatsRebuildJobLockKey)
+}
+
+// insertPendingRebuildJob queues one rebuild under the queue advisory lock.
+// Only a pending row of this type is a duplicate. A running rebuild does not
+// block, because that run may have started before the new month committed.
+func (s *Store) insertPendingRebuildJob(ctx context.Context, jobType model.JobType, lockKey string) (*model.Job, error) {
 	return s.insertPendingTypeJob(
 		ctx,
-		model.JobTypeRebuildRouteWeatherStats,
-		store.WeatherStatsRebuildJobLockKey,
+		jobType,
+		lockKey,
+		store.QueryPendingJobByType,
+		jobType,
+		string(model.JobStatusPending),
 	)
 }
 
 // insertPendingTypeJob inserts one pending jobs row for a parameterless job.
 // lockKey is the advisory-lock namespace (hashtext); key 0 matches other type-only jobs.
-func (s *Store) insertPendingTypeJob(ctx context.Context, jobType model.JobType, lockKey string) (*model.Job, error) {
+// duplicateQuery runs under that lock and returns a row when the insert should be skipped.
+func (s *Store) insertPendingTypeJob(
+	ctx context.Context,
+	jobType model.JobType,
+	lockKey string,
+	duplicateQuery string,
+	duplicateArgs ...any,
+) (*model.Job, error) {
 	now := time.Now().UTC()
 	job := &model.Job{
 		ID:        uuid.NewString(),
@@ -61,11 +82,7 @@ func (s *Store) insertPendingTypeJob(ctx context.Context, jobType model.JobType,
 
 	var exists int
 
-	err = tx.QueryRowContext(ctx, store.QueryActiveIngestJob,
-		jobType,
-		string(model.JobStatusPending),
-		string(model.JobStatusRunning),
-	).Scan(&exists)
+	err = tx.QueryRowContext(ctx, duplicateQuery, duplicateArgs...).Scan(&exists)
 	if err == nil {
 		return nil, store.ErrActiveIngestConflict
 	}

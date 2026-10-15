@@ -36,6 +36,7 @@ type Store interface {
 	ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
+	PendingIngestJob(ctx context.Context, jobType model.JobType) (bool, error)
 	CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
 	CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error)

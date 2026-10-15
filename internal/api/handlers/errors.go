@@ -12,7 +12,7 @@ const (
 	errFailedCheckExistingWeather = "failed to check existing weather data"
 	errActiveIngestMonths         = "ingest jobs already pending or running for one or more requested months"
 	errActiveReferenceIngest      = "ingest job already pending or running for this dataset"
-	errActiveRebuildJob           = "rebuild job already pending or running"
+	errActiveRebuildJob           = "rebuild job already pending"
 	errFailedCheckActiveRebuild   = "failed to check active rebuild jobs"
 	errFailedCreateRebuildJob     = "failed to create rebuild job"
 	ErrUnauthorized               = "unauthorized"

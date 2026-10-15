@@ -286,7 +286,7 @@ Every ingest returns **409** when a pending or running job already covers that m
 
 Load order for a consistent database (there are no foreign keys): **countries → regions → airports → at least one BTS month → weather-stations → weather observations**. Airport MCT does not depend on that order.
 
-A successful flight-performance load rebuilds travel-window rollups and weather-category rollups. A successful weather-observation or weather-station load rebuilds weather-category rollups only. Admins can queue the same full rebuilds with an empty body: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending or running. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
+A successful flight-performance load queues travel-window and weather-category rollup rebuilds. A successful weather-observation or weather-station load queues a weather-category rollup rebuild. Rollups refresh when that job runs. A pending rebuild of the same type is not queued again; a running rebuild does not block a new pending job. Admins can queue the same full rebuilds with an empty body: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
 
 #### Flight performance (`POST /api/internal/ingest/flight-performance`)
 
@@ -300,7 +300,7 @@ Source: Iowa Environmental Mesonet ASOS/METAR (`asos.py`).
 
 #### Weather stations (`POST /api/internal/ingest/weather-stations`)
 
-One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty. The weather-stats rebuild runs because station ids and timezones change which observation matches a flight.
+One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty. A weather-stats rebuild is queued because station ids and timezones change which observation matches a flight.
 
 #### Reference data (`POST /api/internal/ingest/{countries|regions|airports}`)
 
@@ -316,7 +316,7 @@ These minutes are planning estimates from public sources. They are not official 
 
 ### Job leases and shutdown
 
-Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` and write `lease_expires_at` (claim sets the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
+Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` (ingest jobs before rebuild jobs, then the oldest `created_at` within that group) and write `lease_expires_at` (claim sets the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
 
 - **Crash / SIGKILL / OOM / missed heartbeat:** when `lease_expires_at` is in the past, any replica requeues the row to `pending` and clears `started_at`. Reclaim runs at startup (expired leases only — never all `running` rows) and periodically while the process is up. `JOB_LEASE_TTL` defaults to 90s, long enough to miss a few heartbeats, not as long as a 10-minute BTS download.
 - **SIGINT / SIGTERM:** workers stop claiming immediately (they do not keep polling during HTTP drain), cancel in-flight `Process`, and persist `failed` with `interrupted by shutdown` using a context that is not cancelled. Idle workers exit. After shutdown-fail, re-POST the ingest (`force` if data already exists).

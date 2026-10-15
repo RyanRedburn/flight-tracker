@@ -10,6 +10,7 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -42,6 +43,8 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 
 	var replaceRows int
 
+	var queued []model.JobType
+
 	st := &storetest.Stub{
 		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
 			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
@@ -52,11 +55,15 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 
 			return nil
 		},
-		RebuildRouteTravelWindowsFn: func(context.Context) error {
-			return nil
+		CreateRebuildRouteTravelWindowsJobFn: func(context.Context) (*model.Job, error) {
+			queued = append(queued, model.JobTypeRebuildRouteTravelWindows)
+
+			return queuedRebuild(model.JobTypeRebuildRouteTravelWindows), nil
 		},
-		RebuildRouteWeatherStatsFn: func(context.Context) error {
-			return nil
+		CreateRebuildRouteWeatherStatsJobFn: func(context.Context) (*model.Job, error) {
+			queued = append(queued, model.JobTypeRebuildRouteWeatherStats)
+
+			return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
 		},
 	}
 
@@ -77,6 +84,10 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 		t.Errorf("ReplaceFlightPerformanceByMonth = %d-%d, want 2026-4", replaceYear, replaceMonth)
 	}
 
+	if len(queued) != 2 || queued[0] != model.JobTypeRebuildRouteTravelWindows || queued[1] != model.JobTypeRebuildRouteWeatherStats {
+		t.Fatalf("queued = %v, want travel windows then weather stats", queued)
+	}
+
 	var result map[string]any
 	if err := json.Unmarshal(payload, &result); err != nil {
 		t.Fatalf("Unmarshal result: %v", err)
@@ -87,14 +98,18 @@ func TestFlightPerformanceIngestHandlerProcess(t *testing.T) {
 	}
 }
 
-func TestFlightPerformanceIngestHandlerRebuildsTravelWindows(t *testing.T) {
+func TestFlightPerformanceIngestHandlerSkipsPendingRebuild(t *testing.T) {
 	ctx := context.Background()
 
-	rebuilds := 0
-	st := flightPerformanceIngestStub(t, func(context.Context) error {
-		rebuilds++
+	queued := 0
+	st := flightPerformanceIngestStub(t, func(context.Context) (*model.Job, error) {
+		queued++
 
-		return nil
+		return nil, store.ErrActiveIngestConflict
+	}, func(context.Context) (*model.Job, error) {
+		queued++
+
+		return nil, store.ErrActiveIngestConflict
 	})
 
 	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
@@ -104,30 +119,36 @@ func TestFlightPerformanceIngestHandlerRebuildsTravelWindows(t *testing.T) {
 		t.Fatalf("Process() error = %v", err)
 	}
 
-	if _, err := h.Process(ctx, job); err != nil {
-		t.Fatalf("second Process() error = %v", err)
-	}
-
-	if rebuilds != 2 {
-		t.Fatalf("rebuilds = %d, want 2 (idempotent full replace per ingest)", rebuilds)
+	if queued != 2 {
+		t.Fatalf("enqueue attempts = %d, want 2", queued)
 	}
 }
 
-func TestFlightPerformanceIngestHandlerRebuildError(t *testing.T) {
+func TestFlightPerformanceIngestHandlerEnqueueError(t *testing.T) {
 	ctx := context.Background()
-	st := flightPerformanceIngestStub(t, func(context.Context) error {
-		return errRebuildFailed
+
+	weatherQueued := false
+	st := flightPerformanceIngestStub(t, func(context.Context) (*model.Job, error) {
+		return nil, errEnqueueFailed
+	}, func(context.Context) (*model.Job, error) {
+		weatherQueued = true
+
+		return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
 	})
 
 	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
 	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
 
 	if _, err := h.Process(ctx, job); err == nil {
-		t.Fatal("expected rebuild error")
+		t.Fatal("expected enqueue error")
+	}
+
+	if weatherQueued {
+		t.Fatal("weather rebuild queued after travel-window enqueue failed")
 	}
 }
 
-func TestFlightPerformanceIngestHandlerSkipsRebuildOnImportError(t *testing.T) {
+func TestFlightPerformanceIngestHandlerSkipsEnqueueOnImportError(t *testing.T) {
 	ctx := context.Background()
 	st := &storetest.Stub{
 		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
@@ -147,7 +168,11 @@ func TestFlightPerformanceIngestHandlerSkipsRebuildOnImportError(t *testing.T) {
 	}
 }
 
-func flightPerformanceIngestStub(t *testing.T, rebuild func(context.Context) error) *storetest.Stub {
+func flightPerformanceIngestStub(
+	t *testing.T,
+	travel func(context.Context) (*model.Job, error),
+	weather func(context.Context) (*model.Job, error),
+) *storetest.Stub {
 	t.Helper()
 
 	return &storetest.Stub{
@@ -157,63 +182,49 @@ func flightPerformanceIngestStub(t *testing.T, rebuild func(context.Context) err
 		ReplaceFlightPerformanceByMonthFn: func(context.Context, int, int, []string, [][]string) error {
 			return nil
 		},
-		RebuildRouteTravelWindowsFn: rebuild,
-		RebuildRouteWeatherStatsFn: func(context.Context) error {
-			return nil
-		},
+		CreateRebuildRouteTravelWindowsJobFn: travel,
+		CreateRebuildRouteWeatherStatsJobFn:  weather,
 	}
 }
 
-func TestFlightPerformanceIngestHandlerRebuildsWeatherStats(t *testing.T) {
+func TestFlightPerformanceIngestHandlerWeatherEnqueueError(t *testing.T) {
 	ctx := context.Background()
-
-	var order []string
-
-	st := &storetest.Stub{
-		GetFlightPerformanceIngestJobFn: func(_ context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
-			return &model.FlightPerformanceIngestJob{JobID: jobID, Year: 2026, Month: 4}, nil
-		},
-		ReplaceFlightPerformanceByMonthFn: func(context.Context, int, int, []string, [][]string) error {
-			return nil
-		},
-		RebuildRouteTravelWindowsFn: func(context.Context) error {
-			order = append(order, "travel")
-
-			return nil
-		},
-		RebuildRouteWeatherStatsFn: func(context.Context) error {
-			order = append(order, "weather")
-
-			return nil
-		},
-	}
-
-	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
-	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
-
-	if _, err := h.Process(ctx, job); err != nil {
-		t.Fatalf("Process() error = %v", err)
-	}
-
-	if len(order) != 2 || order[0] != "travel" || order[1] != "weather" {
-		t.Fatalf("rebuild order = %v, want travel then weather", order)
-	}
-}
-
-func TestFlightPerformanceIngestHandlerWeatherRebuildError(t *testing.T) {
-	ctx := context.Background()
-	st := flightPerformanceIngestStub(t, func(context.Context) error {
-		return nil
+	st := flightPerformanceIngestStub(t, func(context.Context) (*model.Job, error) {
+		return queuedRebuild(model.JobTypeRebuildRouteTravelWindows), nil
+	}, func(context.Context) (*model.Job, error) {
+		return nil, errEnqueueFailed
 	})
-	st.RebuildRouteWeatherStatsFn = func(context.Context) error {
-		return errRebuildFailed
-	}
 
 	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
 	job := &model.Job{ID: testJobID, Type: model.JobTypeImportFlightPerformance}
 
 	if _, err := h.Process(ctx, job); err == nil {
-		t.Fatal("expected weather rebuild error")
+		t.Fatal("expected weather enqueue error")
+	}
+}
+
+func TestFlightPerformanceIngestHandlerPendingTravelStillQueuesWeather(t *testing.T) {
+	ctx := context.Background()
+
+	var queued []model.JobType
+
+	st := flightPerformanceIngestStub(t, func(context.Context) (*model.Job, error) {
+		queued = append(queued, model.JobTypeRebuildRouteTravelWindows)
+
+		return nil, store.ErrActiveIngestConflict
+	}, func(context.Context) (*model.Job, error) {
+		queued = append(queued, model.JobTypeRebuildRouteWeatherStats)
+
+		return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
+	})
+
+	h := NewFlightPerformanceIngestHandler(st, btsFixtureService(t, st))
+	if _, err := h.Process(ctx, &model.Job{ID: testJobID}); err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	if len(queued) != 2 || queued[1] != model.JobTypeRebuildRouteWeatherStats {
+		t.Fatalf("queued = %v, want weather stats after a pending travel-window skip", queued)
 	}
 }
 
@@ -225,4 +236,8 @@ func btsFixtureService(t *testing.T, st *storetest.Stub) *bts.Service {
 	return bts.NewService(st, nil).WithCSVOpener(func(context.Context, int, int) (string, func(), error) {
 		return path, func() {}, nil
 	})
+}
+
+func queuedRebuild(jobType model.JobType) *model.Job {
+	return &model.Job{ID: "rebuild-" + string(jobType), Type: jobType, Status: model.JobStatusPending}
 }

@@ -52,6 +52,9 @@ func routerStub() *storetest.Stub {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
+		PendingIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+			return false, nil
+		},
 		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
 			return false, nil
 		},

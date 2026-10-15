@@ -27,7 +27,7 @@ func TestRebuildWeatherStatsCreate(t *testing.T) {
 			var checkedType model.JobType
 
 			h := NewRebuildWeatherStatsHandler(&storetest.Stub{
-				ActiveIngestJobFn: func(_ context.Context, jobType model.JobType) (bool, error) {
+				PendingIngestJobFn: func(_ context.Context, jobType model.JobType) (bool, error) {
 					checkedType = jobType
 
 					return false, nil
@@ -75,7 +75,7 @@ func TestRebuildWeatherStatsCreate(t *testing.T) {
 
 func TestRebuildWeatherStatsActiveConflict(t *testing.T) {
 	h := NewRebuildWeatherStatsHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+		PendingIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return true, nil
 		},
 	})
@@ -104,7 +104,7 @@ func TestRebuildWeatherStatsActiveConflict(t *testing.T) {
 
 func TestRebuildWeatherStatsCreateConflict(t *testing.T) {
 	h := NewRebuildWeatherStatsHandler(&storetest.Stub{
-		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
+		PendingIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
 		CreateRebuildRouteWeatherStatsJobFn: func(context.Context) (*model.Job, error) {

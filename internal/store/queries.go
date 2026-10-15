@@ -21,11 +21,14 @@ const (
 		ORDER BY j.created_at DESC
 		LIMIT $1`
 
+	// Ingest jobs are rank 0. /*rebuild_types*/ is the rank-1 list (rollup rebuilds).
+	// Oldest created_at wins within a rank. ORDER BY type would not, because
+	// it would sort ingest types ahead of each other instead of by age.
 	QueryClaimNextPendingJobSelect = `
 		SELECT id, type, status, result, error, created_at, updated_at, started_at, ended_at
 		FROM jobs
 		WHERE status = $1
-		ORDER BY created_at ASC
+		ORDER BY CASE WHEN type IN (/*rebuild_types*/) THEN 1 ELSE 0 END ASC, created_at ASC
 		LIMIT 1
 		FOR UPDATE SKIP LOCKED`
 
@@ -77,6 +80,14 @@ const (
 		SELECT 1
 		FROM jobs
 		WHERE type = $1 AND status IN ($2, $3)
+		LIMIT 1`
+
+	// Pending only. Rebuild queueing uses this under the advisory lock so a
+	// running rebuild does not block a new pending job.
+	QueryPendingJobByType = `
+		SELECT 1
+		FROM jobs
+		WHERE type = $1 AND status = $2
 		LIMIT 1`
 
 	// /*months*/ is replaced with ($1, $2), ($3, $4), ... for the requested pairs.

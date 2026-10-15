@@ -98,7 +98,7 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	row := tx.QueryRowContext(ctx, store.QueryClaimNextPendingJobSelect, string(model.JobStatusPending))
+	row := tx.QueryRowContext(ctx, store.ClaimNextPendingJobQuery(), string(model.JobStatusPending))
 
 	job, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -249,6 +249,24 @@ func (s *Store) ActiveIngestJob(ctx context.Context, jobType model.JobType) (boo
 		jobType,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
+	).Scan(&exists)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *Store) PendingIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
+	var exists int
+
+	err := s.db.QueryRowContext(ctx, store.QueryPendingJobByType,
+		jobType,
+		string(model.JobStatusPending),
 	).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil

@@ -18,7 +18,7 @@ type RebuildWeatherStatsResponse struct {
 	Job QueuedJobResponse `json:"job"`
 }
 
-// RebuildWeatherStatsConflictResponse is returned when a rebuild job is already pending or running.
+// RebuildWeatherStatsConflictResponse is returned when a rebuild job is already pending.
 type RebuildWeatherStatsConflictResponse struct {
 	Error   string        `json:"error"`
 	JobType model.JobType `json:"job_type,omitempty"`
@@ -31,7 +31,7 @@ func NewRebuildWeatherStatsHandler(s store.Store) *RebuildWeatherStatsHandler {
 // Create queues a full rebuild of route weather-category rollups.
 //
 //	@Summary		Queue route weather-stats rollup rebuild
-//	@Description	Queues a full replace of route weather-category rollups from flight performance and weather observations. The body must be empty. Returns 409 when a rebuild job is already pending or running.
+//	@Description	Queues a full replace of route weather-category rollups from flight performance and weather observations. The body must be empty. Returns 409 when a rebuild of this type is already pending. A running rebuild does not block a new pending job.
 //	@Tags			rebuild,internal
 //	@Produce		json
 //	@Success		201	{object}	RebuildWeatherStatsResponse
@@ -51,7 +51,7 @@ func (h *RebuildWeatherStatsHandler) Create(w http.ResponseWriter, r *http.Reque
 
 	ctx := r.Context()
 
-	active, err := h.store.ActiveIngestJob(ctx, model.JobTypeRebuildRouteWeatherStats)
+	active, err := h.store.PendingIngestJob(ctx, model.JobTypeRebuildRouteWeatherStats)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveRebuild})
 		return

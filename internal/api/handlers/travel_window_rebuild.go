@@ -18,7 +18,7 @@ type RebuildTravelWindowsResponse struct {
 	Job QueuedJobResponse `json:"job"`
 }
 
-// RebuildTravelWindowsConflictResponse is returned when a rebuild job is already pending or running.
+// RebuildTravelWindowsConflictResponse is returned when a rebuild job is already pending.
 type RebuildTravelWindowsConflictResponse struct {
 	Error   string        `json:"error"`
 	JobType model.JobType `json:"job_type,omitempty"`
@@ -31,7 +31,7 @@ func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler 
 // Create queues a full rebuild of travel-window rollups from flight_performance.
 //
 //	@Summary		Queue travel-window rollup rebuild
-//	@Description	Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild job is already pending or running.
+//	@Description	Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild of this type is already pending. A running rebuild does not block a new pending job.
 //	@Tags			rebuild,internal
 //	@Produce		json
 //	@Success		201	{object}	RebuildTravelWindowsResponse
@@ -51,7 +51,7 @@ func (h *RebuildTravelWindowsHandler) Create(w http.ResponseWriter, r *http.Requ
 
 	ctx := r.Context()
 
-	active, err := h.store.ActiveIngestJob(ctx, model.JobTypeRebuildRouteTravelWindows)
+	active, err := h.store.PendingIngestJob(ctx, model.JobTypeRebuildRouteTravelWindows)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveRebuild})
 		return
