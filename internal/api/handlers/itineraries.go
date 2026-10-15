@@ -21,7 +21,7 @@ func NewItinerariesHandler(s store.Store) *ItinerariesHandler {
 // ItineraryOutlook returns historical outlook and connection risk for ordered legs.
 //
 //	@Summary		Itinerary booking outlook
-//	@Description	Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.origin and summary.destination are the first origin and the last destination. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.connection_risk is the worst connection status, from loose through ok and unknown to tight, and is omitted when there are no connections.
+//	@Description	Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.origin and summary.destination are the first origin and the last destination. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.connection_risk is true when any connection is tight or unknown.
 //	@Tags			itineraries,external
 //	@Accept			json
 //	@Produce		json

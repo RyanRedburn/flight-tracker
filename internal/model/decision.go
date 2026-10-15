@@ -132,45 +132,6 @@ func ConnectionStatus(layover int, minutes *ConnectionMinutes) string {
 	return ConnectionTight
 }
 
-// WorstConnectionStatus returns the worse connection status.
-// Best to worst: loose, ok, unknown, tight.
-// tight is the at-risk status. unknown is worse than ok.
-// An empty or unrecognized status does not outrank a known one.
-// No known status returns an empty string.
-func WorstConnectionStatus(statuses ...string) string {
-	worst := ""
-	worstRank := -1
-
-	for _, status := range statuses {
-		rank, ok := connectionStatusRank(status)
-		if !ok {
-			continue
-		}
-
-		if rank > worstRank {
-			worst = status
-			worstRank = rank
-		}
-	}
-
-	return worst
-}
-
-func connectionStatusRank(status string) (int, bool) {
-	switch status {
-	case ConnectionLoose:
-		return 0, true
-	case ConnectionOK:
-		return 1, true
-	case ConnectionUnknown:
-		return 2, true
-	case ConnectionTight:
-		return 3, true
-	default:
-		return 0, false
-	}
-}
-
 // OutlookConfidence maps an outlook sample onto high, low, or unknown.
 // insufficientSample is the existing thin-history flag (some rows, below the minimum).
 // An empty sample is unknown even when that flag is false.

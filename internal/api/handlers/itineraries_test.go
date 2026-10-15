@@ -75,8 +75,15 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 				t.Fatalf("first leg = %+v", out.Legs[0])
 			}
 
-			if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testDestLAX || out.Summary.Confidence != model.ConfidenceHigh || out.Summary.ConnectionRisk != tt.wantStatus {
-				t.Fatalf("summary = %+v", out.Summary)
+			wantRisk := tt.wantStatus == model.ConnectionTight
+
+			riskJSON := `"connection_risk":false`
+			if wantRisk {
+				riskJSON = `"connection_risk":true`
+			}
+
+			if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testDestLAX || out.Summary.Confidence != model.ConfidenceHigh || out.Summary.ConnectionRisk != wantRisk || !bytes.Contains(rec.Body.Bytes(), []byte(riskJSON)) {
+				t.Fatalf("summary = %+v body = %s", out.Summary, rec.Body.Bytes())
 			}
 
 			assertNestedOutlookResults(t, rec.Body.Bytes(), 0)
@@ -544,7 +551,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 		t.Fatalf("connections = %d", len(out.Connections))
 	}
 
-	if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testOriginBOS || out.Summary.Confidence != model.ConfidenceUnknown || out.Summary.ConnectionRisk != model.ConnectionUnknown {
+	if out.Summary.Origin != testOriginBOS || out.Summary.Destination != testOriginBOS || out.Summary.Confidence != model.ConfidenceUnknown || !out.Summary.ConnectionRisk {
 		t.Fatalf("summary = %+v", out.Summary)
 	}
 

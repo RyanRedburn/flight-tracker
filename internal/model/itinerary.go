@@ -47,13 +47,13 @@ type ItineraryLeg struct {
 }
 
 type ItineraryOutlookResponse struct {
-	// Summary is the trip endpoints, the lowest leg confidence, and the worst connection.
+	// Summary is the trip endpoints, the lowest leg confidence, and whether any connection is tight or unknown.
 	Summary     ItineraryOutlookSummary `json:"summary"`
 	Legs        []ItineraryOutlookLeg   `json:"legs"`
 	Connections []ItineraryConnection   `json:"connections"`
 }
 
-// ItineraryOutlookSummary is the trip endpoints, the lowest leg confidence, and the worst connection.
+// ItineraryOutlookSummary is the trip endpoints, the lowest leg confidence, and whether any connection is tight or unknown.
 type ItineraryOutlookSummary struct {
 	// Origin is the first leg's origin airport.
 	Origin string `json:"origin"`
@@ -61,9 +61,8 @@ type ItineraryOutlookSummary struct {
 	Destination string `json:"destination"`
 	// Confidence is the lowest leg outlook confidence. A leg with no outlook is unknown.
 	Confidence string `json:"confidence" enums:"high,low,unknown"`
-	// ConnectionRisk is the worst connection status: loose, then ok, then unknown, then tight.
-	// Omitted when the itinerary has no connections.
-	ConnectionRisk string `json:"connection_risk,omitempty" enums:"loose,ok,tight,unknown"`
+	// ConnectionRisk is true when any connection is tight or unknown, including a missing outlook.
+	ConnectionRisk bool `json:"connection_risk"`
 }
 
 // ItineraryOutlookLeg keeps the itinerary date and position.

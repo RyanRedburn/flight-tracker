@@ -226,10 +226,13 @@ func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutl
 		}
 	}
 
-	connectionRisk := ""
+	connectionRisk := false
 
 	for _, conn := range connections {
-		connectionRisk = model.WorstConnectionStatus(connectionRisk, conn.Status)
+		if conn.Status == model.ConnectionTight || conn.Status == model.ConnectionUnknown {
+			connectionRisk = true
+			break
+		}
 	}
 
 	summary := model.ItineraryOutlookSummary{

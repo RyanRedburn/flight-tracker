@@ -629,7 +629,7 @@ definitions:
         allOf:
         - $ref: '#/definitions/model.ItineraryOutlookSummary'
         description: Summary is the trip endpoints, the lowest leg confidence, and
-          the worst connection.
+          whether any connection is tight or unknown.
     type: object
   model.ItineraryOutlookSummary:
     properties:
@@ -642,15 +642,9 @@ definitions:
         - unknown
         type: string
       connection_risk:
-        description: |-
-          ConnectionRisk is the worst connection status: loose, then ok, then unknown, then tight.
-          Omitted when the itinerary has no connections.
-        enum:
-        - loose
-        - ok
-        - tight
-        - unknown
-        type: string
+        description: ConnectionRisk is true when any connection is tight or unknown,
+          including a missing outlook.
+        type: boolean
       destination:
         description: Destination is the last leg's destination airport.
         type: string
@@ -1825,8 +1819,7 @@ paths:
         analysis, and route-level weather. summary.origin and summary.destination
         are the first origin and the last destination. summary.confidence is the lowest
         leg confidence, and a missing outlook counts as unknown. summary.connection_risk
-        is the worst connection status, from loose through ok and unknown to tight,
-        and is omitted when there are no connections.
+        is true when any connection is tight or unknown.
       parameters:
       - description: Ordered legs
         in: body
