@@ -23,7 +23,6 @@ const (
 
 // WeatherCategoryStat is on-time performance for one METAR category.
 type WeatherCategoryStat struct {
-	// Category is Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, or Unknown.
 	Category   string  `json:"category" enums:"Thunder,Very low clouds or visibility,Low clouds or visibility,Somewhat reduced visibility,Windy,Precipitation,Fair,Unknown"`
 	Flights    int     `json:"flights"`
 	OnTimeRate float64 `json:"on_time_rate"`
@@ -46,7 +45,7 @@ type RouteWeatherStats struct {
 	DestWeather   WeatherSideStats `json:"dest_weather"`
 }
 
-// RouteOutlookWeather is informational fair versus adverse on-time history.
+// RouteOutlookWeather is route-level fair versus adverse history for the route, not the departure slot.
 // It does not change connection status or confidence.
 // Fair is VFR_FAIR. Adverse is every other category except UNKNOWN. Unmatched flights are excluded.
 type RouteOutlookWeather struct {

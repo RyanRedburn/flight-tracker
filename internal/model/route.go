@@ -58,32 +58,28 @@ type RouteStats struct {
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
 
-// RouteOutlook is the route outlook response. OutlookResult is embedded so
-// an itinerary leg can return the same results without the request filters.
 type RouteOutlook struct {
 	Filters Filters `json:"filters"`
 	OutlookResult
 }
 
-// OutlookResult is the outlook sample and estimates. Itinerary legs return this
-// alone so origin, dest, carrier, and departure time are not repeated.
 type OutlookResult struct {
-	Analysis                        Analysis           `json:"analysis"`
-	OnTimeProbability               *float64           `json:"on_time_probability"`
-	DelayProbability                *float64           `json:"delay_probability"`
-	CancellationProbability         *float64           `json:"cancellation_probability"`
-	DiversionProbability            *float64           `json:"diversion_probability"`
-	LikelyArrivalDelayMinutes       *float64           `json:"likely_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes       *float64           `json:"median_arrival_delay_minutes"`
-	LikelyArrivalDelayWhenDelayed   *float64           `json:"likely_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed   *float64           `json:"median_arrival_delay_when_delayed"`
-	LikelyDepartureDelayMinutes     *float64           `json:"likely_departure_delay_minutes"`
-	MedianDepartureDelayMinutes     *float64           `json:"median_departure_delay_minutes"`
-	LikelyDepartureDelayWhenDelayed *float64           `json:"likely_departure_delay_when_delayed"`
-	MedianDepartureDelayWhenDelayed *float64           `json:"median_departure_delay_when_delayed"`
-	Connection                      ConnectionGuidance `json:"connection"`
-	// Weather is route-level fair and adverse on-time rates, not this departure slot.
-	Weather RouteOutlookWeather `json:"weather"`
+	Analysis                        Analysis `json:"analysis"`
+	OnTimeProbability               *float64 `json:"on_time_probability"`
+	DelayProbability                *float64 `json:"delay_probability"`
+	CancellationProbability         *float64 `json:"cancellation_probability"`
+	DiversionProbability            *float64 `json:"diversion_probability"`
+	LikelyArrivalDelayMinutes       *float64 `json:"likely_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes       *float64 `json:"median_arrival_delay_minutes"`
+	LikelyArrivalDelayWhenDelayed   *float64 `json:"likely_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed   *float64 `json:"median_arrival_delay_when_delayed"`
+	LikelyDepartureDelayMinutes     *float64 `json:"likely_departure_delay_minutes"`
+	MedianDepartureDelayMinutes     *float64 `json:"median_departure_delay_minutes"`
+	LikelyDepartureDelayWhenDelayed *float64 `json:"likely_departure_delay_when_delayed"`
+	MedianDepartureDelayWhenDelayed *float64 `json:"median_departure_delay_when_delayed"`
+	// Cleared for empty_sample and insufficient_sample.
+	Connection ConnectionGuidance  `json:"connection"`
+	Weather    RouteOutlookWeather `json:"weather"`
 }
 
 // TravelWindowMonthBucket is one month-of-year on-time rate.

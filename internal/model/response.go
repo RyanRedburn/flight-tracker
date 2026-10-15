@@ -1,6 +1,6 @@
 package model
 
-// Filters is what the caller asked for. Fields that do not apply to an endpoint are omitted.
+// Filters is the request. Fields that do not apply, or that the caller omitted, are left out.
 type Filters struct {
 	Origin               string `json:"origin,omitempty"`
 	Dest                 string `json:"dest,omitempty"`
@@ -20,11 +20,8 @@ type Analysis struct {
 	Start      string `json:"start"`
 	End        string `json:"end"`
 	SampleSize int    `json:"sample_size"`
-	// SampleReason is sufficient, insufficient_sample, or empty_sample.
-	// empty_sample is a seen route and carrier with no flights in this slot:
-	// confidence is unknown and estimate fields are null.
-	// Never-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.
+	// empty_sample means the slot has no flights: confidence is unknown and estimates are null.
+	// sufficient is high confidence; insufficient_sample is low.
 	SampleReason string `json:"sample_reason,omitempty" enums:"sufficient,insufficient_sample,empty_sample"`
-	// Confidence is high, low, or unknown for sufficient, insufficient_sample, and empty_sample.
-	Confidence string `json:"confidence,omitempty" enums:"high,low,unknown"`
+	Confidence   string `json:"confidence,omitempty" enums:"high,low,unknown"`
 }

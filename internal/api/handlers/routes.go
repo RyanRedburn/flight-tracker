@@ -63,7 +63,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // Outlook returns booking-style probabilities for a specific flight pattern.
 //
 //	@Summary		Route booking outlook
-//	@Description	On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD) is required; sending both or neither is rejected. A date selects that weekday for the same historical sample. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). analysis.sample_reason is sufficient when sample_size meets the minimum (confidence high), insufficient_sample when some flights fall short of that minimum (confidence low), and empty_sample when this weekday and departure window have no flights (confidence unknown, probability and delay fields null). A null delay field on a non-empty sample means that delay was not observed. Departure delay uses the same four stats as arrival. connection is same-airport guidance per connection type and is null for empty_sample and insufficient_sample. recommended_minutes is arrival-delay p90 plus the destination airport MCT, or 45/60/120/120 when that MCT bucket is missing (mct_source default; airport when the stored minute is used). It is the smallest layover that is ok. loose_minutes is 30 minutes above recommended_minutes. A shorter layover is tight. A null bucket means that connection status is unknown. These minutes are not an official airline MCT. Itinerary connections use the same thresholds and confidence. weather is route-level fair and adverse on-time rates for this route and carrier over the analysis window; it does not change confidence or connection status. Returns 404 when the origin, destination, and carrier have no flight-performance data. That not-found case is not empty_sample. A day-of-week or departure-time window that matches nothing still returns 200.
+//	@Description	On-time, delay, cancellation, and diversion probabilities for one carrier, route, weekday, and departure window. A date selects that weekday in the same historical sample. A null delay on a non-empty sample means that delay was not observed. A route and carrier with no history are 404, not empty_sample.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin						query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, day of week (1=Mon … 7=Sun), and scheduled local departure hour, pooled from the last up to 2 years of flight-performance data for the origin/destination (and marketing carrier when set). Best/worst lists are the top and bottom 3 buckets whose flight count meets the grain minimum (confidence high). Each bucket's confidence and reliability describe that seasonal on-time rate only; they are not connection statuses (not loose, ok, or tight). confidence is high when flights meet the grain's minimum sample and low when the bucket has fewer flights. reliability is reliable at an on-time rate of at least 0.80, typical from 0.70 up to 0.80, and unreliable below 0.70, and only when confidence is high. reliability unknown with confidence low is a thin bucket, the seasonal form of outlook insufficient_sample, not a second flag and not an unreliable season. A bucket with no flights is omitted rather than returned as a zero rate. filters.carrier is omitted when the carrier query param is not set. Returns 404 when the route (or route+carrier) has no flight-performance data.
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -147,7 +147,7 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 // WeatherStats returns on-time performance by METAR category at each end of a route.
 //
 //	@Summary		Route weather category stats
-//	@Description	On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, and Unknown, plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.
+//	@Description	On-time performance by observed weather category at each end of a route (max 366 days).
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

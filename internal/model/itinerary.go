@@ -47,26 +47,21 @@ type ItineraryLeg struct {
 }
 
 type ItineraryOutlookResponse struct {
-	// Summary is the trip endpoints, the lowest leg confidence, and whether any connection is tight or unknown.
 	Summary     ItineraryOutlookSummary `json:"summary"`
 	Legs        []ItineraryOutlookLeg   `json:"legs"`
 	Connections []ItineraryConnection   `json:"connections"`
 }
 
-// ItineraryOutlookSummary is the trip endpoints, the lowest leg confidence, and whether any connection is tight or unknown.
+// ItineraryOutlookSummary uses the first leg's origin and the last leg's destination.
 type ItineraryOutlookSummary struct {
-	// Origin is the first leg's origin airport.
-	Origin string `json:"origin"`
-	// Destination is the last leg's destination airport.
+	Origin      string `json:"origin"`
 	Destination string `json:"destination"`
-	// Confidence is the lowest leg outlook confidence. A leg with no outlook is unknown.
+	// A missing outlook counts as unknown.
 	Confidence string `json:"confidence" enums:"high,low,unknown"`
-	// ConnectionRisk is true when any connection is tight or unknown, including a missing outlook.
+	// True when any connection is tight or unknown.
 	ConnectionRisk bool `json:"connection_risk"`
 }
 
-// ItineraryOutlookLeg keeps the itinerary date and position.
-// The outlook is the route outlook for that leg, including filters and analysis.
 type ItineraryOutlookLeg struct {
 	Index   int           `json:"index"`
 	Date    string        `json:"date"`
@@ -88,7 +83,7 @@ type ItineraryConnection struct {
 	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
 	// Overnight stays true for a later outbound date, including multi-day, when reason names another cause.
 	Overnight bool `json:"overnight"`
-	// MCTSource is airport or default when this hop used a connection bucket, and null otherwise.
+	// Null when this hop did not use a connection bucket.
 	MCTSource *string `json:"mct_source" enums:"airport,default"`
 }
 

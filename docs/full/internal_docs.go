@@ -1103,7 +1103,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). When dates are omitted, that default window is analysis.start and analysis.end. State is a 2-letter code matching origin or dest. Returns 404 when the carrier has no flight-performance data. Date and state filters that match nothing still return 200.",
+                "description": "On-time stats for a marketing carrier, plus best and worst routes and airports (on-time rate, at least 30 flights, top and bottom 5). Dates are optional and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days).",
                 "produces": [
                     "application/json"
                 ],
@@ -1198,7 +1198,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook is that leg's route outlook, including filters, analysis, and route-level weather. summary.origin and summary.destination are the first origin and the last destination. summary.confidence is the lowest leg confidence, and a missing outlook counts as unknown. summary.connection_risk is true when any connection is tight or unknown.",
+                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not empty_sample.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1268,7 +1268,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD) is required; sending both or neither is rejected. A date selects that weekday for the same historical sample. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). analysis.sample_reason is sufficient when sample_size meets the minimum (confidence high), insufficient_sample when some flights fall short of that minimum (confidence low), and empty_sample when this weekday and departure window have no flights (confidence unknown, probability and delay fields null). A null delay field on a non-empty sample means that delay was not observed. Departure delay uses the same four stats as arrival. connection is same-airport guidance per connection type and is null for empty_sample and insufficient_sample. recommended_minutes is arrival-delay p90 plus the destination airport MCT, or 45/60/120/120 when that MCT bucket is missing (mct_source default; airport when the stored minute is used). It is the smallest layover that is ok. loose_minutes is 30 minutes above recommended_minutes. A shorter layover is tight. A null bucket means that connection status is unknown. These minutes are not an official airline MCT. Itinerary connections use the same thresholds and confidence. weather is route-level fair and adverse on-time rates for this route and carrier over the analysis window; it does not change confidence or connection status. Returns 404 when the origin, destination, and carrier have no flight-performance data. That not-found case is not empty_sample. A day-of-week or departure-time window that matches nothing still returns 200.",
+                "description": "On-time, delay, cancellation, and diversion probabilities for one carrier, route, weekday, and departure window. A date selects that weekday in the same historical sample. A null delay on a non-empty sample means that delay was not observed. A route and carrier with no history are 404, not empty_sample.",
                 "produces": [
                     "application/json"
                 ],
@@ -1513,7 +1513,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, day of week (1=Mon … 7=Sun), and scheduled local departure hour, pooled from the last up to 2 years of flight-performance data for the origin/destination (and marketing carrier when set). Best/worst lists are the top and bottom 3 buckets whose flight count meets the grain minimum (confidence high). Each bucket's confidence and reliability describe that seasonal on-time rate only; they are not connection statuses (not loose, ok, or tight). confidence is high when flights meet the grain's minimum sample and low when the bucket has fewer flights. reliability is reliable at an on-time rate of at least 0.80, typical from 0.70 up to 0.80, and unreliable below 0.70, and only when confidence is high. reliability unknown with confidence low is a thin bucket, the seasonal form of outlook insufficient_sample, not a second flag and not an unreliable season. A bucket with no flights is omitted rather than returned as a zero rate. filters.carrier is omitted when the carrier query param is not set. Returns 404 when the route (or route+carrier) has no flight-performance data.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.",
                 "produces": [
                     "application/json"
                 ],
@@ -1603,7 +1603,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, and Unknown, plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.",
+                "description": "On-time performance by observed weather category at each end of a route (max 366 days).",
                 "produces": [
                     "application/json"
                 ],
@@ -2134,7 +2134,6 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
-                    "description": "Confidence is high, low, or unknown for sufficient, insufficient_sample, and empty_sample.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -2146,7 +2145,7 @@ const docTemplateinternal = `{
                     "type": "string"
                 },
                 "sample_reason": {
-                    "description": "SampleReason is sufficient, insufficient_sample, or empty_sample.\nempty_sample is a seen route and carrier with no flights in this slot:\nconfidence is unknown and estimate fields are null.\nNever-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.",
+                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient is high confidence; insufficient_sample is low.",
                     "type": "string",
                     "enum": [
                         "sufficient",
@@ -2549,7 +2548,7 @@ const docTemplateinternal = `{
                     "type": "integer"
                 },
                 "mct_source": {
-                    "description": "MCTSource is airport or default when this hop used a connection bucket, and null otherwise.",
+                    "description": "Null when this hop did not use a connection bucket.",
                     "type": "string",
                     "enum": [
                         "airport",
@@ -2678,12 +2677,7 @@ const docTemplateinternal = `{
                     }
                 },
                 "summary": {
-                    "description": "Summary is the trip endpoints, the lowest leg confidence, and whether any connection is tight or unknown.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.ItineraryOutlookSummary"
-                        }
-                    ]
+                    "$ref": "#/definitions/model.ItineraryOutlookSummary"
                 }
             }
         },
@@ -2691,7 +2685,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
-                    "description": "Confidence is the lowest leg outlook confidence. A leg with no outlook is unknown.",
+                    "description": "A missing outlook counts as unknown.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -2700,15 +2694,13 @@ const docTemplateinternal = `{
                     ]
                 },
                 "connection_risk": {
-                    "description": "ConnectionRisk is true when any connection is tight or unknown, including a missing outlook.",
+                    "description": "True when any connection is tight or unknown.",
                     "type": "boolean"
                 },
                 "destination": {
-                    "description": "Destination is the last leg's destination airport.",
                     "type": "string"
                 },
                 "origin": {
-                    "description": "Origin is the first leg's origin airport.",
                     "type": "string"
                 }
             }
@@ -2763,7 +2755,12 @@ const docTemplateinternal = `{
                     "type": "number"
                 },
                 "connection": {
-                    "$ref": "#/definitions/model.ConnectionGuidance"
+                    "description": "Cleared for empty_sample and insufficient_sample.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectionGuidance"
+                        }
+                    ]
                 },
                 "delay_probability": {
                     "type": "number"
@@ -2802,12 +2799,7 @@ const docTemplateinternal = `{
                     "type": "number"
                 },
                 "weather": {
-                    "description": "Weather is route-level fair and adverse on-time rates, not this departure slot.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.RouteOutlookWeather"
-                        }
-                    ]
+                    "$ref": "#/definitions/model.RouteOutlookWeather"
                 }
             }
         },
@@ -3115,7 +3107,6 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "category": {
-                    "description": "Category is Thunder, Very low clouds or visibility, Low clouds or visibility, Somewhat reduced visibility, Windy, Precipitation, Fair, or Unknown.",
                     "type": "string",
                     "enum": [
                         "Thunder",

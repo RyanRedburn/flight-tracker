@@ -23,9 +23,6 @@ const (
 	ReliabilityUnknown    = "unknown"
 
 	// SampleReason names the outlook slot behind confidence.
-	// It is the machine-readable sample state for a 200 response.
-	// A route and carrier that have never been seen are not a sample reason:
-	// route outlook is 404, and an itinerary leg has a null outlook plus error.
 	SampleReasonSufficient         = "sufficient"
 	SampleReasonInsufficientSample = "insufficient_sample"
 	SampleReasonEmptySample        = "empty_sample"
@@ -61,9 +58,9 @@ const (
 )
 
 // ConnectionMinutes is the layover threshold for one same-airport connection type.
-// recommended_minutes is the smallest layover that is ok.
-// loose_minutes is 30 minutes higher; a layover that long is loose.
-// A shorter layover than recommended_minutes is tight.
+// recommended_minutes is arrival-delay p90 plus the destination airport MCT, or 45/60/120/120 when that minute is missing.
+// It is the smallest layover that is ok. loose_minutes is 30 minutes higher. A shorter layover is tight.
+// These minutes are not an official airline MCT.
 type ConnectionMinutes struct {
 	RecommendedMinutes int `json:"recommended_minutes"`
 	LooseMinutes       int `json:"loose_minutes"`
