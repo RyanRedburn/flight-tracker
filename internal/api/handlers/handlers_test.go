@@ -69,7 +69,7 @@ func TestHealthDatabaseVersion(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/db/version", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/db/version", nil)
 	rec := httptest.NewRecorder()
 	h.DatabaseVersion(rec, req)
 

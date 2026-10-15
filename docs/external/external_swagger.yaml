@@ -12,6 +12,30 @@ definitions:
       count:
         type: integer
     type: object
+  model.Analysis:
+    properties:
+      confidence:
+        enum:
+        - high
+        - low
+        - unknown
+        type: string
+      end:
+        type: string
+      sample_reason:
+        description: |-
+          empty_sample means the slot has no flights: confidence is unknown and estimates are null.
+          sufficient is high confidence; insufficient_sample is low.
+        enum:
+        - sufficient
+        - insufficient_sample
+        - empty_sample
+        type: string
+      sample_size:
+        type: integer
+      start:
+        type: string
+    type: object
   model.CarrierAirportStat:
     properties:
       airport:
@@ -71,6 +95,8 @@ definitions:
     type: object
   model.CarrierStats:
     properties:
+      analysis:
+        $ref: '#/definitions/model.Analysis'
       avg_arrival_delay_minutes:
         type: number
       avg_arrival_delay_when_delayed:
@@ -91,8 +117,6 @@ definitions:
         type: number
       cancelled:
         type: integer
-      carrier:
-        type: string
       delay_causes_avg_minutes:
         $ref: '#/definitions/model.DelayCausesAvgMinutes'
       delay_causes_share:
@@ -105,22 +129,22 @@ definitions:
         type: number
       diverted:
         type: integer
-      end_date:
-        type: string
       filters:
-        $ref: '#/definitions/model.CarrierStatsFilters'
+        $ref: '#/definitions/model.Filters'
       flights:
         type: integer
       median_arrival_delay_minutes:
         type: number
       median_arrival_delay_when_delayed:
         type: number
+      median_departure_delay_minutes:
+        type: number
+      median_departure_delay_when_delayed:
+        type: number
       on_time:
         type: integer
       on_time_rate:
         type: number
-      start_date:
-        type: string
       worst_airports:
         items:
           $ref: '#/definitions/model.CarrierAirportStat'
@@ -129,11 +153,6 @@ definitions:
         items:
           $ref: '#/definitions/model.CarrierRouteStat'
         type: array
-    type: object
-  model.CarrierStatsFilters:
-    properties:
-      state:
-        type: string
     type: object
   model.ConnectionGuidance:
     properties:
@@ -148,12 +167,15 @@ definitions:
     type: object
   model.ConnectionMinutes:
     properties:
-      floor_only:
-        description: FloorOnly means the static floor (45, 60, 120, or 120) replaced
-          a missing airport MCT minute. A stored zero is not missing.
-        type: boolean
       loose_minutes:
         type: integer
+      mct_source:
+        description: MCTSource is airport when this bucket used the stored airport
+          minute, or default when that minute was missing.
+        enum:
+        - airport
+        - default
+        type: string
       recommended_minutes:
         type: integer
     type: object
@@ -185,6 +207,33 @@ definitions:
       weather:
         type: number
     type: object
+  model.Filters:
+    properties:
+      carrier:
+        type: string
+      day_of_week:
+        type: integer
+      days_of_week:
+        items:
+          type: integer
+        type: array
+      dep_time:
+        type: string
+      dep_time_window_minutes:
+        type: integer
+      dest:
+        type: string
+      end_date:
+        type: string
+      flight_number:
+        type: string
+      origin:
+        type: string
+      start_date:
+        type: string
+      state:
+        type: string
+    type: object
   model.ItineraryConnection:
     properties:
       after_leg:
@@ -204,13 +253,16 @@ definitions:
         - international_to_domestic
         - international_to_international
         type: string
-      floor_only:
-        description: FloorOnly is null when this hop did not use a connection bucket.
-        type: boolean
       layover_minutes:
         type: integer
       loose_minutes:
         type: integer
+      mct_source:
+        description: Null when this hop did not use a connection bucket.
+        enum:
+        - airport
+        - default
+        type: string
       overnight:
         description: Overnight stays true for a later outbound date, including multi-day,
           when reason names another cause.
@@ -271,26 +323,12 @@ definitions:
     type: object
   model.ItineraryOutlookLeg:
     properties:
-      arr_time:
-        type: string
-      carrier:
-        type: string
       date:
-        type: string
-      day_of_week:
-        type: integer
-      dep_time:
-        type: string
-      dep_time_window_minutes:
-        type: integer
-      dest:
         type: string
       error:
         type: string
       index:
         type: integer
-      origin:
-        type: string
       outlook:
         $ref: '#/definitions/model.RouteOutlook'
     type: object
@@ -315,76 +353,62 @@ definitions:
         items:
           $ref: '#/definitions/model.ItineraryOutlookLeg'
         type: array
+      summary:
+        $ref: '#/definitions/model.ItineraryOutlookSummary'
     type: object
-  model.RouteOutlook:
+  model.ItineraryOutlookSummary:
     properties:
-      analysis_end:
-        type: string
-      analysis_start:
-        type: string
-      cancellation_probability:
-        type: number
-      carrier:
-        type: string
       confidence:
-        description: Confidence is high, low, or unknown for sufficient, insufficient_sample,
-          and empty_sample.
+        description: A missing outlook counts as unknown.
         enum:
         - high
         - low
         - unknown
         type: string
+      connection_risk:
+        description: True when any connection is tight or unknown.
+        type: boolean
+      destination:
+        type: string
+      origin:
+        type: string
+    type: object
+  model.RouteOutlook:
+    properties:
+      analysis:
+        $ref: '#/definitions/model.Analysis'
+      cancellation_probability:
+        type: number
       connection:
-        $ref: '#/definitions/model.ConnectionGuidance'
-      day_of_week:
-        type: integer
+        allOf:
+        - $ref: '#/definitions/model.ConnectionGuidance'
+        description: Cleared for empty_sample and insufficient_sample.
       delay_probability:
         type: number
-      dep_time:
-        type: string
-      dep_time_window_minutes:
-        type: integer
-      dest:
-        type: string
       diversion_probability:
         type: number
-      insufficient_sample:
-        description: |-
-          InsufficientSample is true only for sample_reason insufficient_sample.
-          An empty slot leaves it false; never-seen is not this flag.
-        type: boolean
+      filters:
+        $ref: '#/definitions/model.Filters'
       likely_arrival_delay_minutes:
         type: number
       likely_arrival_delay_when_delayed:
         type: number
       likely_departure_delay_minutes:
         type: number
+      likely_departure_delay_when_delayed:
+        type: number
       median_arrival_delay_minutes:
         type: number
       median_arrival_delay_when_delayed:
         type: number
+      median_departure_delay_minutes:
+        type: number
+      median_departure_delay_when_delayed:
+        type: number
       on_time_probability:
         type: number
-      origin:
-        type: string
-      sample_reason:
-        description: |-
-          SampleReason is sufficient, insufficient_sample, or empty_sample.
-          insufficient_sample matches the bool. empty_sample is a seen route and carrier
-          with no flights in this slot: confidence is unknown and estimate fields are null.
-          Never-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.
-        enum:
-        - sufficient
-        - insufficient_sample
-        - empty_sample
-        type: string
-      sample_size:
-        type: integer
       weather:
-        allOf:
-        - $ref: '#/definitions/model.RouteOutlookWeather'
-        description: Weather is route-level fair and adverse on-time rates, not this
-          departure slot.
+        $ref: '#/definitions/model.RouteOutlookWeather'
     type: object
   model.RouteOutlookWeather:
     properties:
@@ -421,6 +445,8 @@ definitions:
     type: object
   model.RouteStats:
     properties:
+      analysis:
+        $ref: '#/definitions/model.Analysis'
       avg_arrival_delay_minutes:
         type: number
       avg_arrival_delay_when_delayed:
@@ -447,8 +473,6 @@ definitions:
         type: number
       delayed:
         type: integer
-      dest:
-        type: string
       diversion_airports:
         items:
           $ref: '#/definitions/model.AirportCount'
@@ -457,38 +481,27 @@ definitions:
         type: number
       diverted:
         type: integer
-      end_date:
-        type: string
       filters:
-        $ref: '#/definitions/model.RouteStatsFilters'
+        $ref: '#/definitions/model.Filters'
       flights:
         type: integer
       median_arrival_delay_minutes:
         type: number
       median_arrival_delay_when_delayed:
         type: number
+      median_departure_delay_minutes:
+        type: number
+      median_departure_delay_when_delayed:
+        type: number
       on_time:
         type: integer
       on_time_rate:
         type: number
-      origin:
-        type: string
-      start_date:
-        type: string
-    type: object
-  model.RouteStatsFilters:
-    properties:
-      carrier:
-        type: string
-      days_of_week:
-        items:
-          type: integer
-        type: array
-      flight_number:
-        type: string
     type: object
   model.RouteTravelWindows:
     properties:
+      analysis:
+        $ref: '#/definitions/model.Analysis'
       best_days:
         items:
           $ref: '#/definitions/model.TravelWindowDayBucket'
@@ -513,16 +526,8 @@ definitions:
         items:
           $ref: '#/definitions/model.TravelWindowMonthBucket'
         type: array
-      carrier:
-        type: string
-      dest:
-        type: string
-      origin:
-        type: string
-      window_end:
-        type: string
-      window_start:
-        type: string
+      filters:
+        $ref: '#/definitions/model.Filters'
       worst_days:
         items:
           $ref: '#/definitions/model.TravelWindowDayBucket'
@@ -538,22 +543,16 @@ definitions:
     type: object
   model.RouteWeatherStats:
     properties:
-      dest:
-        type: string
+      analysis:
+        $ref: '#/definitions/model.Analysis'
       dest_weather:
         $ref: '#/definitions/model.WeatherSideStats'
-      end_date:
-        type: string
       filters:
-        $ref: '#/definitions/model.RouteStatsFilters'
+        $ref: '#/definitions/model.Filters'
       flights:
         type: integer
-      origin:
-        type: string
       origin_weather:
         $ref: '#/definitions/model.WeatherSideStats'
-      start_date:
-        type: string
     type: object
   model.TravelWindowDayBucket:
     properties:
@@ -624,6 +623,15 @@ definitions:
   model.WeatherCategoryStat:
     properties:
       category:
+        enum:
+        - Thunder
+        - Very low clouds or visibility
+        - Low clouds or visibility
+        - Somewhat reduced visibility
+        - Windy
+        - Precipitation
+        - Fair
+        - Unknown
         type: string
       flights:
         type: integer
@@ -653,13 +661,10 @@ info:
 paths:
   /api/v1/carriers/stats:
     get:
-      description: Aggregated on-time, delay, cancellation, and diversion stats for
-        a marketing carrier, plus best and worst routes and airports (on-time rate,
-        min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code.
-        Dates are optional together and default to the trailing 90 days ending at
-        the carrier's latest flight date (max span 366 days). State is a 2-letter
-        code matching origin or dest. Returns 404 when the carrier has no flight-performance
-        data. Date and state filters that match nothing still return 200.
+      description: On-time stats for a marketing carrier, plus best and worst routes
+        and airports (on-time rate, at least 30 flights, top and bottom 5). Dates
+        are optional and default to the trailing 90 days ending at the carrier's latest
+        flight date (max span 366 days).
       parameters:
       - description: Marketing carrier code
         in: query
@@ -727,9 +732,7 @@ paths:
       consumes:
       - application/json
       description: Historical outlook for 2–4 ordered legs and each connection. Always
-        200. A leg with no history has a null outlook and an error, not sample_reason
-        empty_sample. Each leg outlook includes route-level weather rates, which do
-        not change that connection's status or confidence.
+        200. A leg with no history has a null outlook and an error, not empty_sample.
       parameters:
       - description: Ordered legs
         in: body
@@ -772,30 +775,10 @@ paths:
       - external
   /api/v1/routes/outlook:
     get:
-      description: On-time, delay, cancellation, and diversion probabilities for a
-        carrier/route/day/departure-time window, based on the trailing analysis period.
-        Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD)
-        is required; sending both or neither is rejected. A date selects that weekday
-        for the same historical sample. dep_time is local departure time as HHmm (e.g.
-        0700). dep_time_window_minutes defaults to 30 (max 120). sample_reason is
-        sufficient when sample_size meets the minimum (insufficient_sample false,
-        confidence high), insufficient_sample when some flights fall short of that
-        minimum (the bool is true, confidence low), and empty_sample when this weekday
-        and departure window have no flights (insufficient_sample stays false, confidence
-        unknown, probability and delay fields null). A null delay field on a non-empty
-        sample means that delay was not observed. connection is same-airport guidance
-        per connection type and is null for empty_sample and insufficient_sample.
-        recommended_minutes is arrival-delay p90 plus the destination airport MCT,
-        or 45/60/120/120 when that MCT bucket is missing; it is the smallest layover
-        that is ok. loose_minutes is 30 minutes above recommended_minutes. A shorter
-        layover is tight. A null bucket means that connection status is unknown. These
-        minutes are not an official airline MCT. Itinerary connections use the same
-        thresholds and confidence. weather is route-level fair and adverse on-time
-        rates for this route and carrier over the analysis window; it does not change
-        confidence or connection status. Returns 404 when the origin, destination,
-        and carrier have no flight-performance data. That not-found case is not empty_sample.
-        A day-of-week or departure-time window that matches nothing still returns
-        200.
+      description: On-time, delay, cancellation, and diversion probabilities for one
+        carrier, route, weekday, and departure window. A date selects that weekday
+        in the same historical sample. A null delay on a non-empty sample means that
+        delay was not observed.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -880,13 +863,9 @@ paths:
   /api/v1/routes/stats:
     get:
       description: Aggregated on-time, delay, cancellation, and diversion stats for
-        a route over a date range (max 366 days). Origin and dest are 3-letter airport
-        codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted,
-        carrier_on_time lists per-marketing-carrier on-time rates and flight counts
-        for the same filters. The field is omitted entirely when carrier is set. Returns
-        404 when the origin/destination has no flight-performance data, or when carrier
-        is set and that route and carrier have none. Date, weekday, and flight-number
-        filters that match nothing still return 200.
+        a route over a date range (max 366 days). When carrier is omitted, carrier_on_time
+        lists per-marketing-carrier on-time rates and flight counts for the same filters.
+        The field is omitted entirely when carrier is set.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -972,21 +951,9 @@ paths:
       - external
   /api/v1/routes/travel-windows:
     get:
-      description: Typical-year on-time rates by month, day of week (1=Mon … 7=Sun),
-        and scheduled local departure hour, pooled from the last up to 2 years of
-        flight-performance data for the origin/destination (and marketing carrier
-        when set). Best/worst lists are the top and bottom 3 buckets whose flight
-        count meets the grain minimum (confidence high). Each bucket's confidence
-        and reliability describe that seasonal on-time rate only; they are not connection
-        statuses (not loose, ok, or tight). confidence is high when flights meet the
-        grain's minimum sample and low when the bucket has fewer flights. reliability
-        is reliable at an on-time rate of at least 0.80, typical from 0.70 up to 0.80,
-        and unreliable below 0.70, and only when confidence is high. reliability unknown
-        with confidence low is a thin bucket, the seasonal form of outlook insufficient_sample,
-        not a second flag and not an unreliable season. A bucket with no flights is
-        omitted rather than returned as a zero rate. The carrier field is omitted
-        when the carrier query param is not set. Returns 404 when the route (or route+carrier)
-        has no flight-performance data.
+      description: Typical-year on-time rates by month, weekday, and local departure
+        hour, from up to the last 2 years. Best and worst lists are the top and bottom
+        3 buckets that meet the grain minimum.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -1047,16 +1014,8 @@ paths:
       - external
   /api/v1/routes/weather-stats:
     get:
-      description: 'On-time performance by observed weather category at the origin
-        and at the destination over a date range (max 366 days). Origin and dest are
-        3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side
-        lists flight counts and on-time rate by category: thunderstorms (THUNDER),
-        low ceiling or visibility (LIFR, IFR, MVFR), wind (WINDY), precipitation (PRECIP),
-        fair weather (VFR_FAIR), and an observation too incomplete to classify (UNKNOWN),
-        plus flights with no matching observation. Those unmatched flights are not
-        treated as fair weather. Returns 404 when the origin/destination has no flight-performance
-        data, or when carrier is set and that route and carrier have none. Date, weekday,
-        and flight-number filters that match nothing still return 200.'
+      description: On-time performance by observed weather category at each end of
+        a route (max 366 days).
       parameters:
       - description: Origin airport IATA code
         in: query

@@ -74,7 +74,7 @@ func ConnectionType(originCountry, hubCountry, destCountry string) (string, bool
 // empty_sample or insufficient_sample, missing_threshold, negative_layover or
 // invalid_schedule, overnight, evaluated.
 // A later outbound date sets overnight even when an earlier reason wins.
-// floor_only is copied only from a published bucket.
+// mct_source is copied only from a published bucket.
 func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.RouteOutlook, countries map[string]string) model.ItineraryConnection {
 	conn := model.ItineraryConnection{
 		Airport:    inbound.Dest,
@@ -136,10 +136,10 @@ func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.Route
 
 	recommended := minutes.RecommendedMinutes
 	loose := minutes.LooseMinutes
-	floorOnly := minutes.FloorOnly
+	source := minutes.MCTSource
 	conn.RecommendedMinutes = &recommended
 	conn.LooseMinutes = &loose
-	conn.FloorOnly = &floorOnly
+	conn.MCTSource = &source
 
 	if layoverFailure != "" {
 		conn.Reason = layoverFailure
@@ -173,8 +173,6 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 	}
 
 	for i, leg := range legs {
-		day, _ := ISOWeekdayFromDate(leg.Date)
-
 		var errMsg *string
 
 		if i < len(legErrors) && legErrors[i] != "" {
@@ -183,29 +181,22 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 		}
 
 		var outlook *model.RouteOutlook
-		if errMsg == nil && i < len(outlooks) {
+		if errMsg == nil && i < len(outlooks) && outlooks[i] != nil {
 			outlook = outlooks[i]
 		}
 
 		out.Legs[i] = model.ItineraryOutlookLeg{
-			Index:                i,
-			Origin:               leg.Origin,
-			Dest:                 leg.Dest,
-			Carrier:              leg.Carrier,
-			Date:                 leg.Date,
-			DepTime:              FormatHHMM(leg.DepTime),
-			ArrTime:              FormatHHMM(leg.ArrTime),
-			DepTimeWindowMinutes: ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
-			DayOfWeek:            day,
-			Outlook:              outlook,
-			Error:                errMsg,
+			Index:   i,
+			Date:    leg.Date,
+			Outlook: outlook,
+			Error:   errMsg,
 		}
 	}
 
 	for i := 0; i < len(legs)-1; i++ {
 		var inbound *model.RouteOutlook
-		if out.Legs[i].Error == nil {
-			inbound = out.Legs[i].Outlook
+		if out.Legs[i].Error == nil && i < len(outlooks) {
+			inbound = outlooks[i]
 		}
 
 		conn := AssessConnection(legs[i], legs[i+1], inbound, countries)
@@ -213,7 +204,59 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 		out.Connections = append(out.Connections, conn)
 	}
 
+	out.Summary = itinerarySummary(legs, out.Legs, out.Connections)
+
 	return out
+}
+
+func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutlookLeg, connections []model.ItineraryConnection) model.ItineraryOutlookSummary {
+	confidence := model.ConfidenceHigh
+	if len(legs) == 0 {
+		confidence = model.ConfidenceUnknown
+	}
+
+	for _, leg := range legs {
+		legConfidence := model.ConfidenceUnknown
+		if leg.Outlook != nil {
+			legConfidence = leg.Outlook.DecisionConfidence()
+		}
+
+		if confidenceRank(legConfidence) < confidenceRank(confidence) {
+			confidence = legConfidence
+		}
+	}
+
+	connectionRisk := false
+
+	for _, conn := range connections {
+		if conn.Status == model.ConnectionTight || conn.Status == model.ConnectionUnknown {
+			connectionRisk = true
+			break
+		}
+	}
+
+	summary := model.ItineraryOutlookSummary{
+		Confidence:     confidence,
+		ConnectionRisk: connectionRisk,
+	}
+
+	if n := len(requested); n > 0 {
+		summary.Origin = requested[0].Origin
+		summary.Destination = requested[n-1].Dest
+	}
+
+	return summary
+}
+
+func confidenceRank(confidence string) int {
+	switch confidence {
+	case model.ConfidenceHigh:
+		return 2
+	case model.ConfidenceLow:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func localDateTime(date, hhmm string) (time.Time, bool) {

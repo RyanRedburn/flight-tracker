@@ -81,12 +81,12 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 
 	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
 
-	if got.Origin != testTravelOrigin || got.Dest != testTravelDest || got.Carrier != "" {
+	if got.Filters.Origin != testTravelOrigin || got.Filters.Dest != testTravelDest || got.Filters.Carrier != "" {
 		t.Fatalf("identity = %+v", got)
 	}
 
-	if got.WindowStart != testTravelWindowStart || got.WindowEnd != testTravelWindowEnd {
-		t.Errorf("window = %s..%s", got.WindowStart, got.WindowEnd)
+	if got.Analysis.Start != testTravelWindowStart || got.Analysis.End != testTravelWindowEnd || got.Analysis.SampleSize != 200 {
+		t.Errorf("window = %s..%s sample %d", got.Analysis.Start, got.Analysis.End, got.Analysis.SampleSize)
 	}
 
 	if len(got.ByMonth) != 4 {
@@ -163,8 +163,8 @@ func TestAssembleRouteTravelWindowsEligibilityShare(t *testing.T) {
 	}
 
 	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "UA", testTravelWindowStart, testTravelWindowEnd, 10000, counts)
-	if got.Carrier != "UA" {
-		t.Fatalf("carrier = %q, want UA", got.Carrier)
+	if got.Filters.Carrier != "UA" {
+		t.Fatalf("carrier = %q, want UA", got.Filters.Carrier)
 	}
 
 	if len(got.ByMonth) != 2 {

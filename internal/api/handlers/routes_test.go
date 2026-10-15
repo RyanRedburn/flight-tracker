@@ -36,8 +36,7 @@ func TestRoutesStats(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
-				Origin:    testOriginORD,
-				Dest:      testDestLAX,
+				Filters:   model.Filters{Origin: testOriginORD, Dest: testDestLAX},
 				Flights:   5,
 				OnTime:    2,
 				Delayed:   1,
@@ -100,8 +99,7 @@ func TestRoutesStatsEmptyFilters(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
 			return &model.RouteStats{
-				Origin:            testOriginORD,
-				Dest:              testDestLAX,
+				Filters:           model.Filters{Origin: testOriginORD, Dest: testDestLAX},
 				DiversionAirports: []model.AirportCount{},
 				CarrierOnTime:     []model.CarrierOnTime{},
 			}, nil
@@ -160,8 +158,7 @@ func TestRoutesStatsCarrierOnTime(t *testing.T) {
 			}
 
 			return &model.RouteStats{
-				Origin:  testOriginORD,
-				Dest:    testDestLAX,
+				Filters: model.Filters{Origin: testOriginORD, Dest: testDestLAX},
 				Flights: 10,
 				OnTime:  8,
 				Delayed: 2,
@@ -215,14 +212,17 @@ func TestRoutesOutlook(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			out := &model.RouteOutlook{
-				Origin:            testOriginORD,
-				Dest:              testDestLAX,
-				Carrier:           "UA",
-				DayOfWeek:         3,
-				DepTime:           "0700",
-				SampleSize:        3,
-				OnTimeProbability: floatPtr(0),
-				AnalysisEnd:       testAnalysisEnd,
+				Filters: model.Filters{
+					Origin:    testOriginORD,
+					Dest:      testDestLAX,
+					Carrier:   "UA",
+					DayOfWeek: 3,
+					DepTime:   "0700",
+				},
+				OutlookResult: model.OutlookResult{
+					Analysis:          model.Analysis{SampleSize: 3, End: testAnalysisEnd},
+					OnTimeProbability: floatPtr(0),
+				},
 			}
 			out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
@@ -245,24 +245,20 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.SampleSize != 3 {
-		t.Fatalf("sample_size = %d, want 3", out.SampleSize)
+	if out.Analysis.SampleSize != 3 {
+		t.Fatalf("sample_size = %d, want 3", out.Analysis.SampleSize)
 	}
 
-	if !out.InsufficientSample {
-		t.Fatal("expected insufficient_sample")
-	}
-
-	if out.Confidence != model.ConfidenceLow || out.SampleReason != model.SampleReasonInsufficientSample {
-		t.Errorf("confidence = %q reason = %q", out.Confidence, out.SampleReason)
+	if out.Analysis.Confidence != model.ConfidenceLow || out.Analysis.SampleReason != model.SampleReasonInsufficientSample {
+		t.Errorf("confidence = %q reason = %q", out.Analysis.Confidence, out.Analysis.SampleReason)
 	}
 
 	if string(jsonFieldRaw(t, body, "on_time_probability")) != "0" {
 		t.Errorf("on_time_probability = %s, want 0", jsonFieldRaw(t, body, "on_time_probability"))
 	}
 
-	if out.AnalysisEnd != testAnalysisEnd {
-		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
+	if out.Analysis.End != testAnalysisEnd {
+		t.Errorf("analysis end = %q, want %q", out.Analysis.End, testAnalysisEnd)
 	}
 
 	assertNullConnectionMinutesJSON(t, body)
@@ -287,15 +283,21 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			zero := 0.0
 			out := &model.RouteOutlook{
-				Origin:            testOriginORD,
-				Dest:              testDestLAX,
-				Carrier:           "UA",
-				DayOfWeek:         3,
-				DepTime:           "0700",
-				SampleSize:        0,
-				OnTimeProbability: &zero,
-				AnalysisStart:     "2025-04-15",
-				AnalysisEnd:       testAnalysisEnd,
+				Filters: model.Filters{
+					Origin:    testOriginORD,
+					Dest:      testDestLAX,
+					Carrier:   "UA",
+					DayOfWeek: 3,
+					DepTime:   "0700",
+				},
+				OutlookResult: model.OutlookResult{
+					Analysis: model.Analysis{
+						SampleSize: 0,
+						Start:      "2025-04-15",
+						End:        testAnalysisEnd,
+					},
+					OnTimeProbability: &zero,
+				},
 			}
 			out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
@@ -318,20 +320,20 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.SampleSize != 0 {
-		t.Fatalf("sample_size = %d, want 0", out.SampleSize)
+	if out.Analysis.SampleSize != 0 {
+		t.Fatalf("sample_size = %d, want 0", out.Analysis.SampleSize)
 	}
 
-	if out.InsufficientSample || out.SampleReason != model.SampleReasonEmptySample || out.Confidence != model.ConfidenceUnknown {
-		t.Fatalf("empty slot = insufficient %v reason %q confidence %q", out.InsufficientSample, out.SampleReason, out.Confidence)
+	if out.Analysis.SampleReason != model.SampleReasonEmptySample || out.Analysis.Confidence != model.ConfidenceUnknown {
+		t.Fatalf("empty slot = reason %q confidence %q", out.Analysis.SampleReason, out.Analysis.Confidence)
 	}
 
 	if out.OnTimeProbability != nil || string(jsonFieldRaw(t, body, "on_time_probability")) != jsonNull {
 		t.Fatalf("on_time_probability = %s, want null", jsonFieldRaw(t, body, "on_time_probability"))
 	}
 
-	if out.AnalysisEnd != testAnalysisEnd {
-		t.Errorf("analysis_end = %q, want %q", out.AnalysisEnd, testAnalysisEnd)
+	if out.Analysis.End != testAnalysisEnd {
+		t.Errorf("analysis end = %q, want %q", out.Analysis.End, testAnalysisEnd)
 	}
 
 	assertNullConnectionMinutesJSON(t, body)
@@ -341,12 +343,16 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			out := &model.RouteOutlook{
-				Origin:            testOriginORD,
-				Dest:              testDestLAX,
-				Carrier:           "UA",
-				SampleSize:        store.MinOutlookSampleSize,
-				OnTimeProbability: floatPtr(0),
-				Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+				Filters: model.Filters{
+					Origin:  testOriginORD,
+					Dest:    testDestLAX,
+					Carrier: "UA",
+				},
+				OutlookResult: model.OutlookResult{
+					Analysis:          model.Analysis{SampleSize: store.MinOutlookSampleSize},
+					OnTimeProbability: floatPtr(0),
+					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+				},
 			}
 			out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
@@ -367,8 +373,8 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.SampleReason != model.SampleReasonSufficient || out.Confidence != model.ConfidenceHigh || out.InsufficientSample {
-		t.Fatalf("solid slot = %+v", out)
+	if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceHigh {
+		t.Fatalf("solid slot = %+v", out.Analysis)
 	}
 
 	if string(jsonFieldRaw(t, rec.Body.Bytes(), "on_time_probability")) != "0" {
@@ -393,15 +399,21 @@ func TestRoutesOutlookWeatherContrast(t *testing.T) {
 	h := NewRoutesHandler(&storetest.Stub{
 		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 			return &model.RouteOutlook{
-				Origin:            testOriginORD,
-				Dest:              testDestLAX,
-				Carrier:           "UA",
-				SampleSize:        40,
-				SampleReason:      model.SampleReasonSufficient,
-				Confidence:        model.ConfidenceHigh,
-				OnTimeProbability: floatPtr(0.81),
-				Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
-				Weather:           weather,
+				Filters: model.Filters{
+					Origin:  testOriginORD,
+					Dest:    testDestLAX,
+					Carrier: "UA",
+				},
+				OutlookResult: model.OutlookResult{
+					Analysis: model.Analysis{
+						SampleSize:   40,
+						SampleReason: model.SampleReasonSufficient,
+						Confidence:   model.ConfidenceHigh,
+					},
+					OnTimeProbability: floatPtr(0.81),
+					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+					Weather:           weather,
+				},
 			}, nil
 		},
 	})
@@ -419,8 +431,8 @@ func TestRoutesOutlookWeatherContrast(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.Confidence != model.ConfidenceHigh || out.SampleReason != model.SampleReasonSufficient {
-		t.Fatalf("outlook decision = confidence %q reason %q", out.Confidence, out.SampleReason)
+	if out.Analysis.Confidence != model.ConfidenceHigh || out.Analysis.SampleReason != model.SampleReasonSufficient {
+		t.Fatalf("outlook decision = confidence %q reason %q", out.Analysis.Confidence, out.Analysis.SampleReason)
 	}
 
 	if out.Connection.DomesticToDomestic == nil || out.Connection.DomesticToDomestic.RecommendedMinutes != 45 {
@@ -474,10 +486,8 @@ func TestRoutesTravelWindows(t *testing.T) {
 			}
 
 			return &model.RouteTravelWindows{
-				Origin:      testOriginORD,
-				Dest:        testDestLAX,
-				WindowStart: testWindowStart,
-				WindowEnd:   testWindowEnd,
+				Filters:  model.Filters{Origin: testOriginORD, Dest: testDestLAX},
+				Analysis: model.Analysis{Start: testWindowStart, End: testWindowEnd},
 				ByMonth: []model.TravelWindowMonthBucket{
 					{Month: 1, OnTimeRate: 0.8, Flights: 100},
 				},
@@ -508,15 +518,15 @@ func TestRoutesTravelWindows(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.Origin != testOriginORD || out.Dest != testDestLAX {
-		t.Fatalf("od = %s-%s", out.Origin, out.Dest)
+	if out.Filters.Origin != testOriginORD || out.Filters.Dest != testDestLAX {
+		t.Fatalf("od = %s-%s", out.Filters.Origin, out.Filters.Dest)
 	}
 
-	if out.WindowStart != testWindowStart || out.WindowEnd != testWindowEnd {
-		t.Errorf("window = %s..%s", out.WindowStart, out.WindowEnd)
+	if out.Analysis.Start != testWindowStart || out.Analysis.End != testWindowEnd {
+		t.Errorf("window = %s..%s", out.Analysis.Start, out.Analysis.End)
 	}
 
-	if jsonHasKey(t, body, "carrier") {
+	if jsonHasKey(t, jsonFieldRaw(t, body, "filters"), "carrier") {
 		t.Fatalf("carrier should be omitted when not requested: %s", body)
 	}
 
@@ -533,11 +543,8 @@ func TestRoutesTravelWindowsCarrier(t *testing.T) {
 			}
 
 			return &model.RouteTravelWindows{
-				Origin:      testOriginORD,
-				Dest:        testDestLAX,
-				Carrier:     "UA",
-				WindowStart: "2025-01-01",
-				WindowEnd:   testWindowEnd,
+				Filters:     model.Filters{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA"},
+				Analysis:    model.Analysis{Start: "2025-01-01", End: testWindowEnd},
 				ByMonth:     []model.TravelWindowMonthBucket{},
 				ByDayOfWeek: []model.TravelWindowDayBucket{},
 				ByHour:      []model.TravelWindowHourBucket{},
@@ -566,11 +573,11 @@ func TestRoutesTravelWindowsCarrier(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.Carrier != "UA" {
-		t.Fatalf("carrier = %q, want UA", out.Carrier)
+	if out.Filters.Carrier != "UA" {
+		t.Fatalf("carrier = %q, want UA", out.Filters.Carrier)
 	}
 
-	if !jsonHasKey(t, body, "carrier") {
+	if !jsonHasKey(t, jsonFieldRaw(t, body, "filters"), "carrier") {
 		t.Fatalf("carrier missing from JSON: %s", body)
 	}
 }
@@ -633,11 +640,13 @@ func TestRoutesOutlookDate(t *testing.T) {
 			got = filter
 
 			return &model.RouteOutlook{
-				Origin:    filter.Origin,
-				Dest:      filter.Dest,
-				Carrier:   filter.Carrier,
-				DayOfWeek: filter.DayOfWeek,
-				DepTime:   filter.DepTime,
+				Filters: model.Filters{
+					Origin:    filter.Origin,
+					Dest:      filter.Dest,
+					Carrier:   filter.Carrier,
+					DayOfWeek: filter.DayOfWeek,
+					DepTime:   filter.DepTime,
+				},
 			}, nil
 		},
 	})
@@ -667,8 +676,8 @@ func TestRoutesOutlookDate(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.DayOfWeek != 2 {
-		t.Fatalf("response day_of_week = %d, want 2", out.DayOfWeek)
+	if out.Filters.DayOfWeek != 2 {
+		t.Fatalf("response day_of_week = %d, want 2", out.Filters.DayOfWeek)
 	}
 }
 
@@ -680,11 +689,11 @@ func TestRoutesWeatherStats(t *testing.T) {
 			gotFilter = filter
 
 			return &model.RouteWeatherStats{
-				Origin:    testOriginORD,
-				Dest:      testDestLAX,
-				StartDate: "2026-04-01",
-				EndDate:   "2026-04-30",
-				Filters: model.RouteStatsFilters{
+				Filters: model.Filters{
+					Origin:     testOriginORD,
+					Dest:       testDestLAX,
+					StartDate:  "2026-04-01",
+					EndDate:    "2026-04-30",
 					Carrier:    "UA",
 					DaysOfWeek: []int{1, 2},
 				},
@@ -693,15 +702,15 @@ func TestRoutesWeatherStats(t *testing.T) {
 					Flights:          9,
 					FlightsUnmatched: 2,
 					Categories: []model.WeatherCategoryStat{
-						{Category: model.WeatherCategoryThunder, Flights: 4, OnTimeRate: 0.25},
-						{Category: model.WeatherCategoryVFRFair, Flights: 3, OnTimeRate: 0.67},
+						{Category: model.WeatherLabelThunder, Flights: 4, OnTimeRate: 0.25},
+						{Category: model.WeatherLabelFair, Flights: 3, OnTimeRate: 0.67},
 					},
 				},
 				DestWeather: model.WeatherSideStats{
 					Flights:          9,
 					FlightsUnmatched: 1,
 					Categories: []model.WeatherCategoryStat{
-						{Category: model.WeatherCategoryIFR, Flights: 2, OnTimeRate: 0.5},
+						{Category: model.WeatherLabelIFR, Flights: 2, OnTimeRate: 0.5},
 					},
 				},
 			}, nil
@@ -737,11 +746,11 @@ func TestRoutesWeatherStats(t *testing.T) {
 		t.Fatalf("unmatched origin=%d dest=%d", stats.OriginWeather.FlightsUnmatched, stats.DestWeather.FlightsUnmatched)
 	}
 
-	if len(stats.OriginWeather.Categories) != 2 || stats.OriginWeather.Categories[0].Category != model.WeatherCategoryThunder {
+	if len(stats.OriginWeather.Categories) != 2 || stats.OriginWeather.Categories[0].Category != model.WeatherLabelThunder {
 		t.Fatalf("origin categories = %+v", stats.OriginWeather.Categories)
 	}
 
-	if len(stats.DestWeather.Categories) != 1 || stats.DestWeather.Categories[0].Category != model.WeatherCategoryIFR {
+	if len(stats.DestWeather.Categories) != 1 || stats.DestWeather.Categories[0].Category != model.WeatherLabelIFR {
 		t.Fatalf("dest categories = %+v", stats.DestWeather.Categories)
 	}
 }

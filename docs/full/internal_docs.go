@@ -15,6 +15,56 @@ const docTemplateinternal = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/db/version": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns the current schema migration version and dirty flag.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health",
+                    "internal"
+                ],
+                "summary": "Database migration version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/store.MigrationVersion"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/internal/data-freshness": {
             "get": {
                 "security": [
@@ -1053,7 +1103,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a marketing carrier, plus best and worst routes and airports (on-time rate, min 30 flights, top/bottom 5). Carrier is a 2-letter marketing IATA code. Dates are optional together and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days). State is a 2-letter code matching origin or dest. Returns 404 when the carrier has no flight-performance data. Date and state filters that match nothing still return 200.",
+                "description": "On-time stats for a marketing carrier, plus best and worst routes and airports (on-time rate, at least 30 flights, top and bottom 5). Dates are optional and default to the trailing 90 days ending at the carrier's latest flight date (max span 366 days).",
                 "produces": [
                     "application/json"
                 ],
@@ -1148,7 +1198,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not sample_reason empty_sample. Each leg outlook includes route-level weather rates, which do not change that connection's status or confidence.",
+                "description": "Historical outlook for 2–4 ordered legs and each connection. Always 200. A leg with no history has a null outlook and an error, not empty_sample.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1218,7 +1268,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time, delay, cancellation, and diversion probabilities for a carrier/route/day/departure-time window, based on the trailing analysis period. Exactly one of day_of_week (1=Monday through 7=Sunday) or date (YYYY-MM-DD) is required; sending both or neither is rejected. A date selects that weekday for the same historical sample. dep_time is local departure time as HHmm (e.g. 0700). dep_time_window_minutes defaults to 30 (max 120). sample_reason is sufficient when sample_size meets the minimum (insufficient_sample false, confidence high), insufficient_sample when some flights fall short of that minimum (the bool is true, confidence low), and empty_sample when this weekday and departure window have no flights (insufficient_sample stays false, confidence unknown, probability and delay fields null). A null delay field on a non-empty sample means that delay was not observed. connection is same-airport guidance per connection type and is null for empty_sample and insufficient_sample. recommended_minutes is arrival-delay p90 plus the destination airport MCT, or 45/60/120/120 when that MCT bucket is missing; it is the smallest layover that is ok. loose_minutes is 30 minutes above recommended_minutes. A shorter layover is tight. A null bucket means that connection status is unknown. These minutes are not an official airline MCT. Itinerary connections use the same thresholds and confidence. weather is route-level fair and adverse on-time rates for this route and carrier over the analysis window; it does not change confidence or connection status. Returns 404 when the origin, destination, and carrier have no flight-performance data. That not-found case is not empty_sample. A day-of-week or departure-time window that matches nothing still returns 200.",
+                "description": "On-time, delay, cancellation, and diversion probabilities for one carrier, route, weekday, and departure window. A date selects that weekday in the same historical sample. A null delay on a non-empty sample means that delay was not observed.",
                 "produces": [
                     "application/json"
                 ],
@@ -1339,7 +1389,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1463,7 +1513,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, day of week (1=Mon … 7=Sun), and scheduled local departure hour, pooled from the last up to 2 years of flight-performance data for the origin/destination (and marketing carrier when set). Best/worst lists are the top and bottom 3 buckets whose flight count meets the grain minimum (confidence high). Each bucket's confidence and reliability describe that seasonal on-time rate only; they are not connection statuses (not loose, ok, or tight). confidence is high when flights meet the grain's minimum sample and low when the bucket has fewer flights. reliability is reliable at an on-time rate of at least 0.80, typical from 0.70 up to 0.80, and unreliable below 0.70, and only when confidence is high. reliability unknown with confidence low is a thin bucket, the seasonal form of outlook insufficient_sample, not a second flag and not an unreliable season. A bucket with no flights is omitted rather than returned as a zero rate. The carrier field is omitted when the carrier query param is not set. Returns 404 when the route (or route+carrier) has no flight-performance data.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.",
                 "produces": [
                     "application/json"
                 ],
@@ -1553,7 +1603,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "On-time performance by observed weather category at the origin and at the destination over a date range (max 366 days). Origin and dest are 3-letter airport codes. Days of week use 1=Monday through 7=Sunday. Each side lists flight counts and on-time rate by category: thunderstorms (THUNDER), low ceiling or visibility (LIFR, IFR, MVFR), wind (WINDY), precipitation (PRECIP), fair weather (VFR_FAIR), and an observation too incomplete to classify (UNKNOWN), plus flights with no matching observation. Those unmatched flights are not treated as fair weather. Returns 404 when the origin/destination has no flight-performance data, or when carrier is set and that route and carrier have none. Date, weekday, and flight-number filters that match nothing still return 200.",
+                "description": "On-time performance by observed weather category at each end of a route (max 366 days).",
                 "produces": [
                     "application/json"
                 ],
@@ -1651,56 +1701,6 @@ const docTemplateinternal = `{
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "429": {
-                        "description": "Too Many Requests",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/db/version": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Returns the current schema migration version and dirty flag.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "health",
-                    "internal"
-                ],
-                "summary": "Database migration version",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/store.MigrationVersion"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -2130,6 +2130,37 @@ const docTemplateinternal = `{
                 }
             }
         },
+        "model.Analysis": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "string",
+                    "enum": [
+                        "high",
+                        "low",
+                        "unknown"
+                    ]
+                },
+                "end": {
+                    "type": "string"
+                },
+                "sample_reason": {
+                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient is high confidence; insufficient_sample is low.",
+                    "type": "string",
+                    "enum": [
+                        "sufficient",
+                        "insufficient_sample",
+                        "empty_sample"
+                    ]
+                },
+                "sample_size": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "string"
+                }
+            }
+        },
         "model.CarrierAirportStat": {
             "type": "object",
             "properties": {
@@ -2220,6 +2251,9 @@ const docTemplateinternal = `{
         "model.CarrierStats": {
             "type": "object",
             "properties": {
+                "analysis": {
+                    "$ref": "#/definitions/model.Analysis"
+                },
                 "avg_arrival_delay_minutes": {
                     "type": "number"
                 },
@@ -2250,9 +2284,6 @@ const docTemplateinternal = `{
                 "cancelled": {
                     "type": "integer"
                 },
-                "carrier": {
-                    "type": "string"
-                },
                 "delay_causes_avg_minutes": {
                     "$ref": "#/definitions/model.DelayCausesAvgMinutes"
                 },
@@ -2271,11 +2302,8 @@ const docTemplateinternal = `{
                 "diverted": {
                     "type": "integer"
                 },
-                "end_date": {
-                    "type": "string"
-                },
                 "filters": {
-                    "$ref": "#/definitions/model.CarrierStatsFilters"
+                    "$ref": "#/definitions/model.Filters"
                 },
                 "flights": {
                     "type": "integer"
@@ -2286,14 +2314,17 @@ const docTemplateinternal = `{
                 "median_arrival_delay_when_delayed": {
                     "type": "number"
                 },
+                "median_departure_delay_minutes": {
+                    "type": "number"
+                },
+                "median_departure_delay_when_delayed": {
+                    "type": "number"
+                },
                 "on_time": {
                     "type": "integer"
                 },
                 "on_time_rate": {
                     "type": "number"
-                },
-                "start_date": {
-                    "type": "string"
                 },
                 "worst_airports": {
                     "type": "array",
@@ -2306,14 +2337,6 @@ const docTemplateinternal = `{
                     "items": {
                         "$ref": "#/definitions/model.CarrierRouteStat"
                     }
-                }
-            }
-        },
-        "model.CarrierStatsFilters": {
-            "type": "object",
-            "properties": {
-                "state": {
-                    "type": "string"
                 }
             }
         },
@@ -2337,12 +2360,16 @@ const docTemplateinternal = `{
         "model.ConnectionMinutes": {
             "type": "object",
             "properties": {
-                "floor_only": {
-                    "description": "FloorOnly means the static floor (45, 60, 120, or 120) replaced a missing airport MCT minute. A stored zero is not missing.",
-                    "type": "boolean"
-                },
                 "loose_minutes": {
                     "type": "integer"
+                },
+                "mct_source": {
+                    "description": "MCTSource is airport when this bucket used the stored airport minute, or default when that minute was missing.",
+                    "type": "string",
+                    "enum": [
+                        "airport",
+                        "default"
+                    ]
                 },
                 "recommended_minutes": {
                     "type": "integer"
@@ -2405,6 +2432,47 @@ const docTemplateinternal = `{
                 },
                 "weather": {
                     "type": "number"
+                }
+            }
+        },
+        "model.Filters": {
+            "type": "object",
+            "properties": {
+                "carrier": {
+                    "type": "string"
+                },
+                "day_of_week": {
+                    "type": "integer"
+                },
+                "days_of_week": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dep_time": {
+                    "type": "string"
+                },
+                "dep_time_window_minutes": {
+                    "type": "integer"
+                },
+                "dest": {
+                    "type": "string"
+                },
+                "end_date": {
+                    "type": "string"
+                },
+                "flight_number": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
                 }
             }
         },
@@ -2473,15 +2541,19 @@ const docTemplateinternal = `{
                         "international_to_international"
                     ]
                 },
-                "floor_only": {
-                    "description": "FloorOnly is null when this hop did not use a connection bucket.",
-                    "type": "boolean"
-                },
                 "layover_minutes": {
                     "type": "integer"
                 },
                 "loose_minutes": {
                     "type": "integer"
+                },
+                "mct_source": {
+                    "description": "Null when this hop did not use a connection bucket.",
+                    "type": "string",
+                    "enum": [
+                        "airport",
+                        "default"
+                    ]
                 },
                 "overnight": {
                     "description": "Overnight stays true for a later outbound date, including multi-day, when reason names another cause.",
@@ -2559,25 +2631,7 @@ const docTemplateinternal = `{
         "model.ItineraryOutlookLeg": {
             "type": "object",
             "properties": {
-                "arr_time": {
-                    "type": "string"
-                },
-                "carrier": {
-                    "type": "string"
-                },
                 "date": {
-                    "type": "string"
-                },
-                "day_of_week": {
-                    "type": "integer"
-                },
-                "dep_time": {
-                    "type": "string"
-                },
-                "dep_time_window_minutes": {
-                    "type": "integer"
-                },
-                "dest": {
                     "type": "string"
                 },
                 "error": {
@@ -2585,9 +2639,6 @@ const docTemplateinternal = `{
                 },
                 "index": {
                     "type": "integer"
-                },
-                "origin": {
-                    "type": "string"
                 },
                 "outlook": {
                     "$ref": "#/definitions/model.RouteOutlook"
@@ -2624,6 +2675,33 @@ const docTemplateinternal = `{
                     "items": {
                         "$ref": "#/definitions/model.ItineraryOutlookLeg"
                     }
+                },
+                "summary": {
+                    "$ref": "#/definitions/model.ItineraryOutlookSummary"
+                }
+            }
+        },
+        "model.ItineraryOutlookSummary": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "description": "A missing outlook counts as unknown.",
+                    "type": "string",
+                    "enum": [
+                        "high",
+                        "low",
+                        "unknown"
+                    ]
+                },
+                "connection_risk": {
+                    "description": "True when any connection is tight or unknown.",
+                    "type": "boolean"
+                },
+                "destination": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
                 }
             }
         },
@@ -2670,51 +2748,28 @@ const docTemplateinternal = `{
         "model.RouteOutlook": {
             "type": "object",
             "properties": {
-                "analysis_end": {
-                    "type": "string"
-                },
-                "analysis_start": {
-                    "type": "string"
+                "analysis": {
+                    "$ref": "#/definitions/model.Analysis"
                 },
                 "cancellation_probability": {
                     "type": "number"
                 },
-                "carrier": {
-                    "type": "string"
-                },
-                "confidence": {
-                    "description": "Confidence is high, low, or unknown for sufficient, insufficient_sample, and empty_sample.",
-                    "type": "string",
-                    "enum": [
-                        "high",
-                        "low",
-                        "unknown"
-                    ]
-                },
                 "connection": {
-                    "$ref": "#/definitions/model.ConnectionGuidance"
-                },
-                "day_of_week": {
-                    "type": "integer"
+                    "description": "Cleared for empty_sample and insufficient_sample.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ConnectionGuidance"
+                        }
+                    ]
                 },
                 "delay_probability": {
                     "type": "number"
                 },
-                "dep_time": {
-                    "type": "string"
-                },
-                "dep_time_window_minutes": {
-                    "type": "integer"
-                },
-                "dest": {
-                    "type": "string"
-                },
                 "diversion_probability": {
                     "type": "number"
                 },
-                "insufficient_sample": {
-                    "description": "InsufficientSample is true only for sample_reason insufficient_sample.\nAn empty slot leaves it false; never-seen is not this flag.",
-                    "type": "boolean"
+                "filters": {
+                    "$ref": "#/definitions/model.Filters"
                 },
                 "likely_arrival_delay_minutes": {
                     "type": "number"
@@ -2725,37 +2780,26 @@ const docTemplateinternal = `{
                 "likely_departure_delay_minutes": {
                     "type": "number"
                 },
+                "likely_departure_delay_when_delayed": {
+                    "type": "number"
+                },
                 "median_arrival_delay_minutes": {
                     "type": "number"
                 },
                 "median_arrival_delay_when_delayed": {
                     "type": "number"
                 },
+                "median_departure_delay_minutes": {
+                    "type": "number"
+                },
+                "median_departure_delay_when_delayed": {
+                    "type": "number"
+                },
                 "on_time_probability": {
                     "type": "number"
                 },
-                "origin": {
-                    "type": "string"
-                },
-                "sample_reason": {
-                    "description": "SampleReason is sufficient, insufficient_sample, or empty_sample.\ninsufficient_sample matches the bool. empty_sample is a seen route and carrier\nwith no flights in this slot: confidence is unknown and estimate fields are null.\nNever-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.",
-                    "type": "string",
-                    "enum": [
-                        "sufficient",
-                        "insufficient_sample",
-                        "empty_sample"
-                    ]
-                },
-                "sample_size": {
-                    "type": "integer"
-                },
                 "weather": {
-                    "description": "Weather is route-level fair and adverse on-time rates, not this departure slot.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.RouteOutlookWeather"
-                        }
-                    ]
+                    "$ref": "#/definitions/model.RouteOutlookWeather"
                 }
             }
         },
@@ -2803,6 +2847,9 @@ const docTemplateinternal = `{
         "model.RouteStats": {
             "type": "object",
             "properties": {
+                "analysis": {
+                    "$ref": "#/definitions/model.Analysis"
+                },
                 "avg_arrival_delay_minutes": {
                     "type": "number"
                 },
@@ -2840,9 +2887,6 @@ const docTemplateinternal = `{
                 "delayed": {
                     "type": "integer"
                 },
-                "dest": {
-                    "type": "string"
-                },
                 "diversion_airports": {
                     "type": "array",
                     "items": {
@@ -2855,11 +2899,8 @@ const docTemplateinternal = `{
                 "diverted": {
                     "type": "integer"
                 },
-                "end_date": {
-                    "type": "string"
-                },
                 "filters": {
-                    "$ref": "#/definitions/model.RouteStatsFilters"
+                    "$ref": "#/definitions/model.Filters"
                 },
                 "flights": {
                     "type": "integer"
@@ -2870,40 +2911,26 @@ const docTemplateinternal = `{
                 "median_arrival_delay_when_delayed": {
                     "type": "number"
                 },
+                "median_departure_delay_minutes": {
+                    "type": "number"
+                },
+                "median_departure_delay_when_delayed": {
+                    "type": "number"
+                },
                 "on_time": {
                     "type": "integer"
                 },
                 "on_time_rate": {
                     "type": "number"
-                },
-                "origin": {
-                    "type": "string"
-                },
-                "start_date": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.RouteStatsFilters": {
-            "type": "object",
-            "properties": {
-                "carrier": {
-                    "type": "string"
-                },
-                "days_of_week": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "flight_number": {
-                    "type": "string"
                 }
             }
         },
         "model.RouteTravelWindows": {
             "type": "object",
             "properties": {
+                "analysis": {
+                    "$ref": "#/definitions/model.Analysis"
+                },
                 "best_days": {
                     "type": "array",
                     "items": {
@@ -2940,20 +2967,8 @@ const docTemplateinternal = `{
                         "$ref": "#/definitions/model.TravelWindowMonthBucket"
                     }
                 },
-                "carrier": {
-                    "type": "string"
-                },
-                "dest": {
-                    "type": "string"
-                },
-                "origin": {
-                    "type": "string"
-                },
-                "window_end": {
-                    "type": "string"
-                },
-                "window_start": {
-                    "type": "string"
+                "filters": {
+                    "$ref": "#/definitions/model.Filters"
                 },
                 "worst_days": {
                     "type": "array",
@@ -2978,29 +2993,20 @@ const docTemplateinternal = `{
         "model.RouteWeatherStats": {
             "type": "object",
             "properties": {
-                "dest": {
-                    "type": "string"
+                "analysis": {
+                    "$ref": "#/definitions/model.Analysis"
                 },
                 "dest_weather": {
                     "$ref": "#/definitions/model.WeatherSideStats"
                 },
-                "end_date": {
-                    "type": "string"
-                },
                 "filters": {
-                    "$ref": "#/definitions/model.RouteStatsFilters"
+                    "$ref": "#/definitions/model.Filters"
                 },
                 "flights": {
                     "type": "integer"
                 },
-                "origin": {
-                    "type": "string"
-                },
                 "origin_weather": {
                     "$ref": "#/definitions/model.WeatherSideStats"
-                },
-                "start_date": {
-                    "type": "string"
                 }
             }
         },
@@ -3101,7 +3107,17 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "category": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "Thunder",
+                        "Very low clouds or visibility",
+                        "Low clouds or visibility",
+                        "Somewhat reduced visibility",
+                        "Windy",
+                        "Precipitation",
+                        "Fair",
+                        "Unknown"
+                    ]
                 },
                 "flights": {
                     "type": "integer"

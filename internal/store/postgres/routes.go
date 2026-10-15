@@ -37,6 +37,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	}
 
 	applyDelayStats(scanned, routeDelayFields(stats))
+	stats.Analysis.SampleSize = stats.Flights
 
 	airports, err := unmarshalAirportCounts(diversionJSON)
 	if err != nil {
@@ -83,8 +84,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	}
 
 	analysisStart := endTime.AddDate(0, 0, -store.OutlookLookbackDays).Format("2006-01-02")
-	out.AnalysisStart = analysisStart
-	out.AnalysisEnd = analysisEnd.String
+	out.Analysis.Start = analysisStart
+	out.Analysis.End = analysisEnd.String
 
 	var p90Arr sql.NullFloat64
 
@@ -99,6 +100,9 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 			avgArrDelayed    sql.NullFloat64
 			medianArrDelayed sql.NullFloat64
 			avgDep           sql.NullFloat64
+			medianDep        sql.NullFloat64
+			avgDepDelayed    sql.NullFloat64
+			medianDepDelayed sql.NullFloat64
 		)
 
 		err = s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
@@ -111,7 +115,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 			targetMin,
 			filter.DepTimeWindowMinutes,
 		).Scan(
-			&out.SampleSize,
+			&out.Analysis.SampleSize,
 			&onTime,
 			&delayed,
 			&cancelled,
@@ -121,17 +125,20 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 			&avgArrDelayed,
 			&medianArrDelayed,
 			&avgDep,
+			&medianDep,
+			&avgDepDelayed,
+			&medianDepDelayed,
 			&p90Arr,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		if out.SampleSize > 0 {
-			onTimeRate := ratio(onTime, out.SampleSize)
-			delayRate := ratio(delayed, out.SampleSize)
-			cancelRate := ratio(cancelled, out.SampleSize)
-			divertRate := ratio(diverted, out.SampleSize)
+		if out.Analysis.SampleSize > 0 {
+			onTimeRate := ratio(onTime, out.Analysis.SampleSize)
+			delayRate := ratio(delayed, out.Analysis.SampleSize)
+			cancelRate := ratio(cancelled, out.Analysis.SampleSize)
+			divertRate := ratio(diverted, out.Analysis.SampleSize)
 			out.OnTimeProbability = &onTimeRate
 			out.DelayProbability = &delayRate
 			out.CancellationProbability = &cancelRate
@@ -141,12 +148,15 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 			out.LikelyArrivalDelayWhenDelayed = nullFloatPtr(avgArrDelayed)
 			out.MedianArrivalDelayWhenDelayed = nullFloatPtr(medianArrDelayed)
 			out.LikelyDepartureDelayMinutes = nullFloatPtr(avgDep)
+			out.MedianDepartureDelayMinutes = nullFloatPtr(medianDep)
+			out.LikelyDepartureDelayWhenDelayed = nullFloatPtr(avgDepDelayed)
+			out.MedianDepartureDelayWhenDelayed = nullFloatPtr(medianDepDelayed)
 		}
 	}
 
 	out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
-	if out.SampleReason == model.SampleReasonSufficient {
+	if out.Analysis.SampleReason == model.SampleReasonSufficient {
 		if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
 			return nil, err
 		}
@@ -166,11 +176,11 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 // the modifier is not slot-conditioned.
 func (s *Store) attachOutlookWeather(ctx context.Context, out *model.RouteOutlook) error {
 	query, args := buildRouteWeatherStatsQuery(store.RouteStatsFilter{
-		Origin:    out.Origin,
-		Dest:      out.Dest,
-		StartDate: out.AnalysisStart,
-		EndDate:   out.AnalysisEnd,
-		Carrier:   out.Carrier,
+		Origin:    out.Filters.Origin,
+		Dest:      out.Filters.Dest,
+		StartDate: out.Analysis.Start,
+		EndDate:   out.Analysis.End,
+		Carrier:   out.Filters.Carrier,
 	})
 
 	counts, err := s.queryWeatherCategoryCounts(ctx, query, args...)
@@ -189,11 +199,11 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct   *store.AirportConnectionMCT
 	)
 
-	if !out.InsufficientSample && p90.Valid {
+	if p90.Valid {
 		v := p90.Float64
 		delay = &v
 
-		loaded, err := s.airportConnectionMCT(ctx, out.Dest)
+		loaded, err := s.airportConnectionMCT(ctx, out.Filters.Dest)
 		if err != nil {
 			return err
 		}
@@ -201,7 +211,7 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct = loaded
 	}
 
-	out.Connection = store.ConnectionRecommendation(out.InsufficientSample, delay, mct)
+	out.Connection = store.ConnectionRecommendation(false, delay, mct)
 
 	return nil
 }
@@ -312,20 +322,19 @@ func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (strin
 }
 
 func emptyRouteStats(filter store.RouteStatsFilter) *model.RouteStats {
-	days := append([]int(nil), filter.DaysOfWeek...)
-	if days == nil {
-		days = []int{}
-	}
-
 	return &model.RouteStats{
-		Origin:    filter.Origin,
-		Dest:      filter.Dest,
-		StartDate: filter.StartDate,
-		EndDate:   filter.EndDate,
-		Filters: model.RouteStatsFilters{
+		Filters: model.Filters{
+			Origin:       filter.Origin,
+			Dest:         filter.Dest,
 			Carrier:      filter.Carrier,
 			FlightNumber: filter.FlightNumber,
-			DaysOfWeek:   days,
+			DaysOfWeek:   filter.DaysOfWeek,
+			StartDate:    filter.StartDate,
+			EndDate:      filter.EndDate,
+		},
+		Analysis: model.Analysis{
+			Start: filter.StartDate,
+			End:   filter.EndDate,
 		},
 		DiversionAirports: []model.AirportCount{},
 	}
@@ -333,13 +342,19 @@ func emptyRouteStats(filter store.RouteStatsFilter) *model.RouteStats {
 
 func emptyRouteOutlook(filter store.RouteOutlookFilter) *model.RouteOutlook {
 	return &model.RouteOutlook{
-		Origin:               filter.Origin,
-		Dest:                 filter.Dest,
-		Carrier:              filter.Carrier,
-		DayOfWeek:            filter.DayOfWeek,
-		DepTime:              filter.DepTime,
-		DepTimeWindowMinutes: filter.DepTimeWindowMinutes,
-		Confidence:           model.ConfidenceUnknown,
+		Filters: model.Filters{
+			Origin:               filter.Origin,
+			Dest:                 filter.Dest,
+			Carrier:              filter.Carrier,
+			DayOfWeek:            filter.DayOfWeek,
+			DepTime:              filter.DepTime,
+			DepTimeWindowMinutes: filter.DepTimeWindowMinutes,
+		},
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				Confidence: model.ConfidenceUnknown,
+			},
+		},
 	}
 }
 

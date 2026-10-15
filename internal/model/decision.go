@@ -22,19 +22,15 @@ const (
 	ReliabilityUnreliable = "unreliable"
 	ReliabilityUnknown    = "unknown"
 
-	// SampleReason names the outlook slot behind confidence and insufficient_sample.
-	// It is the machine-readable sample state for a 200 response. It is not a
-	// second sparse boolean, and it is not a connection status.
-	// A route and carrier that have never been seen are not a sample reason:
-	// route outlook is 404, and an itinerary leg has a null outlook plus error.
+	// SampleReason names the outlook slot behind confidence.
 	SampleReasonSufficient         = "sufficient"
 	SampleReasonInsufficientSample = "insufficient_sample"
 	SampleReasonEmptySample        = "empty_sample"
 
 	// ConnectionReason explains an itinerary status, including unknown.
-	// empty_sample and insufficient_sample are the inbound outlook sample_reason,
-	// not a second sparse flag. missing_outlook is a null inbound outlook
-	// (route outlook 404 / leg error), which is not empty_sample.
+	// empty_sample and insufficient_sample are the inbound outlook sample_reason.
+	// missing_outlook is a null inbound outlook (route outlook 404 / leg error),
+	// which is not empty_sample.
 	ConnectionReasonEvaluated        = "evaluated"
 	ConnectionReasonOvernight        = "overnight"
 	ConnectionReasonMultiAirport     = "multi_airport"
@@ -43,6 +39,11 @@ const (
 	ConnectionReasonMissingThreshold = "missing_threshold"
 	ConnectionReasonNegativeLayover  = "negative_layover"
 	ConnectionReasonInvalidSchedule  = "invalid_schedule"
+
+	// MCTSourceAirport means the stored airport minimum connection time was used.
+	// MCTSourceDefault means that bucket was missing, so the static floor was used.
+	MCTSourceAirport = "airport"
+	MCTSourceDefault = "default"
 )
 
 const (
@@ -57,14 +58,14 @@ const (
 )
 
 // ConnectionMinutes is the layover threshold for one same-airport connection type.
-// recommended_minutes is the smallest layover that is ok.
-// loose_minutes is 30 minutes higher; a layover that long is loose.
-// A shorter layover than recommended_minutes is tight.
+// recommended_minutes is arrival-delay p90 plus the destination airport MCT, or 45/60/120/120 when that minute is missing.
+// It is the smallest layover that is ok. loose_minutes is 30 minutes higher. A shorter layover is tight.
+// These minutes are not an official airline MCT.
 type ConnectionMinutes struct {
 	RecommendedMinutes int `json:"recommended_minutes"`
 	LooseMinutes       int `json:"loose_minutes"`
-	// FloorOnly means the static floor (45, 60, 120, or 120) replaced a missing airport MCT minute. A stored zero is not missing.
-	FloorOnly bool `json:"floor_only"`
+	// MCTSource is airport when this bucket used the stored airport minute, or default when that minute was missing.
+	MCTSource string `json:"mct_source" enums:"airport,default"`
 }
 
 // ConnectionGuidance is per connection type for one inbound outlook.
@@ -143,12 +144,12 @@ func OutlookConfidence(sampleSize int, insufficientSample bool) string {
 	return ConfidenceHigh
 }
 
-// ApplyOutlookSample sets insufficient_sample, sample_reason, and confidence from the slot size.
-// sufficient: sample meets minSample. The bool is false and confidence is high.
-// insufficient_sample: some flights fall short of minSample. The bool is true and confidence is low.
+// ApplyOutlookSample sets sample_reason and confidence from the slot size.
+// sufficient: sample meets minSample and confidence is high.
+// insufficient_sample: some flights fall short of minSample and confidence is low.
 // Estimates stay, and connection thresholds are cleared.
-// empty_sample: no flights in this weekday and departure window. The bool stays false,
-// confidence is unknown, and probability, delay, and connection fields are cleared
+// empty_sample: no flights in this weekday and departure window.
+// Confidence is unknown, and probability, delay, and connection fields are cleared
 // so a zero is not a forecast.
 // minSample <= 0 treats every non-empty slot as sufficient.
 func (o *RouteOutlook) ApplyOutlookSample(minSample int) {
@@ -156,22 +157,21 @@ func (o *RouteOutlook) ApplyOutlookSample(minSample int) {
 		return
 	}
 
-	insufficient := o.SampleSize > 0 && minSample > 0 && o.SampleSize < minSample
-	o.InsufficientSample = insufficient
-	o.Confidence = OutlookConfidence(o.SampleSize, insufficient)
+	insufficient := o.Analysis.SampleSize > 0 && minSample > 0 && o.Analysis.SampleSize < minSample
+	o.Analysis.Confidence = OutlookConfidence(o.Analysis.SampleSize, insufficient)
 
-	switch o.Confidence {
+	switch o.Analysis.Confidence {
 	case ConfidenceHigh:
-		o.SampleReason = SampleReasonSufficient
+		o.Analysis.SampleReason = SampleReasonSufficient
 	case ConfidenceLow:
-		o.SampleReason = SampleReasonInsufficientSample
+		o.Analysis.SampleReason = SampleReasonInsufficientSample
 		o.Connection = ConnectionGuidance{}
 	default:
-		if o.SampleSize < 0 {
-			o.SampleSize = 0
+		if o.Analysis.SampleSize < 0 {
+			o.Analysis.SampleSize = 0
 		}
 
-		o.SampleReason = SampleReasonEmptySample
+		o.Analysis.SampleReason = SampleReasonEmptySample
 		o.clearEstimates()
 	}
 }
@@ -186,6 +186,9 @@ func (o *RouteOutlook) clearEstimates() {
 	o.LikelyArrivalDelayWhenDelayed = nil
 	o.MedianArrivalDelayWhenDelayed = nil
 	o.LikelyDepartureDelayMinutes = nil
+	o.MedianDepartureDelayMinutes = nil
+	o.LikelyDepartureDelayWhenDelayed = nil
+	o.MedianDepartureDelayWhenDelayed = nil
 	o.Connection = ConnectionGuidance{}
 }
 
@@ -196,18 +199,18 @@ func (o *RouteOutlook) DecisionConfidence() string {
 		return ConfidenceUnknown
 	}
 
-	switch o.Confidence {
+	switch o.Analysis.Confidence {
 	case ConfidenceHigh, ConfidenceLow, ConfidenceUnknown:
-		return o.Confidence
+		return o.Analysis.Confidence
 	default:
-		return OutlookConfidence(o.SampleSize, o.InsufficientSample)
+		return OutlookConfidence(o.Analysis.SampleSize, o.Analysis.SampleReason == SampleReasonInsufficientSample)
 	}
 }
 
 // BlockingSampleReason is empty_sample or insufficient_sample when that sample
 // withholds connection thresholds. A sufficient sample returns an empty string.
-// An explicit sample_reason wins. Otherwise a thin or low-confidence non-empty
-// sample is insufficient_sample, and any other empty sample is empty_sample.
+// An explicit sample_reason wins. Otherwise a low-confidence non-empty sample
+// is insufficient_sample, and any other empty sample is empty_sample.
 // Nil returns an empty string. A missing inbound outlook is not a sample reason.
 func (o *RouteOutlook) BlockingSampleReason() string {
 	if o == nil {
@@ -225,16 +228,16 @@ func (o *RouteOutlook) BlockingSampleReason() string {
 // resolvedSampleReason is the outlook sample_reason, or the same words derived
 // from the sample size and confidence when the field was not set.
 func (o *RouteOutlook) resolvedSampleReason() string {
-	switch o.SampleReason {
+	switch o.Analysis.SampleReason {
 	case SampleReasonSufficient, SampleReasonInsufficientSample, SampleReasonEmptySample:
-		return o.SampleReason
+		return o.Analysis.SampleReason
 	}
 
-	if o.SampleSize > 0 && (o.InsufficientSample || o.Confidence == ConfidenceLow) {
+	if o.Analysis.SampleSize > 0 && o.Analysis.Confidence == ConfidenceLow {
 		return SampleReasonInsufficientSample
 	}
 
-	if o.SampleSize <= 0 && o.Confidence != ConfidenceHigh {
+	if o.Analysis.SampleSize <= 0 && o.Analysis.Confidence != ConfidenceHigh {
 		return SampleReasonEmptySample
 	}
 

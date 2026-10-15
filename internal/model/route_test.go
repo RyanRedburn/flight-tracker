@@ -10,16 +10,18 @@ const jsonCarrierOnTime = "carrier_on_time"
 
 func TestRouteStatsRoundForResponse(t *testing.T) {
 	stats := RouteStats{
-		OnTimeRate:                    1.0 / 3.0,
-		DelayRate:                     2.0 / 3.0,
-		CancellationRate:              0.125,
-		DiversionRate:                 0.5,
-		AvgArrivalDelayMinutes:        15.4,
-		MedianArrivalDelayMinutes:     15.5,
-		AvgArrivalDelayWhenDelayed:    -1.5,
-		MedianArrivalDelayWhenDelayed: 0.4,
-		AvgDepartureDelayMinutes:      10.49,
-		AvgDepartureDelayWhenDelayed:  10.5,
+		OnTimeRate:                      1.0 / 3.0,
+		DelayRate:                       2.0 / 3.0,
+		CancellationRate:                0.125,
+		DiversionRate:                   0.5,
+		AvgArrivalDelayMinutes:          15.4,
+		MedianArrivalDelayMinutes:       15.5,
+		AvgArrivalDelayWhenDelayed:      -1.5,
+		MedianArrivalDelayWhenDelayed:   0.4,
+		AvgDepartureDelayMinutes:        10.49,
+		MedianDepartureDelayMinutes:     8.4,
+		AvgDepartureDelayWhenDelayed:    10.5,
+		MedianDepartureDelayWhenDelayed: 12.6,
 		DelayCausesAvgMinutes: DelayCausesAvgMinutes{
 			Carrier:      1.4,
 			Weather:      2.5,
@@ -51,7 +53,9 @@ func TestRouteStatsRoundForResponse(t *testing.T) {
 	assertFloat(t, "avg_arrival_delay_when_delayed", stats.AvgArrivalDelayWhenDelayed, -2)
 	assertFloat(t, "median_arrival_delay_when_delayed", stats.MedianArrivalDelayWhenDelayed, 0)
 	assertFloat(t, "avg_departure_delay_minutes", stats.AvgDepartureDelayMinutes, 10)
+	assertFloat(t, "median_departure_delay_minutes", stats.MedianDepartureDelayMinutes, 8)
 	assertFloat(t, "avg_departure_delay_when_delayed", stats.AvgDepartureDelayWhenDelayed, 11)
+	assertFloat(t, "median_departure_delay_when_delayed", stats.MedianDepartureDelayWhenDelayed, 13)
 	assertFloat(t, "delay_causes.carrier", stats.DelayCausesAvgMinutes.Carrier, 1)
 	assertFloat(t, "delay_causes.weather", stats.DelayCausesAvgMinutes.Weather, 3)
 	assertFloat(t, "delay_causes.nas", stats.DelayCausesAvgMinutes.NAS, 4)
@@ -110,21 +114,23 @@ func TestRouteStatsCarrierOnTimeJSON(t *testing.T) {
 }
 
 func TestConnectionGuidanceJSON(t *testing.T) {
-	body, err := json.Marshal(RouteOutlook{Confidence: ConfidenceUnknown})
+	body, err := json.Marshal(sampleOutlook(0, "", ConfidenceUnknown))
 	if err != nil {
 		t.Fatalf("marshal nulls: %v", err)
 	}
 
-	if jsonFieldString(t, body, "confidence") != ConfidenceUnknown {
-		t.Fatalf("confidence = %s", jsonField(t, body, "confidence"))
+	analysis := jsonField(t, body, "analysis")
+	if jsonFieldString(t, analysis, "confidence") != ConfidenceUnknown {
+		t.Fatalf("confidence = %s", jsonField(t, analysis, "confidence"))
 	}
 
 	assertNullConnectionMinutes(t, jsonField(t, body, "connection"))
 
-	populated, err := json.Marshal(RouteOutlook{
-		Confidence: ConfidenceHigh,
-		Connection: ConnectionGuidanceFromRecommended(0, 60, 50, 200),
-	})
+	populatedOutlook := sampleOutlook(0, "", ConfidenceHigh)
+	populatedOutlook.Connection = ConnectionGuidanceFromRecommended(0, 60, 50, 200)
+	tagMCT(populatedOutlook.Connection, MCTSourceAirport)
+
+	populated, err := json.Marshal(populatedOutlook)
 	if err != nil {
 		t.Fatalf("marshal populated: %v", err)
 	}
@@ -134,25 +140,38 @@ func TestConnectionGuidanceJSON(t *testing.T) {
 		t.Fatalf("decode connection: %v", err)
 	}
 
-	assertConnectionMinutesJSON(t, "domestic_to_domestic", got.DomesticToDomestic, 0, false)
-	assertConnectionMinutesJSON(t, "domestic_to_international", got.DomesticToInternational, 60, false)
-	assertConnectionMinutesJSON(t, "international_to_domestic", got.InternationalToDomestic, 50, false)
-	assertConnectionMinutesJSON(t, "international_to_international", got.InternationalToInternational, 200, false)
+	assertConnectionMinutesJSON(t, "domestic_to_domestic", got.DomesticToDomestic, 0, MCTSourceAirport)
+	assertConnectionMinutesJSON(t, "domestic_to_international", got.DomesticToInternational, 60, MCTSourceAirport)
+	assertConnectionMinutesJSON(t, "international_to_domestic", got.InternationalToDomestic, 50, MCTSourceAirport)
+	assertConnectionMinutesJSON(t, "international_to_international", got.InternationalToInternational, 200, MCTSourceAirport)
 
-	if !strings.Contains(string(populated), `"floor_only":false`) {
+	if !strings.Contains(string(populated), `"mct_source":"airport"`) {
 		t.Fatalf("airport bucket JSON = %s", populated)
 	}
 
 	floor := ConnectionGuidanceFromRecommended(45, 60, 120, 120)
-	floor.DomesticToDomestic.FloorOnly = true
+	floor.DomesticToDomestic.MCTSource = MCTSourceDefault
 
 	floorBody, err := json.Marshal(floor.DomesticToDomestic)
 	if err != nil {
 		t.Fatalf("marshal floor bucket: %v", err)
 	}
 
-	if !strings.Contains(string(floorBody), `"floor_only":true`) {
+	if !strings.Contains(string(floorBody), `"mct_source":"default"`) {
 		t.Fatalf("floor bucket JSON = %s", floorBody)
+	}
+}
+
+func tagMCT(g ConnectionGuidance, source string) {
+	for _, bucket := range []*ConnectionMinutes{
+		g.DomesticToDomestic,
+		g.DomesticToInternational,
+		g.InternationalToDomestic,
+		g.InternationalToInternational,
+	} {
+		if bucket != nil {
+			bucket.MCTSource = source
+		}
 	}
 }
 
@@ -182,7 +201,7 @@ func assertNullConnectionMinutes(t *testing.T, raw json.RawMessage) {
 	}
 }
 
-func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinutes, recommended int, floorOnly bool) {
+func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinutes, recommended int, source string) {
 	t.Helper()
 
 	if got == nil {
@@ -190,8 +209,8 @@ func assertConnectionMinutesJSON(t *testing.T, name string, got *ConnectionMinut
 		return
 	}
 
-	if got.RecommendedMinutes != recommended || got.LooseMinutes != recommended+ConnectionLooseSlackMinutes || got.FloorOnly != floorOnly {
-		t.Errorf("%s = %+v, want recommended %d loose %d floor_only %v", name, got, recommended, recommended+ConnectionLooseSlackMinutes, floorOnly)
+	if got.RecommendedMinutes != recommended || got.LooseMinutes != recommended+ConnectionLooseSlackMinutes || got.MCTSource != source {
+		t.Errorf("%s = %+v, want recommended %d loose %d mct_source %s", name, got, recommended, recommended+ConnectionLooseSlackMinutes, source)
 	}
 }
 
@@ -208,20 +227,25 @@ func jsonFieldString(t *testing.T, body []byte, field string) string {
 
 func TestRouteOutlookRoundForResponse(t *testing.T) {
 	out := RouteOutlook{
-		OnTimeProbability:             floatPtr(1.0 / 3.0),
-		DelayProbability:              floatPtr(2.0 / 3.0),
-		CancellationProbability:       floatPtr(0.125),
-		DiversionProbability:          floatPtr(0.5),
-		LikelyArrivalDelayMinutes:     floatPtr(15.4),
-		MedianArrivalDelayMinutes:     floatPtr(15.5),
-		LikelyArrivalDelayWhenDelayed: floatPtr(-1.5),
-		MedianArrivalDelayWhenDelayed: floatPtr(0.4),
-		LikelyDepartureDelayMinutes:   floatPtr(10.5),
-		DepTimeWindowMinutes:          30,
-		Weather: RouteOutlookWeather{
-			Dest: RouteOutlookWeatherSide{
-				FairOnTimeRate:    floatPtr(1.0 / 3.0),
-				AdverseOnTimeRate: floatPtr(0.125),
+		Filters: Filters{DepTimeWindowMinutes: 30},
+		OutlookResult: OutlookResult{
+			OnTimeProbability:               floatPtr(1.0 / 3.0),
+			DelayProbability:                floatPtr(2.0 / 3.0),
+			CancellationProbability:         floatPtr(0.125),
+			DiversionProbability:            floatPtr(0.5),
+			LikelyArrivalDelayMinutes:       floatPtr(15.4),
+			MedianArrivalDelayMinutes:       floatPtr(15.5),
+			LikelyArrivalDelayWhenDelayed:   floatPtr(-1.5),
+			MedianArrivalDelayWhenDelayed:   floatPtr(0.4),
+			LikelyDepartureDelayMinutes:     floatPtr(10.5),
+			MedianDepartureDelayMinutes:     floatPtr(4.4),
+			LikelyDepartureDelayWhenDelayed: floatPtr(12.6),
+			MedianDepartureDelayWhenDelayed: floatPtr(9.5),
+			Weather: RouteOutlookWeather{
+				Dest: RouteOutlookWeatherSide{
+					FairOnTimeRate:    floatPtr(1.0 / 3.0),
+					AdverseOnTimeRate: floatPtr(0.125),
+				},
 			},
 		},
 	}
@@ -237,9 +261,12 @@ func TestRouteOutlookRoundForResponse(t *testing.T) {
 	assertFloatPtr(t, "likely_arrival_delay_when_delayed", out.LikelyArrivalDelayWhenDelayed, -2)
 	assertFloatPtr(t, "median_arrival_delay_when_delayed", out.MedianArrivalDelayWhenDelayed, 0)
 	assertFloatPtr(t, "likely_departure_delay_minutes", out.LikelyDepartureDelayMinutes, 11)
+	assertFloatPtr(t, "median_departure_delay_minutes", out.MedianDepartureDelayMinutes, 4)
+	assertFloatPtr(t, "likely_departure_delay_when_delayed", out.LikelyDepartureDelayWhenDelayed, 13)
+	assertFloatPtr(t, "median_departure_delay_when_delayed", out.MedianDepartureDelayWhenDelayed, 10)
 
-	if out.DepTimeWindowMinutes != 30 {
-		t.Errorf("dep_time_window_minutes = %d, want 30 (input filter, not rounded as a delay)", out.DepTimeWindowMinutes)
+	if out.Filters.DepTimeWindowMinutes != 30 {
+		t.Errorf("dep_time_window_minutes = %d, want 30 (input filter, not rounded as a delay)", out.Filters.DepTimeWindowMinutes)
 	}
 
 	assertFloatPtr(t, "weather.dest.fair_on_time_rate", out.Weather.Dest.FairOnTimeRate, 0.33)
@@ -261,10 +288,12 @@ func TestRouteOutlookRoundForResponse(t *testing.T) {
 func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 	zero := 0.0
 	empty := RouteOutlook{
-		SampleSize:                0,
-		OnTimeProbability:         &zero,
-		LikelyArrivalDelayMinutes: &zero,
-		Connection:                ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+		OutlookResult: OutlookResult{
+			Analysis:                  Analysis{SampleSize: 0},
+			OnTimeProbability:         &zero,
+			LikelyArrivalDelayMinutes: &zero,
+			Connection:                ConnectionGuidanceFromRecommended(45, 60, 90, 120),
+		},
 	}
 	empty.ApplyOutlookSample(10)
 
@@ -273,12 +302,9 @@ func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 		t.Fatalf("marshal empty: %v", err)
 	}
 
-	if jsonFieldString(t, body, "sample_reason") != SampleReasonEmptySample || jsonFieldString(t, body, "confidence") != ConfidenceUnknown {
+	analysis := jsonField(t, body, "analysis")
+	if jsonFieldString(t, analysis, "sample_reason") != SampleReasonEmptySample || jsonFieldString(t, analysis, "confidence") != ConfidenceUnknown {
 		t.Fatalf("empty labels = %s", body)
-	}
-
-	if string(jsonField(t, body, "insufficient_sample")) != "false" {
-		t.Fatalf("insufficient_sample = %s, want false", jsonField(t, body, "insufficient_sample"))
 	}
 
 	for _, field := range []string{"on_time_probability", "delay_probability", "likely_arrival_delay_minutes", "likely_departure_delay_minutes"} {
@@ -289,7 +315,7 @@ func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 
 	assertNullConnectionMinutes(t, jsonField(t, body, "connection"))
 
-	solid := RouteOutlook{SampleSize: 12, OnTimeProbability: &zero}
+	solid := RouteOutlook{OutlookResult: OutlookResult{Analysis: Analysis{SampleSize: 12}, OnTimeProbability: &zero}}
 	solid.ApplyOutlookSample(10)
 
 	solidBody, err := json.Marshal(solid)
@@ -297,8 +323,8 @@ func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 		t.Fatalf("marshal solid: %v", err)
 	}
 
-	if jsonFieldString(t, solidBody, "sample_reason") != SampleReasonSufficient {
-		t.Fatalf("sample_reason = %s", jsonField(t, solidBody, "sample_reason"))
+	if jsonFieldString(t, jsonField(t, solidBody, "analysis"), "sample_reason") != SampleReasonSufficient {
+		t.Fatalf("sample_reason = %s", jsonField(t, jsonField(t, solidBody, "analysis"), "sample_reason"))
 	}
 
 	if string(jsonField(t, solidBody, "on_time_probability")) != "0" {
@@ -323,8 +349,7 @@ func assertFloatPtr(t *testing.T, name string, got *float64, want float64) {
 
 func TestRouteTravelWindowsRoundAndJSON(t *testing.T) {
 	windows := RouteTravelWindows{
-		Origin: "SEA",
-		Dest:   "MIA",
+		Filters: Filters{Origin: "SEA", Dest: "MIA"},
 		ByHour: []TravelWindowHourBucket{
 			{Hour: 0, OnTimeRate: 1.0 / 3.0, Flights: 40},
 		},
@@ -342,7 +367,8 @@ func TestRouteTravelWindowsRoundAndJSON(t *testing.T) {
 		t.Fatalf("marshal omitted carrier: %v", err)
 	}
 
-	if jsonHasField(t, omitted, "carrier") {
+	filters := jsonField(t, omitted, "filters")
+	if jsonHasField(t, filters, "carrier") {
 		t.Fatalf("carrier should be omitted when empty: %s", omitted)
 	}
 
@@ -357,12 +383,12 @@ func TestRouteTravelWindowsRoundAndJSON(t *testing.T) {
 		t.Fatalf("by_hour = %+v, want hour 0 present", hours)
 	}
 
-	withCarrier, err := json.Marshal(RouteTravelWindows{Origin: "SEA", Dest: "MIA", Carrier: "AS"})
+	withCarrier, err := json.Marshal(RouteTravelWindows{Filters: Filters{Origin: "SEA", Dest: "MIA", Carrier: "AS"}})
 	if err != nil {
 		t.Fatalf("marshal carrier: %v", err)
 	}
 
-	if !jsonHasField(t, withCarrier, "carrier") {
+	if !jsonHasField(t, jsonField(t, withCarrier, "filters"), "carrier") {
 		t.Fatalf("carrier missing: %s", withCarrier)
 	}
 }

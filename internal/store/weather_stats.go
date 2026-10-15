@@ -55,26 +55,26 @@ func AssembleRouteWeatherStats(filter RouteStatsFilter, counts []WeatherCategory
 	out.OriginWeather = origin.stats()
 	out.DestWeather = dest.stats()
 	out.Flights = out.OriginWeather.Flights
+	out.Analysis.SampleSize = out.Flights
 	out.RoundForResponse()
 
 	return out
 }
 
 func emptyRouteWeatherStats(filter RouteStatsFilter) *model.RouteWeatherStats {
-	days := append([]int(nil), filter.DaysOfWeek...)
-	if days == nil {
-		days = []int{}
-	}
-
 	return &model.RouteWeatherStats{
-		Origin:    filter.Origin,
-		Dest:      filter.Dest,
-		StartDate: filter.StartDate,
-		EndDate:   filter.EndDate,
-		Filters: model.RouteStatsFilters{
+		Filters: model.Filters{
+			Origin:       filter.Origin,
+			Dest:         filter.Dest,
 			Carrier:      filter.Carrier,
 			FlightNumber: filter.FlightNumber,
-			DaysOfWeek:   days,
+			DaysOfWeek:   filter.DaysOfWeek,
+			StartDate:    filter.StartDate,
+			EndDate:      filter.EndDate,
+		},
+		Analysis: model.Analysis{
+			Start: filter.StartDate,
+			End:   filter.EndDate,
 		},
 	}
 }
@@ -232,7 +232,7 @@ func (a *weatherSideAccum) stats() model.WeatherSideStats {
 	for _, category := range order {
 		count := a.byCat[category]
 		out.Categories = append(out.Categories, model.WeatherCategoryStat{
-			Category:   category,
+			Category:   model.WeatherCategoryLabel(category),
 			Flights:    count.flights,
 			OnTimeRate: rate(count.onTime, count.flights),
 		})

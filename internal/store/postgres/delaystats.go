@@ -18,7 +18,9 @@ type delayStatsScan struct {
 	avgArrDelayed     sql.NullFloat64
 	medianArrDelayed  sql.NullFloat64
 	avgDep            sql.NullFloat64
+	medianDep         sql.NullFloat64
 	avgDepDelayed     sql.NullFloat64
+	medianDepDelayed  sql.NullFloat64
 	causeCarrier      sql.NullFloat64
 	causeWeather      sql.NullFloat64
 	causeNAS          sql.NullFloat64
@@ -44,7 +46,9 @@ func (row *delayStatsScan) args() []any {
 		&row.avgArrDelayed,
 		&row.medianArrDelayed,
 		&row.avgDep,
+		&row.medianDep,
 		&row.avgDepDelayed,
+		&row.medianDepDelayed,
 		&row.causeCarrier,
 		&row.causeWeather,
 		&row.causeNAS,
@@ -60,23 +64,25 @@ func (row *delayStatsScan) args() []any {
 }
 
 type delayStatFields struct {
-	flights                       *int
-	onTime                        *int
-	delayed                       *int
-	cancelled                     *int
-	diverted                      *int
-	onTimeRate                    *float64
-	delayRate                     *float64
-	cancellationRate              *float64
-	diversionRate                 *float64
-	avgArrivalDelayMinutes        *float64
-	medianArrivalDelayMinutes     *float64
-	avgArrivalDelayWhenDelayed    *float64
-	medianArrivalDelayWhenDelayed *float64
-	avgDepartureDelayMinutes      *float64
-	avgDepartureDelayWhenDelayed  *float64
-	causes                        *model.DelayCausesAvgMinutes
-	share                         *model.DelayCausesShare
+	flights                         *int
+	onTime                          *int
+	delayed                         *int
+	cancelled                       *int
+	diverted                        *int
+	onTimeRate                      *float64
+	delayRate                       *float64
+	cancellationRate                *float64
+	diversionRate                   *float64
+	avgArrivalDelayMinutes          *float64
+	medianArrivalDelayMinutes       *float64
+	avgArrivalDelayWhenDelayed      *float64
+	medianArrivalDelayWhenDelayed   *float64
+	avgDepartureDelayMinutes        *float64
+	medianDepartureDelayMinutes     *float64
+	avgDepartureDelayWhenDelayed    *float64
+	medianDepartureDelayWhenDelayed *float64
+	causes                          *model.DelayCausesAvgMinutes
+	share                           *model.DelayCausesShare
 }
 
 func applyDelayStats(row delayStatsScan, dst delayStatFields) {
@@ -94,7 +100,9 @@ func applyDelayStats(row delayStatsScan, dst delayStatFields) {
 	*dst.avgArrivalDelayWhenDelayed = nullFloat(row.avgArrDelayed)
 	*dst.medianArrivalDelayWhenDelayed = nullFloat(row.medianArrDelayed)
 	*dst.avgDepartureDelayMinutes = nullFloat(row.avgDep)
+	*dst.medianDepartureDelayMinutes = nullFloat(row.medianDep)
 	*dst.avgDepartureDelayWhenDelayed = nullFloat(row.avgDepDelayed)
+	*dst.medianDepartureDelayWhenDelayed = nullFloat(row.medianDepDelayed)
 
 	if row.delayed == 0 {
 		return
@@ -120,44 +128,48 @@ func applyDelayStats(row delayStatsScan, dst delayStatFields) {
 
 func routeDelayFields(stats *model.RouteStats) delayStatFields {
 	return delayStatFields{
-		flights:                       &stats.Flights,
-		onTime:                        &stats.OnTime,
-		delayed:                       &stats.Delayed,
-		cancelled:                     &stats.Cancelled,
-		diverted:                      &stats.Diverted,
-		onTimeRate:                    &stats.OnTimeRate,
-		delayRate:                     &stats.DelayRate,
-		cancellationRate:              &stats.CancellationRate,
-		diversionRate:                 &stats.DiversionRate,
-		avgArrivalDelayMinutes:        &stats.AvgArrivalDelayMinutes,
-		medianArrivalDelayMinutes:     &stats.MedianArrivalDelayMinutes,
-		avgArrivalDelayWhenDelayed:    &stats.AvgArrivalDelayWhenDelayed,
-		medianArrivalDelayWhenDelayed: &stats.MedianArrivalDelayWhenDelayed,
-		avgDepartureDelayMinutes:      &stats.AvgDepartureDelayMinutes,
-		avgDepartureDelayWhenDelayed:  &stats.AvgDepartureDelayWhenDelayed,
-		causes:                        &stats.DelayCausesAvgMinutes,
-		share:                         &stats.DelayCausesShare,
+		flights:                         &stats.Flights,
+		onTime:                          &stats.OnTime,
+		delayed:                         &stats.Delayed,
+		cancelled:                       &stats.Cancelled,
+		diverted:                        &stats.Diverted,
+		onTimeRate:                      &stats.OnTimeRate,
+		delayRate:                       &stats.DelayRate,
+		cancellationRate:                &stats.CancellationRate,
+		diversionRate:                   &stats.DiversionRate,
+		avgArrivalDelayMinutes:          &stats.AvgArrivalDelayMinutes,
+		medianArrivalDelayMinutes:       &stats.MedianArrivalDelayMinutes,
+		avgArrivalDelayWhenDelayed:      &stats.AvgArrivalDelayWhenDelayed,
+		medianArrivalDelayWhenDelayed:   &stats.MedianArrivalDelayWhenDelayed,
+		avgDepartureDelayMinutes:        &stats.AvgDepartureDelayMinutes,
+		medianDepartureDelayMinutes:     &stats.MedianDepartureDelayMinutes,
+		avgDepartureDelayWhenDelayed:    &stats.AvgDepartureDelayWhenDelayed,
+		medianDepartureDelayWhenDelayed: &stats.MedianDepartureDelayWhenDelayed,
+		causes:                          &stats.DelayCausesAvgMinutes,
+		share:                           &stats.DelayCausesShare,
 	}
 }
 
 func carrierDelayFields(stats *model.CarrierStats) delayStatFields {
 	return delayStatFields{
-		flights:                       &stats.Flights,
-		onTime:                        &stats.OnTime,
-		delayed:                       &stats.Delayed,
-		cancelled:                     &stats.Cancelled,
-		diverted:                      &stats.Diverted,
-		onTimeRate:                    &stats.OnTimeRate,
-		delayRate:                     &stats.DelayRate,
-		cancellationRate:              &stats.CancellationRate,
-		diversionRate:                 &stats.DiversionRate,
-		avgArrivalDelayMinutes:        &stats.AvgArrivalDelayMinutes,
-		medianArrivalDelayMinutes:     &stats.MedianArrivalDelayMinutes,
-		avgArrivalDelayWhenDelayed:    &stats.AvgArrivalDelayWhenDelayed,
-		medianArrivalDelayWhenDelayed: &stats.MedianArrivalDelayWhenDelayed,
-		avgDepartureDelayMinutes:      &stats.AvgDepartureDelayMinutes,
-		avgDepartureDelayWhenDelayed:  &stats.AvgDepartureDelayWhenDelayed,
-		causes:                        &stats.DelayCausesAvgMinutes,
-		share:                         &stats.DelayCausesShare,
+		flights:                         &stats.Flights,
+		onTime:                          &stats.OnTime,
+		delayed:                         &stats.Delayed,
+		cancelled:                       &stats.Cancelled,
+		diverted:                        &stats.Diverted,
+		onTimeRate:                      &stats.OnTimeRate,
+		delayRate:                       &stats.DelayRate,
+		cancellationRate:                &stats.CancellationRate,
+		diversionRate:                   &stats.DiversionRate,
+		avgArrivalDelayMinutes:          &stats.AvgArrivalDelayMinutes,
+		medianArrivalDelayMinutes:       &stats.MedianArrivalDelayMinutes,
+		avgArrivalDelayWhenDelayed:      &stats.AvgArrivalDelayWhenDelayed,
+		medianArrivalDelayWhenDelayed:   &stats.MedianArrivalDelayWhenDelayed,
+		avgDepartureDelayMinutes:        &stats.AvgDepartureDelayMinutes,
+		medianDepartureDelayMinutes:     &stats.MedianDepartureDelayMinutes,
+		avgDepartureDelayWhenDelayed:    &stats.AvgDepartureDelayWhenDelayed,
+		medianDepartureDelayWhenDelayed: &stats.MedianDepartureDelayWhenDelayed,
+		causes:                          &stats.DelayCausesAvgMinutes,
+		share:                           &stats.DelayCausesShare,
 	}
 }

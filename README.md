@@ -128,7 +128,7 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 | --- | --- |
 | `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`) and `/docs/` |
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
-| `admin` | Everything: `/api/internal/*` (ingest, jobs, data freshness, rebuilds, keys), `/db/version`, `/docs/internal/`, and consumer surfaces |
+| `admin` | Everything: `/api/internal/*` (ingest, jobs, data freshness, rebuilds, keys), `/api/db/version`, `/docs/internal/`, and consumer surfaces |
 
 `/health` and `/ready` are unauthenticated and are not rate-limited. Ingest is never anonymous — **admin only**, with `RATE_LIMIT_ADMIN_INGEST_RPM`. Protected routes fail closed when auth is enabled (missing/invalid/revoked key → **401**, or **429** if the auth-fail IP bucket is exhausted; wrong role → **403**).
 
@@ -183,9 +183,7 @@ If you run under Kubernetes, set `terminationGracePeriodSeconds` similarly (at l
 
 Consumer reads stay on `/api/v1`. Operator routes (ingest, jobs, freshness, rebuilds, and keys) are unversioned under `/api/internal`.
 
-When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. Date and flight-number filters that match nothing still return **200** with zero counts. Route outlook is also **200** when that carrier has flown the route but the weekday and departure window are empty: `sample_reason` is `empty_sample`, `insufficient_sample` is false, `confidence` is `unknown`, and probability and delay fields are null. A smaller non-empty outlook sample is `sample_reason` `insufficient_sample` (the bool is true, `confidence` is `low`). A valid itinerary body returns **200**. A leg with no history has a null outlook and `error`; a seen leg carries the same outlook `sample_reason`. Field rules are in Swagger.
-
-Outlook and itinerary share connection status and confidence. Travel-window reliability is seasonal on-time only; a thin bucket stays `unknown` rather than `unreliable`. Outlook `weather` is route-level fair versus adverse on-time history and does not change connection status or confidence.
+When `AUTH_DISABLED=true`, these curls work as written. With authentication on, send `-H "Authorization: Bearer $API_KEY"` on protected routes (`/health` and `/ready` stay open). A route or carrier with no flight-performance history is **404**. Date and flight-number filters that match nothing still return **200** with zero counts.
 
 ```bash
 # Liveness
@@ -195,7 +193,7 @@ curl http://localhost:8080/health
 curl http://localhost:8080/ready
 
 # Database migration version (admin)
-curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/db/version
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/db/version
 
 # Queue one month of flight-performance data
 curl -X POST http://localhost:8080/api/internal/ingest/flight-performance \

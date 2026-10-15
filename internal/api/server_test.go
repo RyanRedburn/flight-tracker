@@ -20,7 +20,7 @@ import (
 
 const (
 	pathHealth               = "/health"
-	pathDBVersion            = "/db/version"
+	pathDBVersion            = "/api/db/version"
 	pathIngestCountries      = "/api/internal/ingest/countries"
 	pathCarrierStatsUA       = "/api/v1/carriers/stats?carrier=UA"
 	pathDocsIndexHTML        = "/docs/index.html"

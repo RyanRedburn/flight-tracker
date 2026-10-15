@@ -58,7 +58,7 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
-//	@Router			/db/version [get]
+//	@Router			/api/db/version [get]
 func (h *HealthHandler) DatabaseVersion(w http.ResponseWriter, r *http.Request) {
 	version, err := h.store.MigrationVersion(r.Context())
 	if err != nil {

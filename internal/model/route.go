@@ -24,12 +24,6 @@ type AirportCount struct {
 	Count   int    `json:"count"`
 }
 
-type RouteStatsFilters struct {
-	Carrier      string `json:"carrier"`
-	FlightNumber string `json:"flight_number"`
-	DaysOfWeek   []int  `json:"days_of_week"`
-}
-
 // CarrierOnTime is per-marketing-carrier on-time performance for a route.
 type CarrierOnTime struct {
 	Carrier    string  `json:"carrier"`
@@ -38,65 +32,54 @@ type CarrierOnTime struct {
 }
 
 type RouteStats struct {
-	Origin                        string                `json:"origin"`
-	Dest                          string                `json:"dest"`
-	StartDate                     string                `json:"start_date"`
-	EndDate                       string                `json:"end_date"`
-	Filters                       RouteStatsFilters     `json:"filters"`
-	Flights                       int                   `json:"flights"`
-	OnTime                        int                   `json:"on_time"`
-	Delayed                       int                   `json:"delayed"`
-	Cancelled                     int                   `json:"cancelled"`
-	Diverted                      int                   `json:"diverted"`
-	OnTimeRate                    float64               `json:"on_time_rate"`
-	DelayRate                     float64               `json:"delay_rate"`
-	CancellationRate              float64               `json:"cancellation_rate"`
-	DiversionRate                 float64               `json:"diversion_rate"`
-	AvgArrivalDelayMinutes        float64               `json:"avg_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     float64               `json:"median_arrival_delay_minutes"`
-	AvgArrivalDelayWhenDelayed    float64               `json:"avg_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed float64               `json:"median_arrival_delay_when_delayed"`
-	AvgDepartureDelayMinutes      float64               `json:"avg_departure_delay_minutes"`
-	AvgDepartureDelayWhenDelayed  float64               `json:"avg_departure_delay_when_delayed"`
-	DelayCausesAvgMinutes         DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
-	DelayCausesShare              DelayCausesShare      `json:"delay_causes_share"`
-	DiversionAirports             []AirportCount        `json:"diversion_airports"`
+	Filters                         Filters               `json:"filters"`
+	Analysis                        Analysis              `json:"analysis"`
+	Flights                         int                   `json:"flights"`
+	OnTime                          int                   `json:"on_time"`
+	Delayed                         int                   `json:"delayed"`
+	Cancelled                       int                   `json:"cancelled"`
+	Diverted                        int                   `json:"diverted"`
+	OnTimeRate                      float64               `json:"on_time_rate"`
+	DelayRate                       float64               `json:"delay_rate"`
+	CancellationRate                float64               `json:"cancellation_rate"`
+	DiversionRate                   float64               `json:"diversion_rate"`
+	AvgArrivalDelayMinutes          float64               `json:"avg_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes       float64               `json:"median_arrival_delay_minutes"`
+	AvgArrivalDelayWhenDelayed      float64               `json:"avg_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed   float64               `json:"median_arrival_delay_when_delayed"`
+	AvgDepartureDelayMinutes        float64               `json:"avg_departure_delay_minutes"`
+	MedianDepartureDelayMinutes     float64               `json:"median_departure_delay_minutes"`
+	AvgDepartureDelayWhenDelayed    float64               `json:"avg_departure_delay_when_delayed"`
+	MedianDepartureDelayWhenDelayed float64               `json:"median_departure_delay_when_delayed"`
+	DelayCausesAvgMinutes           DelayCausesAvgMinutes `json:"delay_causes_avg_minutes"`
+	DelayCausesShare                DelayCausesShare      `json:"delay_causes_share"`
+	DiversionAirports               []AirportCount        `json:"diversion_airports"`
 	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
 }
 
 type RouteOutlook struct {
-	Origin               string `json:"origin"`
-	Dest                 string `json:"dest"`
-	Carrier              string `json:"carrier"`
-	DayOfWeek            int    `json:"day_of_week"`
-	DepTime              string `json:"dep_time"`
-	DepTimeWindowMinutes int    `json:"dep_time_window_minutes"`
-	AnalysisStart        string `json:"analysis_start"`
-	AnalysisEnd          string `json:"analysis_end"`
-	SampleSize           int    `json:"sample_size"`
-	// InsufficientSample is true only for sample_reason insufficient_sample.
-	// An empty slot leaves it false; never-seen is not this flag.
-	InsufficientSample bool `json:"insufficient_sample"`
-	// SampleReason is sufficient, insufficient_sample, or empty_sample.
-	// insufficient_sample matches the bool. empty_sample is a seen route and carrier
-	// with no flights in this slot: confidence is unknown and estimate fields are null.
-	// Never-seen is 404 on route outlook, and a null outlook plus error on an itinerary leg.
-	SampleReason string `json:"sample_reason" enums:"sufficient,insufficient_sample,empty_sample"`
-	// Confidence is high, low, or unknown for sufficient, insufficient_sample, and empty_sample.
-	Confidence                    string             `json:"confidence" enums:"high,low,unknown"`
-	OnTimeProbability             *float64           `json:"on_time_probability"`
-	DelayProbability              *float64           `json:"delay_probability"`
-	CancellationProbability       *float64           `json:"cancellation_probability"`
-	DiversionProbability          *float64           `json:"diversion_probability"`
-	LikelyArrivalDelayMinutes     *float64           `json:"likely_arrival_delay_minutes"`
-	MedianArrivalDelayMinutes     *float64           `json:"median_arrival_delay_minutes"`
-	LikelyArrivalDelayWhenDelayed *float64           `json:"likely_arrival_delay_when_delayed"`
-	MedianArrivalDelayWhenDelayed *float64           `json:"median_arrival_delay_when_delayed"`
-	LikelyDepartureDelayMinutes   *float64           `json:"likely_departure_delay_minutes"`
-	Connection                    ConnectionGuidance `json:"connection"`
-	// Weather is route-level fair and adverse on-time rates, not this departure slot.
-	Weather RouteOutlookWeather `json:"weather"`
+	Filters Filters `json:"filters"`
+	OutlookResult
+}
+
+type OutlookResult struct {
+	Analysis                        Analysis `json:"analysis"`
+	OnTimeProbability               *float64 `json:"on_time_probability"`
+	DelayProbability                *float64 `json:"delay_probability"`
+	CancellationProbability         *float64 `json:"cancellation_probability"`
+	DiversionProbability            *float64 `json:"diversion_probability"`
+	LikelyArrivalDelayMinutes       *float64 `json:"likely_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes       *float64 `json:"median_arrival_delay_minutes"`
+	LikelyArrivalDelayWhenDelayed   *float64 `json:"likely_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed   *float64 `json:"median_arrival_delay_when_delayed"`
+	LikelyDepartureDelayMinutes     *float64 `json:"likely_departure_delay_minutes"`
+	MedianDepartureDelayMinutes     *float64 `json:"median_departure_delay_minutes"`
+	LikelyDepartureDelayWhenDelayed *float64 `json:"likely_departure_delay_when_delayed"`
+	MedianDepartureDelayWhenDelayed *float64 `json:"median_departure_delay_when_delayed"`
+	// Cleared for empty_sample and insufficient_sample.
+	Connection ConnectionGuidance  `json:"connection"`
+	Weather    RouteOutlookWeather `json:"weather"`
 }
 
 // TravelWindowMonthBucket is one month-of-year on-time rate.
@@ -138,11 +121,8 @@ type TravelWindowHourBucket struct {
 // RouteTravelWindows is typical-year on-time performance for a route (and
 // optional marketing carrier), pooled across the trailing analysis window.
 type RouteTravelWindows struct {
-	Origin      string                    `json:"origin"`
-	Dest        string                    `json:"dest"`
-	Carrier     string                    `json:"carrier,omitempty"`
-	WindowStart string                    `json:"window_start"`
-	WindowEnd   string                    `json:"window_end"`
+	Filters     Filters                   `json:"filters"`
+	Analysis    Analysis                  `json:"analysis"`
 	ByMonth     []TravelWindowMonthBucket `json:"by_month"`
 	ByDayOfWeek []TravelWindowDayBucket   `json:"by_day_of_week"`
 	ByHour      []TravelWindowHourBucket  `json:"by_hour"`
@@ -166,7 +146,9 @@ func (s *RouteStats) RoundForResponse() {
 	s.AvgArrivalDelayWhenDelayed = math.Round(s.AvgArrivalDelayWhenDelayed)
 	s.MedianArrivalDelayWhenDelayed = math.Round(s.MedianArrivalDelayWhenDelayed)
 	s.AvgDepartureDelayMinutes = math.Round(s.AvgDepartureDelayMinutes)
+	s.MedianDepartureDelayMinutes = math.Round(s.MedianDepartureDelayMinutes)
 	s.AvgDepartureDelayWhenDelayed = math.Round(s.AvgDepartureDelayWhenDelayed)
+	s.MedianDepartureDelayWhenDelayed = math.Round(s.MedianDepartureDelayWhenDelayed)
 	s.DelayCausesAvgMinutes.Carrier = math.Round(s.DelayCausesAvgMinutes.Carrier)
 	s.DelayCausesAvgMinutes.Weather = math.Round(s.DelayCausesAvgMinutes.Weather)
 	s.DelayCausesAvgMinutes.NAS = math.Round(s.DelayCausesAvgMinutes.NAS)
@@ -191,6 +173,9 @@ func (o *RouteOutlook) RoundForResponse() {
 	o.LikelyArrivalDelayWhenDelayed = roundMinutesPtr(o.LikelyArrivalDelayWhenDelayed)
 	o.MedianArrivalDelayWhenDelayed = roundMinutesPtr(o.MedianArrivalDelayWhenDelayed)
 	o.LikelyDepartureDelayMinutes = roundMinutesPtr(o.LikelyDepartureDelayMinutes)
+	o.MedianDepartureDelayMinutes = roundMinutesPtr(o.MedianDepartureDelayMinutes)
+	o.LikelyDepartureDelayWhenDelayed = roundMinutesPtr(o.LikelyDepartureDelayWhenDelayed)
+	o.MedianDepartureDelayWhenDelayed = roundMinutesPtr(o.MedianDepartureDelayWhenDelayed)
 	o.Weather.RoundForResponse()
 }
 

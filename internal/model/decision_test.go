@@ -65,13 +65,12 @@ func TestApplyOutlookSample(t *testing.T) {
 		minSample          int
 		wantReason         string
 		wantConfidence     string
-		wantInsufficient   bool
 		wantConnectionKept bool
 	}{
 		{name: "empty slot", minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
 		{name: "negative size", sampleSize: -3, minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
-		{name: "thin sample", sampleSize: 4, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow, wantInsufficient: true},
-		{name: "one below minimum", sampleSize: 9, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow, wantInsufficient: true},
+		{name: "thin sample", sampleSize: 4, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
+		{name: "one below minimum", sampleSize: 9, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
 		{name: "meets minimum", sampleSize: 10, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
 		{name: "solid sample", sampleSize: 40, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
 		{name: "no minimum treats non-empty as sufficient", sampleSize: 1, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
@@ -80,19 +79,21 @@ func TestApplyOutlookSample(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &RouteOutlook{
-				SampleSize:                tt.sampleSize,
-				OnTimeProbability:         &zero,
-				LikelyArrivalDelayMinutes: &zero,
-				Connection:                planted,
+				OutlookResult: OutlookResult{
+					Analysis:                  Analysis{SampleSize: tt.sampleSize},
+					OnTimeProbability:         &zero,
+					LikelyArrivalDelayMinutes: &zero,
+					Connection:                planted,
+				},
 			}
 			out.ApplyOutlookSample(tt.minSample)
 
-			if out.SampleReason != tt.wantReason || out.Confidence != tt.wantConfidence || out.InsufficientSample != tt.wantInsufficient {
-				t.Fatalf("sample = reason %q confidence %q insufficient %v", out.SampleReason, out.Confidence, out.InsufficientSample)
+			if out.Analysis.SampleReason != tt.wantReason || out.Analysis.Confidence != tt.wantConfidence {
+				t.Fatalf("sample = reason %q confidence %q", out.Analysis.SampleReason, out.Analysis.Confidence)
 			}
 
-			if tt.sampleSize < 0 && out.SampleSize != 0 {
-				t.Fatalf("sample_size = %d, want 0", out.SampleSize)
+			if tt.sampleSize < 0 && out.Analysis.SampleSize != 0 {
+				t.Fatalf("sample_size = %d, want 0", out.Analysis.SampleSize)
 			}
 
 			if tt.wantReason == SampleReasonEmptySample {
@@ -125,15 +126,15 @@ func TestBlockingSampleReason(t *testing.T) {
 		outlook RouteOutlook
 		want    string
 	}{
-		{name: "explicit sufficient", outlook: RouteOutlook{SampleReason: SampleReasonSufficient, SampleSize: 40, Confidence: ConfidenceHigh}, want: ""},
-		{name: "explicit empty", outlook: RouteOutlook{SampleReason: SampleReasonEmptySample}, want: SampleReasonEmptySample},
-		{name: "explicit thin", outlook: RouteOutlook{SampleReason: SampleReasonInsufficientSample, SampleSize: 4, InsufficientSample: true}, want: SampleReasonInsufficientSample},
-		{name: "explicit empty wins over thresholds", outlook: RouteOutlook{SampleReason: SampleReasonEmptySample, Confidence: ConfidenceHigh, Connection: ConnectionGuidanceFromRecommended(45, 60, 120, 120)}, want: SampleReasonEmptySample},
-		{name: "derived thin", outlook: RouteOutlook{SampleSize: 4, InsufficientSample: true, Confidence: ConfidenceLow}, want: SampleReasonInsufficientSample},
-		{name: "derived low confidence", outlook: RouteOutlook{SampleSize: 40, Confidence: ConfidenceLow}, want: SampleReasonInsufficientSample},
-		{name: "derived empty", outlook: RouteOutlook{Confidence: ConfidenceUnknown}, want: SampleReasonEmptySample},
-		{name: "derived sufficient from size", outlook: RouteOutlook{SampleSize: 40, Confidence: ConfidenceHigh}, want: ""},
-		{name: "explicit high with empty size stays open", outlook: RouteOutlook{Confidence: ConfidenceHigh}, want: ""},
+		{name: "explicit sufficient", outlook: sampleOutlook(40, SampleReasonSufficient, ConfidenceHigh), want: ""},
+		{name: "explicit empty", outlook: sampleOutlook(0, SampleReasonEmptySample, ""), want: SampleReasonEmptySample},
+		{name: "explicit thin", outlook: sampleOutlook(4, SampleReasonInsufficientSample, ConfidenceLow), want: SampleReasonInsufficientSample},
+		{name: "explicit empty wins over thresholds", outlook: withConnection(sampleOutlook(0, SampleReasonEmptySample, ConfidenceHigh), ConnectionGuidanceFromRecommended(45, 60, 120, 120)), want: SampleReasonEmptySample},
+		{name: "derived thin", outlook: sampleOutlook(4, "", ConfidenceLow), want: SampleReasonInsufficientSample},
+		{name: "derived low confidence", outlook: sampleOutlook(40, "", ConfidenceLow), want: SampleReasonInsufficientSample},
+		{name: "derived empty", outlook: sampleOutlook(0, "", ConfidenceUnknown), want: SampleReasonEmptySample},
+		{name: "derived sufficient from size", outlook: sampleOutlook(40, "", ConfidenceHigh), want: ""},
+		{name: "explicit high with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceHigh), want: ""},
 	}
 
 	for _, tt := range tests {
@@ -150,15 +151,32 @@ func TestDecisionConfidence(t *testing.T) {
 		t.Errorf("nil outlook confidence = %q", got)
 	}
 
-	explicit := &RouteOutlook{SampleSize: 0, Confidence: ConfidenceHigh}
+	explicit := sampleOutlook(0, "", ConfidenceHigh)
 	if got := explicit.DecisionConfidence(); got != ConfidenceHigh {
 		t.Errorf("explicit confidence = %q, want high", got)
 	}
 
-	derived := &RouteOutlook{SampleSize: 3, InsufficientSample: true}
+	derived := sampleOutlook(3, SampleReasonInsufficientSample, "")
 	if got := derived.DecisionConfidence(); got != ConfidenceLow {
 		t.Errorf("derived confidence = %q, want low", got)
 	}
+}
+
+func sampleOutlook(size int, reason, confidence string) RouteOutlook {
+	return RouteOutlook{
+		OutlookResult: OutlookResult{
+			Analysis: Analysis{
+				SampleSize:   size,
+				SampleReason: reason,
+				Confidence:   confidence,
+			},
+		},
+	}
+}
+
+func withConnection(outlook RouteOutlook, connection ConnectionGuidance) RouteOutlook {
+	outlook.Connection = connection
+	return outlook
 }
 
 func TestSeasonalDecision(t *testing.T) {

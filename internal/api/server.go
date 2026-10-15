@@ -56,7 +56,7 @@ func newRouter(
 
 	r.Group(func(r chi.Router) {
 		r.Use(protect.Require(middleware.AdminOnly, store.RateLimitSurfaceInternal))
-		r.Get("/db/version", health.DatabaseVersion)
+		r.Get("/api/db/version", health.DatabaseVersion)
 		// More specific internal UI path before /docs/*.
 		r.Get("/docs/internal/*", httpSwagger.Handler(
 			httpSwagger.InstanceName("internal"),

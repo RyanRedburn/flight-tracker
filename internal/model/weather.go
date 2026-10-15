@@ -9,11 +9,21 @@ const (
 	WeatherCategoryPrecip  = "PRECIP"
 	WeatherCategoryVFRFair = "VFR_FAIR"
 	WeatherCategoryUnknown = "UNKNOWN"
+
+	// Response labels for the stored category codes. Classification and rollups keep the codes.
+	WeatherLabelThunder = "Thunder"
+	WeatherLabelLIFR    = "Very low clouds or visibility"
+	WeatherLabelIFR     = "Low clouds or visibility"
+	WeatherLabelMVFR    = "Somewhat reduced visibility"
+	WeatherLabelWindy   = "Windy"
+	WeatherLabelPrecip  = "Precipitation"
+	WeatherLabelFair    = "Fair"
+	WeatherLabelUnknown = "Unknown"
 )
 
 // WeatherCategoryStat is on-time performance for one METAR category.
 type WeatherCategoryStat struct {
-	Category   string  `json:"category"`
+	Category   string  `json:"category" enums:"Thunder,Very low clouds or visibility,Low clouds or visibility,Somewhat reduced visibility,Windy,Precipitation,Fair,Unknown"`
 	Flights    int     `json:"flights"`
 	OnTimeRate float64 `json:"on_time_rate"`
 }
@@ -28,17 +38,14 @@ type WeatherSideStats struct {
 
 // RouteWeatherStats is on-time performance by observed METAR category for a route.
 type RouteWeatherStats struct {
-	Origin        string            `json:"origin"`
-	Dest          string            `json:"dest"`
-	StartDate     string            `json:"start_date"`
-	EndDate       string            `json:"end_date"`
-	Filters       RouteStatsFilters `json:"filters"`
-	Flights       int               `json:"flights"`
-	OriginWeather WeatherSideStats  `json:"origin_weather"`
-	DestWeather   WeatherSideStats  `json:"dest_weather"`
+	Filters       Filters          `json:"filters"`
+	Analysis      Analysis         `json:"analysis"`
+	Flights       int              `json:"flights"`
+	OriginWeather WeatherSideStats `json:"origin_weather"`
+	DestWeather   WeatherSideStats `json:"dest_weather"`
 }
 
-// RouteOutlookWeather is informational fair versus adverse on-time history.
+// RouteOutlookWeather is route-level fair versus adverse history for the route, not the departure slot.
 // It does not change connection status or confidence.
 // Fair is VFR_FAIR. Adverse is every other category except UNKNOWN. Unmatched flights are excluded.
 type RouteOutlookWeather struct {
@@ -58,6 +65,30 @@ type RouteOutlookWeatherSide struct {
 	AdverseFlights int `json:"adverse_flights"`
 	// Confidence is unknown when fair or adverse flights are absent, and low when the thinner group is below the outlook minimum. A thin sample keeps its rates.
 	Confidence string `json:"confidence" enums:"high,low,unknown"`
+}
+
+// WeatherCategoryLabel is the response name for a stored category code.
+func WeatherCategoryLabel(category string) string {
+	switch category {
+	case WeatherCategoryThunder:
+		return WeatherLabelThunder
+	case WeatherCategoryLIFR:
+		return WeatherLabelLIFR
+	case WeatherCategoryIFR:
+		return WeatherLabelIFR
+	case WeatherCategoryMVFR:
+		return WeatherLabelMVFR
+	case WeatherCategoryWindy:
+		return WeatherLabelWindy
+	case WeatherCategoryPrecip:
+		return WeatherLabelPrecip
+	case WeatherCategoryVFRFair:
+		return WeatherLabelFair
+	case WeatherCategoryUnknown:
+		return WeatherLabelUnknown
+	default:
+		return category
+	}
 }
 
 // WeatherCategoryOrder is the first-match category priority, then UNKNOWN.

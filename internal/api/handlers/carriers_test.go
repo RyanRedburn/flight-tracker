@@ -20,7 +20,7 @@ func TestCarriersStats(t *testing.T) {
 			}
 
 			return &model.CarrierStats{
-				Carrier:       "UA",
+				Filters:       model.Filters{Carrier: "UA"},
 				Flights:       10,
 				OnTime:        7,
 				BestRoutes:    []model.CarrierRouteStat{},
@@ -67,7 +67,7 @@ func TestCarriersStatsEmptyFilters(t *testing.T) {
 	h := NewCarriersHandler(&storetest.Stub{
 		CarrierStatsFn: func(context.Context, store.CarrierStatsFilter) (*model.CarrierStats, error) {
 			return &model.CarrierStats{
-				Carrier:       "UA",
+				Filters:       model.Filters{Carrier: "UA"},
 				BestRoutes:    []model.CarrierRouteStat{},
 				WorstRoutes:   []model.CarrierRouteStat{},
 				BestAirports:  []model.CarrierAirportStat{},

@@ -1,7 +1,9 @@
 package store
 
 import (
+	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -80,22 +82,10 @@ func TestConnectionType(t *testing.T) {
 }
 
 func TestAssessConnection(t *testing.T) {
-	outlook := &model.RouteOutlook{
-		SampleSize:   40,
-		SampleReason: model.SampleReasonSufficient,
-		Confidence:   model.ConfidenceHigh,
-		Connection:   testRecommended(),
-	}
+	outlook := testOutlook(40, model.SampleReasonSufficient, model.ConfidenceHigh, testRecommended())
 	floorGuidance := testRecommended()
-	floorGuidance.DomesticToDomestic.FloorOnly = true
-	floorOutlook := &model.RouteOutlook{
-		SampleSize:   40,
-		SampleReason: model.SampleReasonSufficient,
-		Confidence:   model.ConfidenceHigh,
-		Connection:   floorGuidance,
-	}
-	airportFloor := false
-	staticFloor := true
+	floorGuidance.DomesticToDomestic.MCTSource = model.MCTSourceDefault
+	floorOutlook := testOutlook(40, model.SampleReasonSufficient, model.ConfidenceHigh, floorGuidance)
 	countries := map[string]string{
 		testConnOrigin:   "US",
 		testTravelOrigin: "US",
@@ -133,7 +123,7 @@ func TestAssessConnection(t *testing.T) {
 		wantConfidence string
 		wantReason     string
 		wantOvernight  bool
-		wantFloorOnly  *bool
+		wantMCTSource  string
 		wantType       string
 		wantLayover    *int
 		wantRecommend  *int
@@ -149,7 +139,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionLoose,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover115,
 			wantRecommend:  &dd,
@@ -165,7 +155,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionOK,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover60,
 			wantRecommend:  &dd,
@@ -181,7 +171,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionTight,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover35,
 			wantRecommend:  &dd,
@@ -198,7 +188,7 @@ func TestAssessConnection(t *testing.T) {
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonOvernight,
 			wantOvernight:  true,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover540,
 			wantRecommend:  &dd,
@@ -214,7 +204,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionLoose,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToInternational,
 			wantLayover:    &layover180,
 			wantRecommend:  &di,
@@ -230,7 +220,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionLoose,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionInternationalToDomestic,
 			wantLayover:    &layover180,
 			wantRecommend:  &id,
@@ -246,7 +236,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionOK,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionInternationalToInternational,
 			wantLayover:    intPtr(180),
 			wantRecommend:  &ii,
@@ -290,14 +280,9 @@ func TestAssessConnection(t *testing.T) {
 			name:     "null recommendation",
 			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
 			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook: &model.RouteOutlook{
-				SampleSize:   40,
-				SampleReason: model.SampleReasonSufficient,
-				Confidence:   model.ConfidenceHigh,
-				Connection: model.ConnectionGuidance{
-					DomesticToInternational: model.NewConnectionMinutes(di),
-				},
-			},
+			outlook: testOutlook(40, model.SampleReasonSufficient, model.ConfidenceHigh, model.ConnectionGuidance{
+				DomesticToInternational: model.NewConnectionMinutes(di),
+			}),
 			countries:      countries,
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceHigh,
@@ -314,7 +299,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonNegativeLayover,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantRecommend:  &dd,
 			wantLoose:      &looseDD,
@@ -328,7 +313,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionLoose,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonEvaluated,
-			wantFloorOnly:  &staticFloor,
+			wantMCTSource:  model.MCTSourceDefault,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover115,
 			wantRecommend:  &dd,
@@ -345,7 +330,7 @@ func TestAssessConnection(t *testing.T) {
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonOvernight,
 			wantOvernight:  true,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantLayover:    &layover1980,
 			wantRecommend:  &dd,
@@ -365,14 +350,10 @@ func TestAssessConnection(t *testing.T) {
 			wantLayover:    &layover540,
 		},
 		{
-			name:     "empty sample",
-			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook: &model.RouteOutlook{
-				SampleReason: model.SampleReasonEmptySample,
-				Confidence:   model.ConfidenceUnknown,
-				Connection:   testRecommended(),
-			},
+			name:           "empty sample",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
+			outlook:        testOutlook(0, model.SampleReasonEmptySample, model.ConfidenceUnknown, testRecommended()),
 			countries:      countries,
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceUnknown,
@@ -381,15 +362,10 @@ func TestAssessConnection(t *testing.T) {
 			wantLayover:    &layover115,
 		},
 		{
-			name:     "insufficient sample",
-			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook: &model.RouteOutlook{
-				SampleSize:         4,
-				InsufficientSample: true,
-				SampleReason:       model.SampleReasonInsufficientSample,
-				Confidence:         model.ConfidenceLow,
-			},
+			name:           "insufficient sample",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
+			outlook:        testOutlook(4, model.SampleReasonInsufficientSample, model.ConfidenceLow, model.ConnectionGuidance{}),
 			countries:      countries,
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceLow,
@@ -398,14 +374,10 @@ func TestAssessConnection(t *testing.T) {
 			wantLayover:    &layover115,
 		},
 		{
-			name:     "derived thin sample",
-			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
-			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
-			outlook: &model.RouteOutlook{
-				SampleSize:         4,
-				InsufficientSample: true,
-				Confidence:         model.ConfidenceLow,
-			},
+			name:           "derived thin sample",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateTue, testTime1100, "1400"),
+			outlook:        testOutlook(4, "", model.ConfidenceLow, model.ConnectionGuidance{}),
 			countries:      countries,
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceLow,
@@ -414,15 +386,10 @@ func TestAssessConnection(t *testing.T) {
 			wantLayover:    &layover115,
 		},
 		{
-			name:     "overnight thin sample",
-			inbound:  testLeg(testConnOrigin, testTravelOrigin, testDateTue, "1800", "2200"),
-			outbound: testLeg(testTravelOrigin, testAirportLAX, testDateWed, testTime0700, "1000"),
-			outlook: &model.RouteOutlook{
-				SampleSize:         4,
-				InsufficientSample: true,
-				SampleReason:       model.SampleReasonInsufficientSample,
-				Confidence:         model.ConfidenceLow,
-			},
+			name:           "overnight thin sample",
+			inbound:        testLeg(testConnOrigin, testTravelOrigin, testDateTue, "1800", "2200"),
+			outbound:       testLeg(testTravelOrigin, testAirportLAX, testDateWed, testTime0700, "1000"),
+			outlook:        testOutlook(4, model.SampleReasonInsufficientSample, model.ConfidenceLow, model.ConnectionGuidance{}),
 			countries:      countries,
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceLow,
@@ -440,7 +407,7 @@ func TestAssessConnection(t *testing.T) {
 			wantStatus:     model.ConnectionUnknown,
 			wantConfidence: model.ConfidenceHigh,
 			wantReason:     model.ConnectionReasonInvalidSchedule,
-			wantFloorOnly:  &airportFloor,
+			wantMCTSource:  model.MCTSourceAirport,
 			wantType:       model.ConnectionDomesticToDomestic,
 			wantRecommend:  &dd,
 			wantLoose:      &looseDD,
@@ -466,7 +433,7 @@ func TestAssessConnection(t *testing.T) {
 				t.Errorf("overnight = %v, want %v", got.Overnight, tt.wantOvernight)
 			}
 
-			assertBoolPtr(t, "floor_only", got.FloorOnly, tt.wantFloorOnly)
+			assertStringPtr(t, "mct_source", got.MCTSource, tt.wantMCTSource)
 			assertStringPtr(t, "connection_type", got.ConnectionType, tt.wantType)
 			assertIntPtr(t, "layover_minutes", got.LayoverMinutes, tt.wantLayover)
 			assertIntPtr(t, "recommended_minutes", got.RecommendedMinutes, tt.wantRecommend)
@@ -490,7 +457,19 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 			DepTimeWindowMinutes: &window,
 		},
 	}
-	outlook := &model.RouteOutlook{Origin: testTravelOrigin, Dest: testAirportLAX}
+	outlook := &model.RouteOutlook{
+		Filters: model.Filters{
+			Origin:               testTravelOrigin,
+			Dest:                 testAirportLAX,
+			Carrier:              "UA",
+			DayOfWeek:            2,
+			DepTime:              testTime1100,
+			DepTimeWindowMinutes: window,
+		},
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{Start: "2024-03-01", End: "2025-03-01", SampleSize: 12, Confidence: model.ConfidenceHigh},
+		},
+	}
 
 	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{nil, outlook}, []string{"route outlook not found", ""}, map[string]string{
 		testAirportBOS:   "US",
@@ -502,19 +481,19 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		t.Fatalf("legs=%d connections=%d", len(got.Legs), len(got.Connections))
 	}
 
-	if got.Legs[0].Index != 0 || got.Legs[0].DayOfWeek != 2 || got.Legs[0].Outlook != nil {
+	if got.Legs[0].Index != 0 || got.Legs[0].Date != testDateTue || got.Legs[0].Outlook != nil {
 		t.Fatalf("first leg = %+v", got.Legs[0])
+	}
+
+	if got.Summary.Origin != "bos" || got.Summary.Destination != testAirportLAX || got.Summary.Confidence != model.ConfidenceUnknown || !got.Summary.ConnectionRisk {
+		t.Fatalf("summary = %+v", got.Summary)
 	}
 
 	if got.Legs[0].Error == nil || *got.Legs[0].Error != "route outlook not found" {
 		t.Fatalf("error = %v", got.Legs[0].Error)
 	}
 
-	if got.Legs[0].DepTime != testTime0700 || got.Legs[0].ArrTime != testTime0905 || got.Legs[0].DepTimeWindowMinutes != DefaultDepTimeWindowMinutes {
-		t.Fatalf("echo = %+v", got.Legs[0])
-	}
-
-	if got.Legs[1].Error != nil || got.Legs[1].Outlook != outlook || got.Legs[1].DepTimeWindowMinutes != 45 {
+	if got.Legs[1].Error != nil || got.Legs[1].Outlook == nil || got.Legs[1].Outlook.Analysis.SampleSize != 12 || got.Legs[1].Outlook.Filters.DepTimeWindowMinutes != 45 {
 		t.Fatalf("second leg = %+v", got.Legs[1])
 	}
 
@@ -524,6 +503,54 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 
 	if got.Connections[0].Reason != model.ConnectionReasonMissingOutlook || got.Connections[0].Confidence != model.ConfidenceUnknown {
 		t.Fatalf("connection reason = %q confidence %q", got.Connections[0].Reason, got.Connections[0].Confidence)
+	}
+}
+
+func TestItinerarySummaryConnectionRisk(t *testing.T) {
+	outlook := &model.RouteOutlook{
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			},
+			Connection: testRecommended(),
+		},
+	}
+	legs := []model.ItineraryLeg{
+		testLeg(testAirportBOS, testTravelOrigin, testDateTue, testTime0700, testTime0900),
+		testLeg(testTravelOrigin, testAirportLAX, testDateTue, "0930", "1200"),
+		testLeg(testAirportLAX, testLHR, testDateTue, "1400", "1600"),
+	}
+
+	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{outlook, outlook, outlook}, nil, map[string]string{
+		testAirportBOS:   "US",
+		testTravelOrigin: "US",
+		testAirportLAX:   "US",
+		testLHR:          "GB",
+	})
+
+	if got.Summary.Origin != testAirportBOS || got.Summary.Destination != testLHR || got.Summary.Confidence != model.ConfidenceHigh || !got.Summary.ConnectionRisk {
+		t.Fatalf("summary = %+v connections = %+v", got.Summary, got.Connections)
+	}
+}
+
+func TestItinerarySummaryConnectionRiskWithoutConnections(t *testing.T) {
+	got := BuildItineraryOutlook([]model.ItineraryLeg{
+		testLeg(testAirportBOS, testTravelOrigin, testDateTue, testTime0700, testTime0905),
+	}, nil, nil, nil)
+
+	if got.Summary.Origin != testAirportBOS || got.Summary.Destination != testTravelOrigin || got.Summary.ConnectionRisk {
+		t.Fatalf("summary = %+v", got.Summary)
+	}
+
+	raw, err := json.Marshal(got.Summary)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	if !strings.Contains(string(raw), `"connection_risk":false`) {
+		t.Fatalf("summary json = %s", raw)
 	}
 }
 
@@ -539,7 +566,30 @@ func testLeg(origin, dest, date, dep, arr string) model.ItineraryLeg {
 }
 
 func testRecommended() model.ConnectionGuidance {
-	return model.ConnectionGuidanceFromRecommended(45, 60, 120, 180)
+	guidance := model.ConnectionGuidanceFromRecommended(45, 60, 120, 180)
+	for _, bucket := range []*model.ConnectionMinutes{
+		guidance.DomesticToDomestic,
+		guidance.DomesticToInternational,
+		guidance.InternationalToDomestic,
+		guidance.InternationalToInternational,
+	} {
+		bucket.MCTSource = model.MCTSourceAirport
+	}
+
+	return guidance
+}
+
+func testOutlook(size int, reason, confidence string, connection model.ConnectionGuidance) *model.RouteOutlook {
+	return &model.RouteOutlook{
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				SampleSize:   size,
+				SampleReason: reason,
+				Confidence:   confidence,
+			},
+			Connection: connection,
+		},
+	}
 }
 
 func assertStringPtr(t *testing.T, name string, got *string, want string) {
@@ -556,29 +606,6 @@ func assertStringPtr(t *testing.T, name string, got *string, want string) {
 	if got == nil || *got != want {
 		t.Errorf("%s = %v, want %q", name, got, want)
 	}
-}
-
-func assertBoolPtr(t *testing.T, name string, got, want *bool) {
-	t.Helper()
-
-	switch {
-	case want == nil && got == nil:
-		return
-	case want == nil || got == nil || *want != *got:
-		t.Errorf("%s = %v, want %v", name, formatBoolPtr(got), formatBoolPtr(want))
-	}
-}
-
-func formatBoolPtr(v *bool) string {
-	if v == nil {
-		return "null"
-	}
-
-	if *v {
-		return "true"
-	}
-
-	return "false"
 }
 
 func assertIntPtr(t *testing.T, name string, got, want *int) {
