@@ -316,7 +316,7 @@ These minutes are planning estimates from public sources. They are not official 
 
 ### Job leases and shutdown
 
-Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` (ingest jobs before rebuild jobs, then the oldest `created_at` within that group) and write `lease_expires_at` (claim sets the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
+Multiple app replicas share one Postgres. Workers claim with `FOR UPDATE SKIP LOCKED` (ingest jobs before rebuild jobs, then the oldest `created_at` within that group). A pending rebuild is left unclaimed while another job of that same type is running. Claim writes `lease_expires_at` (the first lease; a ticker refreshes it while `Process` runs). Heartbeats are independent of download/parse/COPY, which can block for minutes.
 
 - **Crash / SIGKILL / OOM / missed heartbeat:** when `lease_expires_at` is in the past, any replica requeues the row to `pending` and clears `started_at`. Reclaim runs at startup (expired leases only — never all `running` rows) and periodically while the process is up. `JOB_LEASE_TTL` defaults to 90s, long enough to miss a few heartbeats, not as long as a 10-minute BTS download.
 - **SIGINT / SIGTERM:** workers stop claiming immediately (they do not keep polling during HTTP drain), cancel in-flight `Process`, and persist `failed` with `interrupted by shutdown` using a context that is not cancelled. Idle workers exit. After shutdown-fail, re-POST the ingest (`force` if data already exists).

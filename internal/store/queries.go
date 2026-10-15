@@ -22,15 +22,25 @@ const (
 		LIMIT $1`
 
 	// Ingest jobs are rank 0. /*rebuild_types*/ is the rank-1 list (rollup rebuilds).
-	// Oldest created_at wins within a rank. ORDER BY type would not, because
-	// it would sort ingest types ahead of each other instead of by age.
+	// Oldest created_at wins within a rank. A pending rebuild is not claimable
+	// while another row of that same type is running ($2). FOR UPDATE OF
+	// candidate SKIP LOCKED locks only the chosen pending row.
 	QueryClaimNextPendingJobSelect = `
 		SELECT id, type, status, result, error, created_at, updated_at, started_at, ended_at
-		FROM jobs
-		WHERE status = $1
-		ORDER BY CASE WHEN type IN (/*rebuild_types*/) THEN 1 ELSE 0 END ASC, created_at ASC
+		FROM jobs AS candidate
+		WHERE candidate.status = $1
+			AND NOT (
+				candidate.type IN (/*rebuild_types*/)
+				AND EXISTS (
+					SELECT 1
+					FROM jobs AS running
+					WHERE running.type = candidate.type
+						AND running.status = $2
+				)
+			)
+		ORDER BY CASE WHEN candidate.type IN (/*rebuild_types*/) THEN 1 ELSE 0 END ASC, candidate.created_at ASC
 		LIMIT 1
-		FOR UPDATE SKIP LOCKED`
+		FOR UPDATE OF candidate SKIP LOCKED`
 
 	QueryClaimNextPendingJobUpdate = `
 		UPDATE jobs

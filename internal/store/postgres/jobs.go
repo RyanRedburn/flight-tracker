@@ -98,7 +98,10 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	row := tx.QueryRowContext(ctx, store.ClaimNextPendingJobQuery(), string(model.JobStatusPending))
+	row := tx.QueryRowContext(ctx, store.ClaimNextPendingJobQuery(),
+		string(model.JobStatusPending),
+		string(model.JobStatusRunning),
+	)
 
 	job, err := scanJob(row)
 	if errors.Is(err, sql.ErrNoRows) {

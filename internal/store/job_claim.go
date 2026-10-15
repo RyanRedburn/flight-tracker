@@ -34,12 +34,13 @@ func jobClaimLess(a, b model.Job) bool {
 }
 
 // ClaimNextPendingJobQuery is QueryClaimNextPendingJobSelect with the rebuild
-// type list filled in. Workers still take one row with FOR UPDATE SKIP LOCKED.
+// type list filled in. $1 is pending and $2 is running. A pending rebuild whose
+// type already has a running row is left for a later claim.
 func ClaimNextPendingJobQuery() string {
 	quoted := make([]string, len(rebuildClaimJobTypes))
 	for i, jobType := range rebuildClaimJobTypes {
 		quoted[i] = "'" + string(jobType) + "'"
 	}
 
-	return strings.Replace(QueryClaimNextPendingJobSelect, rebuildTypesPlaceholder, strings.Join(quoted, ", "), 1)
+	return strings.ReplaceAll(QueryClaimNextPendingJobSelect, rebuildTypesPlaceholder, strings.Join(quoted, ", "))
 }
