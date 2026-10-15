@@ -78,8 +78,8 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 	}
 }
 
-func TestBuildRouteStatsCarrierOnTimeQueryFilters(t *testing.T) {
-	query, args := buildRouteStatsQuery(store.QueryRouteStatsCarrierOnTime, store.RouteStatsFilter{
+func TestBuildRouteStatsQueryCarrierOnTime(t *testing.T) {
+	unfiltered, args := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
 		Origin:     testAirportORD,
 		Dest:       testAirportLAX,
 		StartDate:  testStartDate,
@@ -87,20 +87,48 @@ func TestBuildRouteStatsCarrierOnTimeQueryFilters(t *testing.T) {
 		DaysOfWeek: []int{1, 2},
 	})
 
-	if strings.Contains(query, "iata_code_marketing_airline =") {
-		t.Fatal("unfiltered companion query should not constrain a single carrier")
+	if strings.Contains(unfiltered, "iata_code_marketing_airline =") {
+		t.Fatal("unfiltered query should not constrain a single carrier")
 	}
 
-	if !strings.Contains(query, "day_of_week = ANY") {
-		t.Fatal("expected days_of_week filter in companion query")
+	if !strings.Contains(unfiltered, "json_build_object('carrier'") {
+		t.Fatal("expected per-carrier on-time aggregate in the route stats query")
 	}
 
-	if strings.Contains(query, routeStatsExtraPlaceholder) {
-		t.Fatal("placeholder should be replaced")
+	if !strings.Contains(unfiltered, "day_of_week = ANY") {
+		t.Fatal("expected days_of_week filter")
+	}
+
+	if strings.Contains(unfiltered, routeStatsExtraPlaceholder) || strings.Contains(unfiltered, routeStatsCarrierOnTimePlaceholder) {
+		t.Fatal("placeholders should be replaced")
 	}
 
 	if len(args) != 5 {
 		t.Fatalf("len(args) = %d, want 5", len(args))
+	}
+
+	filtered, filteredArgs := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
+		Origin:    testAirportORD,
+		Dest:      testAirportLAX,
+		StartDate: testStartDate,
+		EndDate:   testEndDate,
+		Carrier:   "UA",
+	})
+
+	if !strings.Contains(filtered, "NULL::json") {
+		t.Fatal("carrier filter should skip the per-carrier aggregate")
+	}
+
+	if strings.Contains(filtered, "json_build_object('carrier'") {
+		t.Fatal("carrier filter should not build per-carrier json")
+	}
+
+	if strings.Contains(filtered, routeStatsCarrierOnTimePlaceholder) {
+		t.Fatal("placeholder should be replaced")
+	}
+
+	if len(filteredArgs) != 5 || filteredArgs[4] != "UA" {
+		t.Fatalf("args = %#v", filteredArgs)
 	}
 }
 
@@ -179,6 +207,34 @@ func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
 
 	if !strings.Contains(noStateAirports, "WHERE TRUE") {
 		t.Fatal("expected unfiltered airport ranking")
+	}
+}
+
+func TestUnmarshalCarrierOnTime(t *testing.T) {
+	got, err := unmarshalCarrierOnTime(nil)
+	if err != nil {
+		t.Fatalf("unmarshalCarrierOnTime() error = %v", err)
+	}
+
+	if got == nil || len(got) != 0 {
+		t.Fatalf("nil json = %#v, want empty slice", got)
+	}
+
+	got, err = unmarshalCarrierOnTime([]byte(`[{"carrier":"AA","on_time":1,"flights":4},{"carrier":"UA","on_time":5,"flights":6}]`))
+	if err != nil {
+		t.Fatalf("unmarshalCarrierOnTime() error = %v", err)
+	}
+
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+
+	if got[0].Carrier != "UA" || got[0].Flights != 6 || got[0].OnTimeRate != store.CarrierOnTimeFromCounts("UA", 5, 6).OnTimeRate {
+		t.Errorf("first = %+v", got[0])
+	}
+
+	if got[1].Carrier != "AA" || got[1].Flights != 4 {
+		t.Errorf("second = %+v", got[1])
 	}
 }
 

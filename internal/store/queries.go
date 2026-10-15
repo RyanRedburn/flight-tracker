@@ -239,7 +239,8 @@ const (
 				div2_airport,
 				div3_airport,
 				div4_airport,
-				div5_airport
+				div5_airport,
+				iata_code_marketing_airline
 			FROM flight_performance
 			WHERE origin = $1
 				AND dest = $2
@@ -266,29 +267,13 @@ const (
 			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
 			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted,
 			AVG(arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS avg_arr,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
-				FROM classified
-				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
-			) AS median_arr,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS median_arr,
 			AVG(arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS avg_arr_delayed,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
-				FROM classified
-				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
-			) AS median_arr_delayed,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS median_arr_delayed,
 			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
-				FROM classified
-				WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL
-			) AS median_dep,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS median_dep,
 			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
-				FROM classified
-				WHERE is_delayed AND dep_delay_minutes IS NOT NULL
-			) AS median_dep_delayed,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS median_dep_delayed,
 			AVG(COALESCE(carrier_delay, 0)) FILTER (WHERE is_delayed) AS cause_carrier,
 			AVG(COALESCE(weather_delay, 0)) FILTER (WHERE is_delayed) AS cause_weather,
 			AVG(COALESCE(nas_delay, 0)) FILTER (WHERE is_delayed) AS cause_nas,
@@ -312,35 +297,26 @@ const (
 					WHERE is_diverted AND airport IS NOT NULL AND btrim(airport) <> ''
 					GROUP BY btrim(airport)
 				) d
-			) AS diversion_airports
+			) AS diversion_airports,
+			/*carrier_on_time*/
 		FROM with_cause`
 
-	QueryRouteStatsCarrierOnTime = `
-		WITH matched AS (
-			SELECT
-				iata_code_marketing_airline,
-				cancelled,
-				diverted,
-				arr_del15
-			FROM flight_performance
-			WHERE origin = $1
-				AND dest = $2
-				AND flight_date >= $3
-				AND flight_date <= $4
-				/*extra*/
-		),
-		classified AS (
-			SELECT
-				iata_code_marketing_airline,
-				` + sqlFlightOutcomeFlags + `
-			FROM matched
-		)
-		SELECT
-			COALESCE(iata_code_marketing_airline, '') AS carrier,
-			COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
-			COUNT(*)::int AS flights
-		FROM classified
-		GROUP BY 1`
+	// Per-carrier on-time counts spliced into QueryRouteStats when the caller
+	// did not filter to one carrier. A carrier filter substitutes NULL::json.
+	RouteStatsCarrierOnTimeJSON = `(
+				SELECT COALESCE(
+					json_agg(json_build_object('carrier', carrier, 'on_time', on_time, 'flights', flights)),
+					'[]'::json
+				)
+				FROM (
+					SELECT
+						COALESCE(iata_code_marketing_airline, '') AS carrier,
+						COUNT(*) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND NOT is_delayed)::int AS on_time,
+						COUNT(*)::int AS flights
+					FROM classified
+					GROUP BY 1
+				) carriers
+			)`
 
 	QueryCarrierStatsMaxDate = `
 		SELECT MAX(flight_date)::text
@@ -544,34 +520,14 @@ const (
 			COUNT(*) FILTER (WHERE is_cancelled)::int AS cancelled,
 			COUNT(*) FILTER (WHERE is_diverted)::int AS diverted,
 			AVG(arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS avg_arr,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
-				FROM classified
-				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
-			) AS median_arr,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS median_arr,
 			AVG(arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS avg_arr_delayed,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes)
-				FROM classified
-				WHERE is_delayed AND arr_delay_minutes IS NOT NULL
-			) AS median_arr_delayed,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY arr_delay_minutes) FILTER (WHERE is_delayed AND arr_delay_minutes IS NOT NULL) AS median_arr_delayed,
 			AVG(dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS avg_dep,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
-				FROM classified
-				WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL
-			) AS median_dep,
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND dep_delay_minutes IS NOT NULL) AS median_dep,
 			AVG(dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS avg_dep_delayed,
-			(
-				SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes)
-				FROM classified
-				WHERE is_delayed AND dep_delay_minutes IS NOT NULL
-			) AS median_dep_delayed,
-			(
-				SELECT percentile_cont(0.9) WITHIN GROUP (ORDER BY arr_delay_minutes)
-				FROM classified
-				WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL
-			) AS p90_arr
+			percentile_cont(0.5) WITHIN GROUP (ORDER BY dep_delay_minutes) FILTER (WHERE is_delayed AND dep_delay_minutes IS NOT NULL) AS median_dep_delayed,
+			percentile_cont(0.9) WITHIN GROUP (ORDER BY arr_delay_minutes) FILTER (WHERE NOT is_cancelled AND NOT is_diverted AND arr_delay_minutes IS NOT NULL) AS p90_arr
 		FROM classified`
 
 	QueryRouteTravelWindowScope = `

@@ -34,8 +34,9 @@ func TestHHMMToMinutes(t *testing.T) {
 }
 
 func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
-	// Same classification as QueryRouteStats / QueryRouteStatsCarrierOnTime:
-	// cancelled, else diverted, else delayed when arr_del15 >= 1, else on-time.
+	// Same classification as QueryRouteStats, including the per-carrier counts
+	// folded into that query: cancelled, else diverted, else delayed when
+	// arr_del15 >= 1, else on-time.
 	type flight struct {
 		carrier                       string
 		cancelled, diverted, arrDel15 float64
@@ -128,6 +129,104 @@ func TestSortCarrierOnTime(t *testing.T) {
 			t.Errorf("items[%d].Carrier = %q, want %q", i, items[i].Carrier, carrier)
 		}
 	}
+}
+
+func TestDelayPercentilesMatchFilteredSubset(t *testing.T) {
+	// percentile_cont(p) FILTER (WHERE pred) matches the same ordered-set
+	// aggregate over that subset. Route stats and route outlook use it for
+	// arrival and departure medians; outlook also uses it for arrival p90.
+	// Cancelled, diverted, and null delays stay out of those populations.
+	type flight struct {
+		cancelled bool
+		diverted  bool
+		delayed   bool
+		arr       *float64
+		dep       *float64
+	}
+
+	f := func(v float64) *float64 { return &v }
+
+	rows := []flight{
+		{arr: f(-10), dep: f(-5)},
+		{arr: f(0), dep: f(0)},
+		{arr: f(5), dep: f(4)},
+		{delayed: true, arr: f(20), dep: f(15)},
+		{delayed: true, arr: f(40), dep: f(30)},
+		{delayed: true, arr: f(60)},
+		{cancelled: true, arr: f(999), dep: f(999)},
+		{diverted: true, arr: f(50), dep: f(50)},
+		{dep: f(8)},
+	}
+
+	arrived := func(row flight) bool { return !row.cancelled && !row.diverted }
+	isDelayed := func(row flight) bool { return row.delayed }
+	arrOf := func(row flight) *float64 { return row.arr }
+	depOf := func(row flight) *float64 { return row.dep }
+
+	values := func(include func(flight) bool, field func(flight) *float64) []float64 {
+		out := make([]float64, 0)
+
+		for _, row := range rows {
+			if !include(row) {
+				continue
+			}
+
+			v := field(row)
+			if v == nil {
+				continue
+			}
+
+			out = append(out, *v)
+		}
+
+		return out
+	}
+
+	tests := []struct {
+		name   string
+		p      float64
+		values []float64
+		want   float64
+	}{
+		{name: "median arrival", p: 0.5, values: values(arrived, arrOf), want: 12.5},
+		{name: "median arrival when delayed", p: 0.5, values: values(isDelayed, arrOf), want: 40},
+		{name: "median departure", p: 0.5, values: values(arrived, depOf), want: 6},
+		{name: "median departure when delayed", p: 0.5, values: values(isDelayed, depOf), want: 22.5},
+		{name: "p90 arrival", p: 0.9, values: values(arrived, arrOf), want: 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := percentileCont(tt.p, tt.values); got != tt.want {
+				t.Fatalf("percentile_cont(%v) = %v, want %v (values %v)", tt.p, got, tt.want, tt.values)
+			}
+		})
+	}
+
+	arrivedArr := values(arrived, arrOf)
+	if len(arrivedArr) != 6 {
+		t.Fatalf("arrived arrival delays = %d, want 6", len(arrivedArr))
+	}
+
+	for _, row := range rows {
+		if (!row.cancelled && !row.diverted) || row.arr == nil {
+			continue
+		}
+
+		if containsFloat(arrivedArr, *row.arr) {
+			t.Fatalf("excluded delay %v entered the arrival median", *row.arr)
+		}
+	}
+}
+
+func containsFloat(values []float64, want float64) bool {
+	for _, v := range values {
+		if v == want {
+			return true
+		}
+	}
+
+	return false
 }
 
 // classifyRouteStatsOnTime reports 1 when the flight is on time: not cancelled,
