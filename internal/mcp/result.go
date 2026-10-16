@@ -52,7 +52,12 @@ func failureResult[T any](failure *Failure) (*mcpsdk.CallToolResult, Result[T], 
 		summary = failure.Message
 	}
 
-	return &mcpsdk.CallToolResult{IsError: true}, Result[T]{
+	var content []mcpsdk.Content
+	if summary != "" {
+		content = []mcpsdk.Content{&mcpsdk.TextContent{Text: summary}}
+	}
+
+	return &mcpsdk.CallToolResult{IsError: true, Content: content}, Result[T]{
 		Summary: summary,
 		Error:   failure,
 	}, nil

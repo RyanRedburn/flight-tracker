@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -31,11 +33,25 @@ type findAirportData struct {
 	Airports []model.Airport `json:"airports"`
 }
 
+func findAirportInputSchema() *jsonschema.Schema {
+	schema, err := jsonschema.ForType(reflect.TypeFor[findAirportInput](), &jsonschema.ForOptions{})
+	if err != nil {
+		panic("find_airport input schema: " + err.Error())
+	}
+
+	schema.Properties["query"].MaxLength = jsonschema.Ptr(store.AirportSearchMaxQueryLen)
+	schema.Properties["limit"].Minimum = jsonschema.Ptr(1.0)
+	schema.Properties["limit"].Maximum = jsonschema.Ptr(float64(store.AirportSearchMaxLimit))
+
+	return schema
+}
+
 func addFindAirport(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
 	closedWorld := false
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        toolFindAirport,
 		Description: "Look up airports by IATA code, city, or name. Returns ranked matches. Use this when the user names a city or airport instead of a code.",
+		InputSchema: findAirportInputSchema(),
 		Annotations: &mcpsdk.ToolAnnotations{
 			Title:         "Find airport",
 			ReadOnlyHint:  true,

@@ -20,13 +20,15 @@ func NewHandler(s store.Store, logger *slog.Logger) http.Handler {
 
 	server := newServer(s, logger)
 
-	return mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
+	handler := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return server
 	}, &mcpsdk.StreamableHTTPOptions{
 		Stateless:    true,
 		JSONResponse: true,
 		Logger:       logger,
 	})
+
+	return http.NewCrossOriginProtection().Handler(handler)
 }
 
 func newServer(s store.Store, logger *slog.Logger) *mcpsdk.Server {

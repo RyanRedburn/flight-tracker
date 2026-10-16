@@ -17,6 +17,9 @@ import (
 )
 
 const (
+	findAirportArgLimit = "limit"
+	findAirportArgQuery = "query"
+
 	testCodeORD     = "ORD"
 	testCodeMDW     = "MDW"
 	testCityChicago = "Chicago"
@@ -149,8 +152,13 @@ func TestFindAirport(t *testing.T) {
 			query:      testCodeORD,
 			limit:      store.AirportSearchMaxLimit + 1,
 			wantError:  true,
-			wantCode:   CodeInvalidInput,
-			wantSubstr: []string{"Limit must be from 1 to 25"},
+			wantSubstr: []string{"validating \"arguments\""},
+		},
+		{
+			name:       "query too long",
+			query:      strings.Repeat("a", store.AirportSearchMaxQueryLen+1),
+			wantError:  true,
+			wantSubstr: []string{"validating \"arguments\""},
 		},
 		{
 			name:      "store failure",
@@ -190,7 +198,12 @@ func TestFindAirport(t *testing.T) {
 				},
 			}
 
-			res := callFindAirport(t, stub, map[string]any{"query": tt.query, "limit": tt.limit})
+			args := map[string]any{findAirportArgQuery: tt.query}
+			if tt.limit != 0 {
+				args[findAirportArgLimit] = tt.limit
+			}
+
+			res := callFindAirport(t, stub, args)
 			if res.IsError != tt.wantError {
 				t.Fatalf("IsError = %v, want %v; content=%s", res.IsError, tt.wantError, toolText(t, res))
 			}
@@ -217,8 +230,10 @@ func TestFindAirport(t *testing.T) {
 			}
 
 			if tt.wantError {
-				if out.Error == nil || out.Error.Code != tt.wantCode {
-					t.Fatalf("error = %#v, want code %s", out.Error, tt.wantCode)
+				if tt.wantCode != "" {
+					if out.Error == nil || out.Error.Code != tt.wantCode {
+						t.Fatalf("error = %#v, want code %s", out.Error, tt.wantCode)
+					}
 				}
 
 				if tt.name == "close codes" && len(out.Error.Matches) != 2 {
@@ -243,6 +258,46 @@ func TestFindAirport(t *testing.T) {
 	}
 }
 
+func TestFindAirportInputSchema(t *testing.T) {
+	schema := findAirportInputSchema()
+
+	query := schema.Properties["query"]
+	if query == nil || query.MaxLength == nil || *query.MaxLength != store.AirportSearchMaxQueryLen {
+		t.Fatalf("query schema = %#v", query)
+	}
+
+	limit := schema.Properties[findAirportArgLimit]
+	if limit == nil || limit.Minimum == nil || *limit.Minimum != 1 {
+		t.Fatalf("limit minimum = %#v", limit)
+	}
+
+	if limit.Maximum == nil || *limit.Maximum != float64(store.AirportSearchMaxLimit) {
+		t.Fatalf("limit maximum = %#v", limit)
+	}
+
+	resolved, err := schema.Resolve(nil)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	tooLong := strings.Repeat("x", store.AirportSearchMaxQueryLen+1)
+	if err := resolved.Validate(map[string]any{findAirportArgQuery: tooLong}); err == nil {
+		t.Fatal("expected validation error for long query")
+	}
+
+	if err := resolved.Validate(map[string]any{findAirportArgQuery: testCodeORD, findAirportArgLimit: 0}); err == nil {
+		t.Fatal("expected validation error for limit 0")
+	}
+
+	if err := resolved.Validate(map[string]any{findAirportArgQuery: testCodeORD, findAirportArgLimit: store.AirportSearchMaxLimit + 1}); err == nil {
+		t.Fatal("expected validation error for limit above max")
+	}
+
+	if err := resolved.Validate(map[string]any{findAirportArgQuery: testCodeORD}); err != nil {
+		t.Fatalf("valid args: %v", err)
+	}
+}
+
 func TestFindAirportOmittedLimit(t *testing.T) {
 	var gotLimit int
 
@@ -258,7 +313,7 @@ func TestFindAirportOmittedLimit(t *testing.T) {
 		},
 	}
 
-	res := callFindAirport(t, stub, map[string]any{"query": testCodeORD})
+	res := callFindAirport(t, stub, map[string]any{findAirportArgQuery: testCodeORD})
 	if res.IsError {
 		t.Fatalf("IsError, content=%s", toolText(t, res))
 	}

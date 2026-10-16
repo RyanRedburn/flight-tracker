@@ -53,3 +53,27 @@ func TestResultJSON(t *testing.T) {
 		t.Fatalf("sample = %#v %#v", got["sample_size"], got["sample_reason"])
 	}
 }
+
+func TestFailureResultTextContent(t *testing.T) {
+	const msg = "Query is required. Pass a city, airport name, or IATA code."
+
+	res, out, err := failureResult[struct{}](&Failure{
+		Code:    CodeInvalidInput,
+		Message: msg,
+	})
+	if err != nil {
+		t.Fatalf("failureResult: %v", err)
+	}
+
+	if !res.IsError {
+		t.Fatal("expected IsError")
+	}
+
+	if out.Error == nil || out.Error.Message != msg {
+		t.Fatalf("error = %#v", out.Error)
+	}
+
+	if text := toolText(t, res); text != msg {
+		t.Fatalf("text = %q, want %q", text, msg)
+	}
+}
