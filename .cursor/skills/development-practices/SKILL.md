@@ -8,6 +8,7 @@ description: Apply flight-tracker Go service conventions for package layering, s
 Read this skill before changing code. Then read the specialist skill that matches the work:
 
 - HTTP handlers, routes, query parsing, or Swagger → [http-api](../http-api/SKILL.md)
+- MCP tools at `/mcp` → [mcp-tools](../mcp-tools/SKILL.md)
 - Ingest adapters, jobs, or workers → [ingest-jobs](../ingest-jobs/SKILL.md)
 - Store interface, SQL, or migrations → [store-and-migrations](../store-and-migrations/SKILL.md)
 

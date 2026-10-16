@@ -46,7 +46,7 @@ Decode with `json.NewDecoder(r.Body).Decode`. Invalid JSON → **400** `invalid 
 | 500 | Store/internal failures with a stable message |
 | 503 | Readiness ping failure |
 
-Protected routes use three shared surfaces: `external` (consumer, subscriber, or admin reads and `/docs/`), `internal` (admin jobs, freshness, rebuild, keys, `/api/db/version`, `/docs/internal/`), and `ingest` (admin ingest POSTs, separate lower RPM). `/health` and `/ready` skip auth and rate limits. Annotate **401**, **403**, and **429** on new protected handlers.
+Protected routes use four shared surfaces: `external` (consumer, subscriber, or admin reads and `/docs/`), `internal` (admin jobs, freshness, rebuild, keys, `/api/db/version`, `/docs/internal/`), `ingest` (admin ingest POSTs, separate lower RPM), and `mcp` (`/mcp`, same roles and RPM as `external` but its own bucket). `/health` and `/ready` skip auth and rate limits. Annotate **401**, **403**, and **429** on new protected handlers.
 
 **500** messages must be generic (`failed to compute route stats`). Conflict bodies use the typed structs in `internal/api/handlers/swagger_models.go` (`active_ingest_months`, `existing_data_months`, `job_type`, `dataset`).
 
@@ -62,6 +62,8 @@ Two generated specs from `cmd/server/main.go` `go:generate`:
 Include both the domain tag (`routes`, `ingest`, `jobs`, …) and `external` or `internal`. New user-facing reads should be `external`; ingest/ops remain `internal`.
 
 Annotate every exported handler. Response types must be exported so swag can see them. Reuse `ErrorResponse` and the conflict structs.
+
+`/mcp` is not a Swagger route. New MCP tools follow [mcp-tools](../mcp-tools/SKILL.md).
 
 Never edit files under `docs/` except via `make swagger`. Pin stays `swag` `v1.16.6`.
 

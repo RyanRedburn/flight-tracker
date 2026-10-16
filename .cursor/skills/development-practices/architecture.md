@@ -5,6 +5,8 @@ HTTP client
     → internal/api (chi + handlers + query)
         → store.Store                    (queue jobs, read stats)
         → ingest helpers (range expand)
+    → internal/mcp (stateless MCP at /mcp)
+        → store.Store                    (read-only tools)
 
 Worker goroutines (internal/operator)
     → ClaimNextPendingJob
@@ -17,7 +19,7 @@ cmd/server wires: config → database.NewStore → ingest services → operator.
 
 ## Request vs job
 
-- **Read endpoints** (`/routes/*`, `/itineraries/*`, `/carriers/*`, `/jobs*`, health) call the store and return immediately.
+- **Read endpoints** (`/routes/*`, `/itineraries/*`, `/carriers/*`, `/jobs*`, health) and `/mcp` tools call the store and return immediately.
 - **Ingest POST** validates, checks active jobs / existing data, inserts `pending` jobs, returns **201**. Workers do the download.
 - Do not download remote files or run multi-minute imports inside HTTP handlers.
 
@@ -25,7 +27,9 @@ cmd/server wires: config → database.NewStore → ingest services → operator.
 
 Workers claim with `FOR UPDATE SKIP LOCKED`. The claim sets `lease_expires_at`; a heartbeat refreshes it about every `JOB_LEASE_TTL`/3 while `Process` runs. An expired lease (crash, OOM, SIGKILL, missed heartbeat) is requeued to `pending`. SIGINT/SIGTERM stops claiming, cancels in-flight work, and persists `failed` with `interrupted by shutdown`. A shutdown failure stays `failed` until the job is queued again.
 
-Advertised rate limits are Postgres token buckets shared by every replica (identity × surface: `external`, `internal`, `ingest`). The configured requests/minute is that shared cap.
+Advertised rate limits are Postgres token buckets shared by every replica (identity × surface: `external`, `internal`, `ingest`). The configured requests/minute is that shared cap. `/mcp` has its own `mcp` bucket.
+
+`/mcp` is stateless (no MCP sessions), so any replica can serve any call.
 
 ## Ingest replace semantics
 
