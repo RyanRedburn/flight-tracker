@@ -4,7 +4,7 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go HTTP API and in-process workers. Workers import BTS on-time performance, IEM airport weather, OurAirports reference data, and airport minimum connection times into Postgres. Reads cover route and carrier stats, typical-year travel windows, weather-category stats, and booking outlook for one route or a short itinerary. Assistants look up airports through a read-only MCP server at `/mcp`.
+Go HTTP API and in-process workers. Workers import BTS on-time performance, IEM airport weather, OurAirports reference data, and airport minimum connection times into Postgres. Reads cover route and carrier stats, typical-year travel windows, weather-category stats, and booking outlook for one route or a short itinerary.
 
 ## Features
 
