@@ -589,4 +589,12 @@ func TestProtectorLimitRPM(t *testing.T) {
 	if got := p.limitRPM(Identity{Valid: true, Role: model.APIKeyRoleAdmin}, store.RateLimitSurfaceIngest); got != 10 {
 		t.Errorf("admin ingest = %d, want 10", got)
 	}
+
+	if got := p.limitRPM(Identity{Valid: true, Role: model.APIKeyRoleConsumer}, store.RateLimitSurfaceMCP); got != 120 {
+		t.Errorf("consumer mcp = %d, want 120", got)
+	}
+
+	if got := p.limitRPM(Identity{Valid: true, Role: model.APIKeyRoleAdmin}, store.RateLimitSurfaceMCP); got != 300 {
+		t.Errorf("admin mcp = %d, want 300", got)
+	}
 }

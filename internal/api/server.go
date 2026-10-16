@@ -10,6 +10,7 @@ import (
 	_ "github.com/RyanRedburn/flight-tracker/docs/full"
 	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
 	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
+	"github.com/RyanRedburn/flight-tracker/internal/mcp"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-chi/chi/v5"
@@ -105,6 +106,11 @@ func newRouter(
 			r.Get("/routes/weather-stats", routes.WeatherStats)
 			r.Get("/carriers/stats", carriers.Stats)
 		})
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(protect.Require(middleware.ExternalRoles, store.RateLimitSurfaceMCP))
+		r.Handle("/mcp", mcp.NewHandler(s, logger))
 	})
 
 	return r

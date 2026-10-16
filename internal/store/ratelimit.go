@@ -9,6 +9,8 @@ const (
 	RateLimitSurfaceExternal = "external"
 	RateLimitSurfaceInternal = "internal"
 	RateLimitSurfaceIngest   = "ingest"
+	// RateLimitSurfaceMCP is the shared bucket for /mcp, separate from REST reads.
+	RateLimitSurfaceMCP = "mcp"
 	// RateLimitSurfaceAuthFail is the shared IP bucket for missing, invalid, or
 	// revoked credentials on protected routes. It is not the anonymous public quota.
 	RateLimitSurfaceAuthFail = "auth_fail"
