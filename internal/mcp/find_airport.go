@@ -131,11 +131,11 @@ func airportSummary(query string, airports []model.Airport) (string, string) {
 
 	if exact == 1 {
 		if len(airports) == 1 {
-			return fmt.Sprintf("%s is %s. Confidence is %s. %s", exactAirport.IATACode, airportPlace(exactAirport), model.ConfidenceHigh, summaryIdentifiesOnly), model.ConfidenceHigh
+			return fmt.Sprintf("%s is %s. %s", exactAirport.IATACode, airportPlace(exactAirport), summaryIdentifiesOnly), model.ConfidenceHigh
 		}
 
-		return fmt.Sprintf("%s is %s. Other airports also match %q; use %s unless you meant one of them. Confidence is %s. %s",
-			exactAirport.IATACode, airportPlace(exactAirport), query, exactAirport.IATACode, model.ConfidenceHigh, summaryIdentifiesOnly), model.ConfidenceHigh
+		return fmt.Sprintf("%s is %s. Other airports also match %q; use %s unless you meant one of them.",
+			exactAirport.IATACode, airportPlace(exactAirport), query, exactAirport.IATACode), model.ConfidenceHigh
 	}
 
 	return ambiguousAirportSummary(query, airports), model.ConfidenceLow
@@ -144,14 +144,14 @@ func airportSummary(query string, airports []model.Airport) (string, string) {
 func ambiguousAirportSummary(query string, airports []model.Airport) string {
 	first := airports[0]
 	if len(airports) == 1 {
-		return fmt.Sprintf("%s (%s) is the only match for %q. Confidence is %s. %s",
-			first.IATACode, airportPlace(first), query, model.ConfidenceLow, summaryConfirmCode)
+		return fmt.Sprintf("%s (%s) is the only match for %q. %s",
+			first.IATACode, airportPlace(first), query, summaryConfirmCode)
 	}
 
 	second := airports[1]
 
-	return fmt.Sprintf("%d airports match %q, including %s (%s) and %s (%s). Confidence is %s. %s",
-		len(airports), query, first.IATACode, first.Name, second.IATACode, second.Name, model.ConfidenceLow, summaryPickCode)
+	return fmt.Sprintf("%d airports match %q, including %s (%s) and %s (%s). %s",
+		len(airports), query, first.IATACode, first.Name, second.IATACode, second.Name, summaryPickCode)
 }
 
 func airportPlace(airport model.Airport) string {

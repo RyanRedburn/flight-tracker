@@ -12,12 +12,6 @@ import (
 )
 
 func (s *Store) SearchAirports(ctx context.Context, query string, limit int) ([]model.Airport, error) {
-	query = normalizeAirportQuery(query)
-	if query == "" {
-		return []model.Airport{}, nil
-	}
-
-	limit = airportSearchLimit(limit)
 	contains, prefix := airportSearchPatterns(query)
 
 	rows, err := s.db.QueryContext(ctx, store.QuerySearchAirports, query, contains, prefix, limit)
@@ -81,21 +75,6 @@ func scanAirports(rows *sql.Rows) ([]model.Airport, error) {
 	}
 
 	return out, nil
-}
-
-func normalizeAirportQuery(q string) string {
-	return strings.Join(strings.Fields(q), " ")
-}
-
-func airportSearchLimit(n int) int {
-	switch {
-	case n <= 0:
-		return store.AirportSearchDefaultLimit
-	case n > store.AirportSearchMaxLimit:
-		return store.AirportSearchMaxLimit
-	default:
-		return n
-	}
 }
 
 func airportSearchPatterns(query string) (contains, prefix string) {

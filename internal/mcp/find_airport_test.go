@@ -76,7 +76,7 @@ func TestFindAirport(t *testing.T) {
 			wantLimit:  store.AirportSearchDefaultLimit,
 			wantQuery:  "ord",
 			wantConf:   model.ConfidenceHigh,
-			wantSubstr: []string{testCodeORD, testCityChicago, "Confidence is high", summaryIdentifiesOnly},
+			wantSubstr: []string{testCodeORD, testCityChicago, summaryIdentifiesOnly},
 		},
 		{
 			name:  "city matches",
@@ -96,7 +96,7 @@ func TestFindAirport(t *testing.T) {
 			wantLimit:  5,
 			wantQuery:  testCityChicago,
 			wantConf:   model.ConfidenceLow,
-			wantSubstr: []string{testCodeORD, testCodeMDW, "Confidence is low", summaryPickCode},
+			wantSubstr: []string{testCodeORD, testCodeMDW, summaryPickCode},
 		},
 		{
 			name:       "single name match",
@@ -106,7 +106,7 @@ func TestFindAirport(t *testing.T) {
 			wantLimit:  store.AirportSearchDefaultLimit,
 			wantQuery:  "Midway",
 			wantConf:   model.ConfidenceLow,
-			wantSubstr: []string{testCodeMDW, "Confidence is low", summaryConfirmCode},
+			wantSubstr: []string{testCodeMDW, summaryConfirmCode},
 		},
 		{
 			name:       "no match",
