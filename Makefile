@@ -17,7 +17,7 @@ test:
 	go test ./...
 
 docker-build:
-	docker compose build
+	docker compose build app migrate
 
 # postgres + app only. The migrate sidecar is behind the "migrate" profile so
 # default `up` does not race the app's on-open migrations.
