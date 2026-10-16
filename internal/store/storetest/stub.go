@@ -41,6 +41,7 @@ type Stub struct {
 	ListAirportWeatherStationsFn          func(ctx context.Context) ([]store.AirportWeatherStation, error)
 	ListAirportIdentifiersByIATAFn        func(ctx context.Context, codes []string) (map[string]store.AirportIdentifiers, error)
 	ListAirportCountriesByIATAFn          func(ctx context.Context, codes []string) (map[string]string, error)
+	SearchAirportsFn                      func(ctx context.Context, query string, limit int) ([]model.Airport, error)
 	MonthsWithFlightPerformanceDataFn     func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	MonthsWithWeatherDataFn               func(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error)
 	DistinctFlightAirportCodesFn          func(ctx context.Context) ([]string, error)
@@ -313,6 +314,14 @@ func (s *Stub) ListAirportCountriesByIATA(ctx context.Context, codes []string) (
 	}
 
 	return s.ListAirportCountriesByIATAFn(ctx, codes)
+}
+
+func (s *Stub) SearchAirports(ctx context.Context, query string, limit int) ([]model.Airport, error) {
+	if s.SearchAirportsFn == nil {
+		panic("unexpected call: SearchAirports")
+	}
+
+	return s.SearchAirportsFn(ctx, query, limit)
 }
 
 func (s *Stub) DistinctFlightAirportCodes(ctx context.Context) ([]string, error) {

@@ -4,7 +4,7 @@
 ![Test](https://github.com/RyanRedburn/flight-tracker/actions/workflows/test.yml/badge.svg?branch=main)
 ![Swagger](https://github.com/RyanRedburn/flight-tracker/actions/workflows/swagger.yml/badge.svg?branch=main)
 
-Go HTTP API and in-process workers. Workers import BTS on-time performance, IEM airport weather, OurAirports reference data, and airport minimum connection times into Postgres. Reads cover route and carrier stats, typical-year travel windows, weather-category stats, and booking outlook for one route or a short itinerary.
+Go HTTP API and in-process workers. Workers import BTS on-time performance, IEM airport weather, OurAirports reference data, and airport minimum connection times into Postgres. Reads cover route and carrier stats, typical-year travel windows, weather-category stats, and booking outlook for one route or a short itinerary. Assistants look up airports through a read-only MCP server at `/mcp`.
 
 ## Features
 
@@ -126,7 +126,7 @@ API replicas share one Postgres. Auth and advertised rate limits are **not** per
 
 | Role | Access |
 | --- | --- |
-| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`) and `/docs/` |
+| `consumer` | External API (`/api/v1/routes/*`, `/api/v1/itineraries/*`, `/api/v1/carriers/*`), `/mcp`, and `/docs/` |
 | `subscriber` | Same allow-list as `consumer` in v1 (role is stored distinctly for later use) |
 | `admin` | Everything: `/api/internal/*` (ingest, jobs, data freshness, rebuilds, keys), `/api/db/version`, `/docs/internal/`, and consumer surfaces |
 
@@ -145,7 +145,7 @@ python3 -c "import secrets; print('ftk_' + secrets.token_hex(4) + '_' + secrets.
 
 | Bucket | When |
 | --- | --- |
-| `key|<id>|<surface>` | Valid API key (`external`, `internal`, or `ingest`) |
+| `key|<id>|<surface>` | Valid API key (`external`, `internal`, `ingest`, or `mcp`) |
 | `ip|<client ip>|auth_fail` | Missing, invalid, or revoked credentials on a **protected** route (`RATE_LIMIT_AUTH_FAIL_RPM`) |
 | `ip|<client ip>|<surface>` | True anonymous public routes (none in v1 besides unlimited probes). Not used for failed credentials. |
 
@@ -265,6 +265,13 @@ curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/inter
 
 # Carrier performance stats
 curl "http://localhost:8080/api/v1/carriers/stats?carrier=UA&state=IL"
+
+# Look up an airport by city, name, or IATA code (stateless MCP; no session)
+curl -X POST http://localhost:8080/mcp \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"find_airport","arguments":{"query":"Chicago"}}}'
 
 # Create an API key (admin; name is required; the plaintext secret is returned once)
 curl -X POST http://localhost:8080/api/internal/keys \

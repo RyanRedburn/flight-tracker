@@ -160,6 +160,84 @@ const (
 		FROM airports
 		WHERE iata_code = ANY($1)`
 
+	// QuerySearchAirports ranks IATA, city, then name. $1 is the raw query,
+	// $2 is the contains LIKE pattern, $3 is the prefix LIKE pattern, $4 is the limit.
+	// match is exact_iata, city, or name (model.AirportMatch*).
+	QuerySearchAirports = `
+		SELECT
+			btrim(iata_code),
+			name,
+			municipality,
+			iso_country,
+			iso_region,
+			type,
+			scheduled_service,
+			CASE
+				WHEN upper(btrim(iata_code)) = upper($1) THEN 'exact_iata'
+				WHEN COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\'
+					OR COALESCE(municipality, '') ILIKE $3 ESCAPE E'\\' THEN 'city'
+				ELSE 'name'
+			END AS match
+		FROM airports
+		WHERE btrim(COALESCE(iata_code, '')) <> ''
+			AND (
+				upper(btrim(iata_code)) = upper($1)
+				OR COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\'
+				OR name ILIKE $2 ESCAPE E'\\'
+				OR COALESCE(keywords, '') ILIKE $2 ESCAPE E'\\'
+			)
+		ORDER BY
+			CASE
+				WHEN upper(btrim(iata_code)) = upper($1) THEN 0
+				WHEN lower(btrim(COALESCE(municipality, ''))) = lower($1) THEN 1
+				WHEN lower(btrim(name)) = lower($1) THEN 2
+				WHEN COALESCE(municipality, '') ILIKE $3 ESCAPE E'\\' THEN 3
+				WHEN name ILIKE $3 ESCAPE E'\\' THEN 4
+				WHEN COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\' THEN 5
+				ELSE 6
+			END,
+			CASE WHEN scheduled_service = 'yes' THEN 0 ELSE 1 END,
+			CASE type
+				WHEN 'large_airport' THEN 0
+				WHEN 'medium_airport' THEN 1
+				WHEN 'small_airport' THEN 2
+				ELSE 3
+			END,
+			name
+		LIMIT $4`
+
+	// QuerySearchSimilarAirportCodes is the fallback when a 3-letter code has no
+	// IATA, city, or name hit. A code is close when at least two characters match
+	// in position, so a one-character typo still returns a code the assistant can use.
+	QuerySearchSimilarAirportCodes = `
+		SELECT
+			btrim(iata_code),
+			name,
+			municipality,
+			iso_country,
+			iso_region,
+			type,
+			scheduled_service,
+			'close_code' AS match
+		FROM airports
+		WHERE char_length(btrim(COALESCE(iata_code, ''))) = 3
+			AND upper(btrim(iata_code)) <> upper($1)
+			AND (
+				(substring(upper(btrim(iata_code)) FROM 1 FOR 1) = substring(upper($1) FROM 1 FOR 1))::int
+				+ (substring(upper(btrim(iata_code)) FROM 2 FOR 1) = substring(upper($1) FROM 2 FOR 1))::int
+				+ (substring(upper(btrim(iata_code)) FROM 3 FOR 1) = substring(upper($1) FROM 3 FOR 1))::int
+			) >= 2
+		ORDER BY
+			CASE WHEN scheduled_service = 'yes' THEN 0 ELSE 1 END,
+			CASE type
+				WHEN 'large_airport' THEN 0
+				WHEN 'medium_airport' THEN 1
+				WHEN 'small_airport' THEN 2
+				ELSE 3
+			END,
+			name
+		LIMIT $2`
+
 	QueryDeleteAllCountries  = `DELETE FROM countries`
 	QueryDeleteAllRegions    = `DELETE FROM regions`
 	QueryDeleteAllAirports   = `DELETE FROM airports`
