@@ -8,7 +8,13 @@ import (
 
 const (
 	testFlightDate20260401 = "2026-04-01"
+	testAirportAAA         = "AAA"
+	testAirportBBB         = "BBB"
 	testAirportLAX         = "LAX"
+	testAirportMDW         = "MDW"
+	testAirportQQQ         = "QQQ"
+	testAirportRRR         = "RRR"
+	testAirportSFO         = "SFO"
 )
 
 func TestHHMMToMinutes(t *testing.T) {

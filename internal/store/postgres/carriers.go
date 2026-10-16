@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -47,22 +48,9 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 	stats.Analysis.Start = filter.StartDate
 	stats.Analysis.End = filter.EndDate
 
-	if err := s.scanCarrierOverall(ctx, filter, stats); err != nil {
+	if err := s.applyCarrierAggregates(ctx, filter, stats); err != nil {
 		return nil, err
 	}
-
-	routes, err := s.listCarrierRoutes(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	airports, err := s.listCarrierAirports(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	stats.BestRoutes, stats.WorstRoutes = store.RankCarrierRoutes(routes)
-	stats.BestAirports, stats.WorstAirports = store.RankCarrierAirports(airports)
 
 	stats.RoundForResponse()
 
@@ -84,96 +72,85 @@ func emptyCarrierStats(filter store.CarrierStatsFilter) *model.CarrierStats {
 	}
 }
 
-func (s *Store) scanCarrierOverall(ctx context.Context, filter store.CarrierStatsFilter, stats *model.CarrierStats) error {
+func (s *Store) applyCarrierAggregates(ctx context.Context, filter store.CarrierStatsFilter, stats *model.CarrierStats) error {
 	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, filter)
 
-	var scanned delayStatsScan
+	var (
+		scanned      delayStatsScan
+		routesJSON   []byte
+		airportsJSON []byte
+	)
 
-	if err := s.db.QueryRowContext(ctx, query, args...).Scan(scanned.args()...); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(append(scanned.args(), &routesJSON, &airportsJSON)...); err != nil {
 		return err
 	}
 
 	applyDelayStats(scanned, carrierDelayFields(stats))
 	stats.Analysis.SampleSize = stats.Flights
 
+	routes, err := unmarshalCarrierRoutes(routesJSON)
+	if err != nil {
+		return fmt.Errorf("decode carrier routes: %w", err)
+	}
+
+	airports, err := unmarshalCarrierAirports(airportsJSON)
+	if err != nil {
+		return fmt.Errorf("decode carrier airports: %w", err)
+	}
+
+	stats.BestRoutes, stats.WorstRoutes = store.RankCarrierRoutes(routes)
+	stats.BestAirports, stats.WorstAirports = store.RankCarrierAirports(airports)
+
 	return nil
 }
 
-func (s *Store) listCarrierRoutes(ctx context.Context, filter store.CarrierStatsFilter) ([]model.CarrierRouteStat, error) {
-	query, args := buildCarrierStatsQuery(store.QueryCarrierStatsRoutes, filter)
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
+func unmarshalCarrierRoutes(raw []byte) ([]model.CarrierRouteStat, error) {
+	rows, err := decodeCarrierCountRows[model.CarrierRouteStat](raw)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	out := make([]model.CarrierRouteStat, 0)
-
-	for rows.Next() {
-		var item model.CarrierRouteStat
-		if err := rows.Scan(
-			&item.Origin,
-			&item.Dest,
-			&item.Flights,
-			&item.OnTime,
-			&item.Delayed,
-			&item.Cancelled,
-			&item.Diverted,
-		); err != nil {
-			return nil, err
-		}
-
-		item.OnTimeRate = ratio(item.OnTime, item.Flights)
-		item.DelayRate = ratio(item.Delayed, item.Flights)
-		item.CancellationRate = ratio(item.Cancelled, item.Flights)
-		item.DiversionRate = ratio(item.Diverted, item.Flights)
-		out = append(out, item)
+	for i := range rows {
+		rows[i].OnTimeRate = ratio(rows[i].OnTime, rows[i].Flights)
+		rows[i].DelayRate = ratio(rows[i].Delayed, rows[i].Flights)
+		rows[i].CancellationRate = ratio(rows[i].Cancelled, rows[i].Flights)
+		rows[i].DiversionRate = ratio(rows[i].Diverted, rows[i].Flights)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return out, nil
+	return rows, nil
 }
 
-func (s *Store) listCarrierAirports(ctx context.Context, filter store.CarrierStatsFilter) ([]model.CarrierAirportStat, error) {
-	query, args := buildCarrierStatsQuery(store.QueryCarrierStatsAirports, filter)
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
+func unmarshalCarrierAirports(raw []byte) ([]model.CarrierAirportStat, error) {
+	rows, err := decodeCarrierCountRows[model.CarrierAirportStat](raw)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	out := make([]model.CarrierAirportStat, 0)
-
-	for rows.Next() {
-		var item model.CarrierAirportStat
-		if err := rows.Scan(
-			&item.Airport,
-			&item.Flights,
-			&item.OnTime,
-			&item.Delayed,
-			&item.Cancelled,
-			&item.Diverted,
-		); err != nil {
-			return nil, err
-		}
-
-		item.OnTimeRate = ratio(item.OnTime, item.Flights)
-		item.DelayRate = ratio(item.Delayed, item.Flights)
-		item.CancellationRate = ratio(item.Cancelled, item.Flights)
-		item.DiversionRate = ratio(item.Diverted, item.Flights)
-		out = append(out, item)
+	for i := range rows {
+		rows[i].OnTimeRate = ratio(rows[i].OnTime, rows[i].Flights)
+		rows[i].DelayRate = ratio(rows[i].Delayed, rows[i].Flights)
+		rows[i].CancellationRate = ratio(rows[i].Cancelled, rows[i].Flights)
+		rows[i].DiversionRate = ratio(rows[i].Diverted, rows[i].Flights)
 	}
 
-	if err := rows.Err(); err != nil {
+	return rows, nil
+}
+
+func decodeCarrierCountRows[T any](raw []byte) ([]T, error) {
+	if len(raw) == 0 || string(raw) == jsonNull {
+		return []T{}, nil
+	}
+
+	var rows []T
+	if err := json.Unmarshal(raw, &rows); err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	if rows == nil {
+		return []T{}, nil
+	}
+
+	return rows, nil
 }
 
 func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (string, []any) {

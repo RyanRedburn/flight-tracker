@@ -16,6 +16,7 @@ import (
 const (
 	routeStatsExtraPlaceholder         = "/*extra*/"
 	routeStatsCarrierOnTimePlaceholder = "/*carrier_on_time*/"
+	jsonNull                           = "null"
 )
 
 func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
@@ -336,7 +337,7 @@ func emptyRouteOutlook(filter store.RouteOutlookFilter) *model.RouteOutlook {
 }
 
 func unmarshalCarrierOnTime(raw []byte) ([]model.CarrierOnTime, error) {
-	if len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 || string(raw) == jsonNull {
 		return []model.CarrierOnTime{}, nil
 	}
 
@@ -363,7 +364,7 @@ func unmarshalCarrierOnTime(raw []byte) ([]model.CarrierOnTime, error) {
 
 func unmarshalAirportCounts(raw []byte) ([]model.AirportCount, error) {
 	out := []model.AirportCount{}
-	if len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 || string(raw) == jsonNull {
 		return out, nil
 	}
 
