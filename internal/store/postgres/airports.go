@@ -59,7 +59,6 @@ func scanAirports(rows *sql.Rows) ([]model.Airport, error) {
 			&airport.ISOCountry,
 			&airport.ISORegion,
 			&airport.Type,
-			&airport.ScheduledService,
 			&airport.Match,
 		); err != nil {
 			return nil, err

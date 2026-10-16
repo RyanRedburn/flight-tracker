@@ -171,7 +171,6 @@ const (
 			iso_country,
 			iso_region,
 			type,
-			scheduled_service,
 			CASE
 				WHEN upper(btrim(iata_code)) = upper($1) THEN 'exact_iata'
 				WHEN COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\'
@@ -180,6 +179,7 @@ const (
 			END AS match
 		FROM airports
 		WHERE btrim(COALESCE(iata_code, '')) <> ''
+			AND scheduled_service = 'yes'
 			AND (
 				upper(btrim(iata_code)) = upper($1)
 				OR COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\'
@@ -196,7 +196,6 @@ const (
 				WHEN COALESCE(municipality, '') ILIKE $2 ESCAPE E'\\' THEN 5
 				ELSE 6
 			END,
-			CASE WHEN scheduled_service = 'yes' THEN 0 ELSE 1 END,
 			CASE type
 				WHEN 'large_airport' THEN 0
 				WHEN 'medium_airport' THEN 1

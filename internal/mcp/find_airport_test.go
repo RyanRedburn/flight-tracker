@@ -33,22 +33,20 @@ func testLogger() *slog.Logger {
 
 func TestFindAirport(t *testing.T) {
 	ord := model.Airport{
-		IATACode:         testCodeORD,
-		Name:             testNameOHare,
-		Municipality:     testCityChicago,
-		ISOCountry:       testCountryUS,
-		Type:             "large_airport",
-		ScheduledService: "yes",
-		Match:            model.AirportMatchExactIATA,
+		IATACode:     testCodeORD,
+		Name:         testNameOHare,
+		Municipality: testCityChicago,
+		ISOCountry:   testCountryUS,
+		Type:         "large_airport",
+		Match:        model.AirportMatchExactIATA,
 	}
 	mdw := model.Airport{
-		IATACode:         testCodeMDW,
-		Name:             "Chicago Midway International Airport",
-		Municipality:     testCityChicago,
-		ISOCountry:       testCountryUS,
-		Type:             "large_airport",
-		ScheduledService: "yes",
-		Match:            model.AirportMatchCity,
+		IATACode:     testCodeMDW,
+		Name:         "Chicago Midway International Airport",
+		Municipality: testCityChicago,
+		ISOCountry:   testCountryUS,
+		Type:         "large_airport",
+		Match:        model.AirportMatchCity,
 	}
 	orf := model.Airport{
 		IATACode: "ORF",
