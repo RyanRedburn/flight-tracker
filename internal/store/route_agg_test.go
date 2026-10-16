@@ -8,6 +8,8 @@ import (
 
 const (
 	testFlightDate20260401 = "2026-04-01"
+	testAirportAAA         = "AAA"
+	testAirportBBB         = "BBB"
 	testAirportLAX         = "LAX"
 )
 

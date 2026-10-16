@@ -91,7 +91,7 @@ func TestRankCarrierRoutes(t *testing.T) {
 
 func TestRankCarrierRoutesFewQualify(t *testing.T) {
 	best, worst := RankCarrierRoutes([]model.CarrierRouteStat{
-		{Origin: "AAA", Dest: "BBB", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
+		{Origin: testAirportAAA, Dest: testAirportBBB, Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
 		{Origin: "CCC", Dest: "DDD", Flights: CarrierStatsMinSampleSize, OnTimeRate: 1},
 		{Origin: "EEE", Dest: "FFF", Flights: CarrierStatsMinSampleSize, OnTimeRate: 0},
 	})
