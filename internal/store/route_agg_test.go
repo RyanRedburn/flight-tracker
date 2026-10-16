@@ -11,10 +11,6 @@ const (
 	testAirportAAA         = "AAA"
 	testAirportBBB         = "BBB"
 	testAirportLAX         = "LAX"
-	testAirportMDW         = "MDW"
-	testAirportQQQ         = "QQQ"
-	testAirportRRR         = "RRR"
-	testAirportSFO         = "SFO"
 )
 
 func TestHHMMToMinutes(t *testing.T) {
