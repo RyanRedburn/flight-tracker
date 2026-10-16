@@ -79,7 +79,7 @@ func TestFindAirport(t *testing.T) {
 			wantLimit:  store.AirportSearchDefaultLimit,
 			wantQuery:  "ord",
 			wantConf:   model.ConfidenceHigh,
-			wantSubstr: []string{testCodeORD, testCityChicago, summaryIdentifiesOnly},
+			wantSubstr: []string{testCodeORD, testCityChicago},
 		},
 		{
 			name:  "city matches",

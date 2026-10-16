@@ -18,9 +18,8 @@ import (
 const (
 	toolFindAirport = "find_airport"
 
-	summaryIdentifiesOnly = "This identifies the airport only, not a reliability score."
-	summaryConfirmCode    = "Confirm this code; it is not a reliability score."
-	summaryPickCode       = "Pick the IATA code for the trip; this is not a reliability ranking."
+	summaryConfirmCode = "Confirm this code."
+	summaryPickCode    = "Pick one IATA code for the trip."
 )
 
 type findAirportInput struct {
@@ -147,7 +146,7 @@ func airportSummary(query string, airports []model.Airport) (string, string) {
 
 	if exact == 1 {
 		if len(airports) == 1 {
-			return fmt.Sprintf("%s is %s. %s", exactAirport.IATACode, airportPlace(exactAirport), summaryIdentifiesOnly), model.ConfidenceHigh
+			return fmt.Sprintf("%s is %s.", exactAirport.IATACode, airportPlace(exactAirport)), model.ConfidenceHigh
 		}
 
 		return fmt.Sprintf("%s is %s. Other airports also match %q; use %s unless you meant one of them.",
