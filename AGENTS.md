@@ -11,3 +11,4 @@
 - Never commit plans, reviews, or design notes to the repo.
 - Keep changes scoped to the task. Don't refactor unrelated code.
 - Run `make lint` and `make test` before pushing.
+- Run `make swagger` after changing handler annotations; CI checks the generated docs.
