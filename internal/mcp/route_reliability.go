@@ -109,7 +109,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 
 	window := store.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
 
-	origin, dest, fail := resolveRouteFromFlightNumber(ctx, s, carrier, in.FlightNumber, firstDepTime(in.DepTimes), in.Origin, in.Dest, window)
+	origin, dest, fail := resolveRouteFromFlightNumber(ctx, s, carrier, in.FlightNumber, in.DepTimes, fieldDepTimes, in.Origin, in.Dest, window)
 	if fail != nil {
 		return failureResult[routeReliabilityData](fail)
 	}
@@ -241,9 +241,9 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	summary, confidence, sampleSize, sampleReason := routeReliabilitySummary(carrier, origin, dest, departures, stats)
+	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
 
-	return successResult(summary, confidence, sampleSize, sampleReason, &routeReliabilityData{
+	return successResult(summary, confidence, &routeReliabilityData{
 		Stats:      *stats,
 		Departures: departures,
 	})
@@ -332,28 +332,18 @@ func resolveStatsWindow(startIn, endIn, defaultStart, defaultEnd string) (string
 	return startIn, endIn, nil
 }
 
-func firstDepTime(depTimes []string) string {
-	if len(depTimes) == 0 {
-		return ""
-	}
-
-	return strings.TrimSpace(depTimes[0])
-}
-
-func routeReliabilitySummary(carrier, origin, dest string, departures []routeReliabilityDeparture, stats *model.RouteStats) (string, string, *int, string) {
+func routeReliabilitySummary(carrier, origin, dest string, departures []routeReliabilityDeparture) (string, string) {
 	bestDep, bestRate, canRank := bestDepartureByOnTime(departures)
 	confidence := minOutlookConfidence(departures)
-	sampleSize := stats.Analysis.SampleSize
-	sampleReason := stats.Analysis.SampleReason
 
 	routeLabel := fmt.Sprintf("%s %s–%s", carrier, origin, dest)
 
 	if len(departures) == 1 {
-		return fmt.Sprintf("%s at %s is the only time compared; see on-time odds in the outlook.", routeLabel, departures[0].DepTime), confidence, &sampleSize, sampleReason
+		return fmt.Sprintf("%s at %s is the only time compared; see on-time odds in the outlook.", routeLabel, departures[0].DepTime), confidence
 	}
 
 	if !canRank || bestDep == "" {
-		return fmt.Sprintf("On-time odds for %s differ by time, but samples are too thin to rank them.", routeLabel), confidence, &sampleSize, sampleReason
+		return fmt.Sprintf("On-time odds for %s differ by time, but samples are too thin to rank them.", routeLabel), confidence
 	}
 
 	if len(departures) == 2 {
@@ -369,11 +359,11 @@ func routeReliabilitySummary(carrier, origin, dest string, departures []routeRel
 
 		if ok {
 			return fmt.Sprintf("Prefer %s over %s on %s (%.0f%% vs %.0f%% on-time in outlook history).",
-				bestDep, other, routeLabel, bestRate*100, otherRate*100), confidence, &sampleSize, sampleReason
+				bestDep, other, routeLabel, bestRate*100, otherRate*100), confidence
 		}
 	}
 
-	return fmt.Sprintf("%s is the strongest departure time on %s among the times you listed.", bestDep, routeLabel), confidence, &sampleSize, sampleReason
+	return fmt.Sprintf("%s is the strongest departure time on %s among the times you listed.", bestDep, routeLabel), confidence
 }
 
 func bestDepartureByOnTime(departures []routeReliabilityDeparture) (string, float64, bool) {

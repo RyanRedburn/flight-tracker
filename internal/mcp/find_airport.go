@@ -116,7 +116,7 @@ func findAirport(ctx context.Context, s store.Store, logger *slog.Logger, in fin
 
 	summary, confidence := airportSummary(query, airports)
 
-	return successResult(summary, confidence, nil, "", &findAirportData{
+	return successResult(summary, confidence, &findAirportData{
 		Query:    query,
 		Airports: airports,
 	})

@@ -10,6 +10,11 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
+const (
+	fieldDepTime  = "dep_time"
+	fieldDepTimes = "dep_times"
+)
+
 func normalizeCarrier(code string) string {
 	return strings.ToUpper(strings.TrimSpace(code))
 }
@@ -17,7 +22,9 @@ func normalizeCarrier(code string) string {
 func resolveRouteFromFlightNumber(
 	ctx context.Context,
 	s store.Store,
-	carrier, flightNumber, depTime string,
+	carrier, flightNumber string,
+	depTimes []string,
+	depTimeField string,
 	origin, dest string,
 	windowMinutes int,
 ) (string, string, *Failure) {
@@ -73,32 +80,51 @@ func resolveRouteFromFlightNumber(
 		return routes[0].Origin, routes[0].Dest, nil
 	}
 
-	if depTime != "" {
-		filtered := filterFlightRoutesByDepTime(routes, depTime, windowMinutes)
-		if len(filtered) == 1 {
+	filtered, near := routesNearDepTimes(routes, depTimes, windowMinutes)
+	if near != "" {
+		switch len(filtered) {
+		case 1:
 			return filtered[0].Origin, filtered[0].Dest, nil
-		}
-
-		if len(filtered) > 1 {
+		case 0:
+			return "", "", &Failure{
+				Code:         CodeFlightNumberAmbiguous,
+				Message:      fmt.Sprintf("No %s %s route leaves near %s; recent routes are listed. Pick origin and destination.", carrier, flightNumber, near),
+				FlightRoutes: routes,
+			}
+		default:
 			routes = filtered
 		}
 	}
 
 	return "", "", &Failure{
 		Code:         CodeFlightNumberAmbiguous,
-		Message:      fmt.Sprintf("%s %s flies more than one route recently. Pick origin and destination from the list, or add dep_time.", carrier, flightNumber),
+		Message:      fmt.Sprintf("%s %s flies more than one route recently. Pick origin and destination from the list, or add %s.", carrier, flightNumber, depTimeField),
 		FlightRoutes: routes,
 	}
 }
 
-func filterFlightRoutesByDepTime(routes []model.FlightNumberRoute, depTime string, windowMinutes int) []model.FlightNumberRoute {
-	target, ok := store.HHMMToMinutes(depTime)
-	if !ok {
-		return routes
-	}
-
+// routesNearDepTimes keeps routes whose usual departure is within the window of any given time.
+// near is empty when no time could be parsed, so the caller keeps the full list.
+func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, windowMinutes int) ([]model.FlightNumberRoute, string) {
 	if windowMinutes <= 0 {
 		windowMinutes = store.DefaultDepTimeWindowMinutes
+	}
+
+	targets := make([]int, 0, len(depTimes))
+	labels := make([]string, 0, len(depTimes))
+
+	for _, dep := range depTimes {
+		target, ok := store.HHMMToMinutes(dep)
+		if !ok {
+			continue
+		}
+
+		targets = append(targets, target)
+		labels = append(labels, store.FormatHHMM(dep))
+	}
+
+	if len(targets) == 0 {
+		return nil, ""
 	}
 
 	out := make([]model.FlightNumberRoute, 0, len(routes))
@@ -109,13 +135,15 @@ func filterFlightRoutesByDepTime(routes []model.FlightNumberRoute, depTime strin
 			continue
 		}
 
-		delta := absCircularMinuteDelta(target, usual)
-		if delta <= windowMinutes {
-			out = append(out, route)
+		for _, target := range targets {
+			if absCircularMinuteDelta(target, usual) <= windowMinutes {
+				out = append(out, route)
+				break
+			}
 		}
 	}
 
-	return out
+	return out, joinAnd(labels)
 }
 
 func absCircularMinuteDelta(a, b int) int {

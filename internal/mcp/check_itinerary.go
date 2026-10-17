@@ -95,7 +95,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 		window := store.ResolveDepTimeWindowMinutes(legIn.DepTimeWindowMinutes)
 
 		origin, dest, fail := resolveRouteFromFlightNumber(ctx, s,
-			legIn.Carrier, legIn.FlightNumber, legIn.DepTime,
+			legIn.Carrier, legIn.FlightNumber, []string{legIn.DepTime}, fieldDepTime,
 			legIn.Origin, legIn.Dest, window)
 		if fail != nil {
 			return failureResult[checkItineraryData](fail)
@@ -140,77 +140,60 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 		})
 	}
 
-	summary, confidence, sampleSize, sampleReason := itineraryToolResult(out)
+	summary, confidence := itineraryToolResult(out)
 
-	return successResult(summary, confidence, sampleSize, sampleReason, &checkItineraryData{Itinerary: out})
+	return successResult(summary, confidence, &checkItineraryData{Itinerary: out})
 }
 
-func itineraryToolResult(out model.ItineraryOutlookResponse) (string, string, *int, string) {
+func itineraryToolResult(out model.ItineraryOutlookResponse) (string, string) {
 	confidence := out.Summary.Confidence
-	sampleSize, sampleReason := minLegOutlookSample(out.Legs)
+	tight, unknown := riskyConnections(out.Connections)
 
 	switch {
-	case out.Summary.ConnectionRisk:
-		hub, status := tightestConnection(out.Connections)
-		if hub == "" {
-			return "Treat connection timing as uncertain until every leg has enough history.", confidence, sampleSize, sampleReason
-		}
-
-		if status == model.ConnectionUnknown {
-			return fmt.Sprintf("Connection risk at %s is unknown; allow extra time or choose a later outbound.", hub), confidence, sampleSize, sampleReason
-		}
-
-		return fmt.Sprintf("Connection at %s looks %s; allow more time or pick a later outbound.", hub, status), confidence, sampleSize, sampleReason
+	case len(tight) > 0 && len(unknown) > 0:
+		return mixedConnectionSummary(tight, unknown), confidence
+	case len(tight) > 1:
+		return "Connections at " + joinAnd(tight) + " look tight; allow more time or pick later outbounds.", confidence
+	case len(tight) == 1:
+		return "Connection at " + tight[0] + " looks tight; allow more time or pick a later outbound.", confidence
+	case len(unknown) > 0:
+		return "Connection risk at " + joinAnd(unknown) + " is unknown; allow extra time or choose a later outbound.", confidence
 	default:
-		return fmt.Sprintf("%s–%s itinerary connections look comfortable on historical data.", out.Summary.Origin, out.Summary.Destination), confidence, sampleSize, sampleReason
+		return fmt.Sprintf("%s–%s itinerary connections look comfortable on historical data.", out.Summary.Origin, out.Summary.Destination), confidence
 	}
 }
 
-func tightestConnection(connections []model.ItineraryConnection) (hub string, status string) {
-	worstRank := -1
-
+func riskyConnections(connections []model.ItineraryConnection) (tight, unknown []string) {
 	for _, conn := range connections {
-		rank := connectionStatusRank(conn.Status)
-		if rank > worstRank {
-			worstRank = rank
-			hub = conn.Airport
-			status = conn.Status
+		switch conn.Status {
+		case model.ConnectionTight:
+			tight = append(tight, conn.Airport)
+		case model.ConnectionUnknown:
+			unknown = append(unknown, conn.Airport)
 		}
 	}
 
-	return hub, status
+	return tight, unknown
 }
 
-func connectionStatusRank(status string) int {
-	switch status {
-	case model.ConnectionTight:
-		return 3
-	case model.ConnectionUnknown:
-		return 2
-	case model.ConnectionOK:
-		return 1
+func mixedConnectionSummary(tight, unknown []string) string {
+	tightClause := "Connection at " + joinAnd(tight) + " looks tight"
+	if len(tight) > 1 {
+		tightClause = "Connections at " + joinAnd(tight) + " look tight"
+	}
+
+	return tightClause + " and risk at " + joinAnd(unknown) + " is unknown; allow more time or pick a later outbound."
+}
+
+func joinAnd(parts []string) string {
+	switch len(parts) {
+	case 0:
+		return ""
+	case 1:
+		return parts[0]
+	case 2:
+		return parts[0] + " and " + parts[1]
 	default:
-		return 0
+		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 	}
-}
-
-func minLegOutlookSample(legs []model.ItineraryOutlookLeg) (*int, string) {
-	var (
-		size   *int
-		reason string
-	)
-
-	for _, leg := range legs {
-		if leg.Outlook == nil {
-			continue
-		}
-
-		sample := leg.Outlook.Analysis.SampleSize
-		if size == nil || sample < *size {
-			size = &sample
-			reason = leg.Outlook.Analysis.SampleReason
-		}
-	}
-
-	return size, reason
 }

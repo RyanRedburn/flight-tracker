@@ -23,6 +23,7 @@ const (
 
 	testCodeBOS     = "BOS"
 	testCodeORD     = "ORD"
+	testCodeDFW     = "DFW"
 	testCodeLAX     = "LAX"
 	testCodeMDW     = "MDW"
 	testCodeSFO     = "SFO"
@@ -266,10 +267,6 @@ func TestFindAirport(t *testing.T) {
 
 			if out.Data == nil || out.Data.Query != tt.wantQuery || len(out.Data.Airports) != len(tt.airports) {
 				t.Fatalf("data = %#v", out.Data)
-			}
-
-			if out.SampleSize != nil || out.SampleReason != "" {
-				t.Errorf("lookup set sample size=%v reason=%q", out.SampleSize, out.SampleReason)
 			}
 		})
 	}

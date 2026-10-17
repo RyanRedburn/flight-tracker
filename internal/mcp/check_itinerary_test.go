@@ -41,8 +41,40 @@ func TestCheckItineraryTightConnection(t *testing.T) {
 		t.Fatalf("confidence = %q", out.Confidence)
 	}
 
-	if out.SampleSize == nil || *out.SampleSize == 0 {
-		t.Fatalf("sample_size = %v", out.SampleSize)
+	if out.Summary != "Connection at ORD looks tight; allow more time or pick a later outbound." {
+		t.Fatalf("summary = %q", out.Summary)
+	}
+}
+
+func TestCheckItineraryTwoTightConnections(t *testing.T) {
+	res := callTool(t, multiLegOutlookStub(""), toolCheckItinerary, map[string]any{
+		jsonKeyLegs: threeLegItinerary(),
+	})
+	if res.IsError {
+		t.Fatalf("IsError content=%s", toolText(t, res))
+	}
+
+	out := decodeResult[checkItineraryData](t, res)
+
+	want := "Connections at ORD and DFW look tight; allow more time or pick later outbounds."
+	if out.Summary != want {
+		t.Fatalf("summary = %q", out.Summary)
+	}
+}
+
+func TestCheckItineraryTightAndUnknownConnections(t *testing.T) {
+	res := callTool(t, multiLegOutlookStub(testCodeORD+"-"+testCodeDFW), toolCheckItinerary, map[string]any{
+		jsonKeyLegs: threeLegItinerary(),
+	})
+	if res.IsError {
+		t.Fatalf("IsError content=%s", toolText(t, res))
+	}
+
+	out := decodeResult[checkItineraryData](t, res)
+
+	want := "Connection at ORD looks tight and risk at DFW is unknown; allow more time or pick a later outbound."
+	if out.Summary != want {
+		t.Fatalf("summary = %q", out.Summary)
 	}
 }
 
@@ -79,6 +111,11 @@ func TestCheckItineraryFlightNumberAmbiguous(t *testing.T) {
 
 	if len(out.Error.FlightRoutes) != 2 {
 		t.Fatalf("flight_routes = %#v", out.Error.FlightRoutes)
+	}
+
+	want := "UA 100 flies more than one route recently. Pick origin and destination from the list, or add dep_time."
+	if out.Error.Message != want {
+		t.Fatalf("message = %q", out.Error.Message)
 	}
 }
 
@@ -236,6 +273,56 @@ func TestCheckItineraryInputSchema(t *testing.T) {
 	}
 	if err := resolved.Validate(map[string]any{jsonKeyLegs: []any{longNumber, leg}}); err == nil {
 		t.Fatal("expected validation error for long flight number")
+	}
+}
+
+func threeLegItinerary() []map[string]any {
+	return []map[string]any{
+		{
+			jsonKeyOrigin: testCodeBOS, jsonKeyDest: testCodeORD, jsonKeyCarrier: testCarrierUA,
+			jsonKeyDate: testDateOct6, jsonKeyDepTime: "700", jsonKeyArrTime: "905",
+		},
+		{
+			jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeDFW, jsonKeyCarrier: testCarrierUA,
+			jsonKeyDate: testDateOct6, jsonKeyDepTime: "940", jsonKeyArrTime: "1130",
+		},
+		{
+			jsonKeyOrigin: testCodeDFW, jsonKeyDest: testCodeLAX, jsonKeyCarrier: testCarrierUA,
+			jsonKeyDate: testDateOct6, jsonKeyDepTime: "1200", jsonKeyArrTime: "1500",
+		},
+	}
+}
+
+// missingRoute is "ORIGIN-DEST" when that leg's outlook is not found.
+func multiLegOutlookStub(missingRoute string) *storetest.Stub {
+	return &storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			if missingRoute != "" && filter.Origin+"-"+filter.Dest == missingRoute {
+				return nil, store.ErrNotFound
+			}
+
+			out := outlookWithConnectionMinutes(60, 90)
+			out.Filters = model.Filters{
+				Origin:    filter.Origin,
+				Dest:      filter.Dest,
+				Carrier:   filter.Carrier,
+				DayOfWeek: filter.DayOfWeek,
+				DepTime:   filter.DepTime,
+			}
+			out.Analysis = model.Analysis{
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			}
+
+			return out, nil
+		},
+		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
+			return map[string]string{
+				testCodeBOS: "US", testCodeORD: "US", testCodeDFW: "US", testCodeLAX: "US",
+			}, nil
+		},
+		SearchAirportsFn: exactAirportSearch,
 	}
 }
 

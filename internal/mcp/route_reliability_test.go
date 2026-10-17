@@ -153,6 +153,115 @@ func TestRouteReliabilityNarrowsFlightNumberByDepTime(t *testing.T) {
 	}
 }
 
+func TestRouteReliabilityFlightNumberNoNearbyRoute(t *testing.T) {
+	stub := &storetest.Stub{
+		FlightNumberRoutesFn: func(context.Context, store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
+			return []model.FlightNumberRoute{
+				{Origin: testCodeORD, Dest: testCodeLAX, Flights: 40, UsualDepTime: "0700"},
+				{Origin: testCodeORD, Dest: testCodeSFO, Flights: 30, UsualDepTime: "1800"},
+			}, nil
+		},
+	}
+
+	res := callTool(t, stub, toolRouteReliability, map[string]any{
+		jsonKeyCarrier:      testCarrierUA,
+		jsonKeyFlightNumber: "1234",
+		jsonKeyDayOfWeek:    2,
+		jsonKeyDepTimes:     []string{"0800"},
+	})
+	if !res.IsError {
+		t.Fatal("expected error")
+	}
+
+	out := decodeResult[routeReliabilityData](t, res)
+
+	want := "No UA 1234 route leaves near 0800; recent routes are listed. Pick origin and destination."
+	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous || out.Error.Message != want {
+		t.Fatalf("error = %#v", out.Error)
+	}
+
+	if len(out.Error.FlightRoutes) != 2 {
+		t.Fatalf("flight_routes = %#v", out.Error.FlightRoutes)
+	}
+}
+
+func TestRouteReliabilityFlightNumberAmbiguousDepTimes(t *testing.T) {
+	stub := &storetest.Stub{
+		FlightNumberRoutesFn: func(context.Context, store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
+			return []model.FlightNumberRoute{
+				{Origin: testCodeORD, Dest: testCodeLAX, Flights: 40, UsualDepTime: "0700"},
+				{Origin: testCodeORD, Dest: testCodeSFO, Flights: 30, UsualDepTime: "1800"},
+			}, nil
+		},
+	}
+
+	res := callTool(t, stub, toolRouteReliability, map[string]any{
+		jsonKeyCarrier:      testCarrierUA,
+		jsonKeyFlightNumber: "200",
+		jsonKeyDayOfWeek:    2,
+		jsonKeyDepTimes:     []string{"0700", "1800"},
+	})
+	if !res.IsError {
+		t.Fatal("expected error")
+	}
+
+	out := decodeResult[routeReliabilityData](t, res)
+
+	want := "UA 200 flies more than one route recently. Pick origin and destination from the list, or add dep_times."
+	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous || out.Error.Message != want {
+		t.Fatalf("error = %#v", out.Error)
+	}
+
+	if len(out.Error.FlightRoutes) != 2 {
+		t.Fatalf("flight_routes = %#v", out.Error.FlightRoutes)
+	}
+}
+
+func TestRouteReliabilityFlightNumberMatchesLaterDepTime(t *testing.T) {
+	var got []store.RouteOutlookFilter
+
+	stub := &storetest.Stub{
+		SearchAirportsFn: exactAirportSearch,
+		FlightNumberRoutesFn: func(context.Context, store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
+			return []model.FlightNumberRoute{
+				{Origin: testCodeORD, Dest: testCodeLAX, Flights: 40, UsualDepTime: "0700"},
+				{Origin: testCodeORD, Dest: testCodeSFO, Flights: 30, UsualDepTime: "1800"},
+			}, nil
+		},
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			got = append(got, filter)
+			rate := 0.8
+
+			return &model.RouteOutlook{
+				OutlookResult: model.OutlookResult{
+					Analysis:          model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 20, Confidence: model.ConfidenceHigh},
+					OnTimeProbability: &rate,
+				},
+			}, nil
+		},
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				Flights:  40,
+				Analysis: model.Analysis{SampleSize: 40, SampleReason: model.SampleReasonSufficient, Confidence: model.ConfidenceHigh},
+			}, nil
+		},
+	}
+
+	res := callTool(t, stub, toolRouteReliability, map[string]any{
+		jsonKeyCarrier:      testCarrierUA,
+		jsonKeyFlightNumber: "200",
+		jsonKeyDayOfWeek:    2,
+		jsonKeyDepTimes:     []string{"0900", "1805"},
+	})
+	if res.IsError {
+		t.Fatalf("IsError content=%s", toolText(t, res))
+	}
+
+	if len(got) != 2 || got[0].Origin != testCodeORD || got[0].Dest != testCodeSFO || got[0].DepTime != "0900" || got[1].DepTime != "1805" || got[1].Dest != testCodeSFO {
+		t.Fatalf("filters = %+v", got)
+	}
+}
+
 func TestRouteReliabilityRouteNotFound(t *testing.T) {
 	tests := []struct {
 		name string
@@ -292,7 +401,7 @@ func TestRouteReliabilityInputSchema(t *testing.T) {
 
 	tooMany := map[string]any{
 		jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX, jsonKeyCarrier: testCarrierUA,
-		jsonKeyDate: testDateOct6, jsonKeyDepTimes: []string{"0700", "0800", "0900", "1000", "1100", "1200"},
+		jsonKeyDate: testDateOct6, jsonKeyDepTimes: []string{"0700", "0800", "0930", "1000", "1100", "1200"},
 	}
 	if err := resolved.Validate(tooMany); err == nil {
 		t.Fatal("expected validation error for too many dep_times")

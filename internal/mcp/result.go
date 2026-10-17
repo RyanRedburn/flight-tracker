@@ -18,15 +18,12 @@ const (
 
 // Result is the structured output every tool returns.
 // Summary is one recommendation line and its caveat.
-// Confidence, SampleSize, and SampleReason use the decision vocabulary when the
-// tool is backed by flight history. A lookup omits the sample.
+// Confidence uses the decision vocabulary when the tool is backed by flight history.
 type Result[T any] struct {
-	Summary      string   `json:"summary,omitempty"`
-	Confidence   string   `json:"confidence,omitempty"`
-	SampleSize   *int     `json:"sample_size,omitempty"`
-	SampleReason string   `json:"sample_reason,omitempty"`
-	Data         *T       `json:"data,omitempty"`
-	Error        *Failure `json:"error,omitempty"`
+	Summary    string   `json:"summary,omitempty"`
+	Confidence string   `json:"confidence,omitempty"`
+	Data       *T       `json:"data,omitempty"`
+	Error      *Failure `json:"error,omitempty"`
 }
 
 // Failure is a tool error an assistant can act on.
@@ -42,13 +39,11 @@ type Failure struct {
 	AvailableEnd   string                    `json:"available_end,omitempty"`
 }
 
-func successResult[T any](summary, confidence string, sampleSize *int, sampleReason string, data *T) (*mcpsdk.CallToolResult, Result[T], error) {
+func successResult[T any](summary, confidence string, data *T) (*mcpsdk.CallToolResult, Result[T], error) {
 	return &mcpsdk.CallToolResult{}, Result[T]{
-		Summary:      summary,
-		Confidence:   confidence,
-		SampleSize:   sampleSize,
-		SampleReason: sampleReason,
-		Data:         data,
+		Summary:    summary,
+		Confidence: confidence,
+		Data:       data,
 	}, nil
 }
 
@@ -58,12 +53,8 @@ func failureResult[T any](failure *Failure) (*mcpsdk.CallToolResult, Result[T], 
 		summary = failure.Message
 	}
 
-	var content []mcpsdk.Content
-	if summary != "" {
-		content = []mcpsdk.Content{&mcpsdk.TextContent{Text: summary}}
-	}
-
-	return &mcpsdk.CallToolResult{IsError: true, Content: content}, Result[T]{
+	// Content stays nil so the SDK writes this same JSON into the text block.
+	return &mcpsdk.CallToolResult{IsError: true}, Result[T]{
 		Summary: summary,
 		Error:   failure,
 	}, nil
