@@ -47,7 +47,7 @@ func resolveRouteFromFlightNumber(
 	if !ok {
 		return "", "", &Failure{
 			Code:    CodeInvalidInput,
-			Message: "Flight number is required.",
+			Message: "Flight number is required and must be 1 to 4 digits.",
 		}
 	}
 

@@ -20,12 +20,12 @@ func NormalizeFlightNumber(raw string) (string, bool) {
 		return "", false
 	}
 
-	n, err := strconv.Atoi(raw)
-	if err != nil || n < 0 {
+	if len(raw) > FlightNumberMaxLen {
 		return "", false
 	}
 
-	if len(raw) > FlightNumberMaxLen {
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
 		return "", false
 	}
 
