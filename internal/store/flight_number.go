@@ -13,6 +13,7 @@ type FlightNumberRoutesFilter struct {
 }
 
 // NormalizeFlightNumber trims and drops leading zeros so "0123" and "123" match BTS.
+// It returns false if the flight number is invalid.
 func NormalizeFlightNumber(raw string) (string, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -21,6 +22,10 @@ func NormalizeFlightNumber(raw string) (string, bool) {
 
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 0 {
+		return "", false
+	}
+
+	if len(raw) > FlightNumberMaxLen {
 		return "", false
 	}
 
