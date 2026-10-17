@@ -48,6 +48,8 @@ type Stub struct {
 	ReplaceFlightPerformanceByMonthFn     func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	ReplaceWeatherObservationsByMonthFn   func(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStatsFn                          func(ctx context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error)
+	RouteFlightDateRangeFn                func(ctx context.Context, origin, dest, carrier string) (store.RouteFlightDateRange, error)
+	FlightNumberRoutesFn                  func(ctx context.Context, filter store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error)
 	RouteOutlookFn                        func(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error)
 	RouteTravelWindowsFn                  func(ctx context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindowsFn           func(ctx context.Context) error
@@ -354,6 +356,22 @@ func (s *Stub) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (*
 	}
 
 	return s.RouteStatsFn(ctx, filter)
+}
+
+func (s *Stub) RouteFlightDateRange(ctx context.Context, origin, dest, carrier string) (store.RouteFlightDateRange, error) {
+	if s.RouteFlightDateRangeFn == nil {
+		panic("unexpected call: RouteFlightDateRange")
+	}
+
+	return s.RouteFlightDateRangeFn(ctx, origin, dest, carrier)
+}
+
+func (s *Stub) FlightNumberRoutes(ctx context.Context, filter store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
+	if s.FlightNumberRoutesFn == nil {
+		panic("unexpected call: FlightNumberRoutes")
+	}
+
+	return s.FlightNumberRoutesFn(ctx, filter)
 }
 
 func (s *Stub) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {

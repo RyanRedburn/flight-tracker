@@ -138,8 +138,20 @@ func TestMCPAuthAndRateLimit(t *testing.T) {
 		}
 
 		names := toolNames(t, got.Body.Bytes())
-		if len(names) != 1 || names[0] != "find_airport" {
+
+		want := map[string]bool{
+			"find_airport":      true,
+			"check_itinerary":   true,
+			"route_reliability": true,
+		}
+		if len(names) != len(want) {
 			t.Fatalf("tools = %#v", names)
+		}
+
+		for _, name := range names {
+			if !want[name] {
+				t.Fatalf("unexpected tool %q in %#v", name, names)
+			}
 		}
 	})
 
