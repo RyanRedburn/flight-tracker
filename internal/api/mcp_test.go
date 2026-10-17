@@ -138,7 +138,7 @@ func TestMCPAuthAndRateLimit(t *testing.T) {
 		}
 
 		names := toolNames(t, got.Body.Bytes())
-		if len(names) != 1 || names[0] != "find_airport" {
+		if len(names) != 3 {
 			t.Fatalf("tools = %#v", names)
 		}
 	})

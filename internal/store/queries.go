@@ -1055,6 +1055,49 @@ const (
 		DELETE FROM rate_limit_buckets
 		WHERE last_refill_at < $1`
 
+	QueryRouteFlightDateRange = `
+		SELECT MIN(flight_date)::text, MAX(flight_date)::text
+		FROM flight_performance
+		WHERE origin = $1
+			AND dest = $2
+			AND ($3 = '' OR iata_code_marketing_airline = $3)`
+
+	QueryFlightNumberRoutes = `
+		WITH bounds AS (
+			SELECT MAX(flight_date) AS end_date
+			FROM flight_performance
+			WHERE iata_code_marketing_airline = $1
+				AND flight_number_marketing_airline::text = $2
+		),
+		scoped AS (
+			SELECT
+				f.origin,
+				f.dest,
+				f.crs_dep_time
+			FROM flight_performance f
+			CROSS JOIN bounds b
+			WHERE b.end_date IS NOT NULL
+				AND f.iata_code_marketing_airline = $1
+				AND f.flight_number_marketing_airline::text = $2
+				AND f.flight_date >= (b.end_date - ($3::int * INTERVAL '1 day'))
+				AND f.flight_date <= b.end_date
+				AND f.crs_dep_time IS NOT NULL
+				AND f.crs_dep_time >= 0
+				AND f.crs_dep_time <= 2359
+				AND (f.crs_dep_time / 100) BETWEEN 0 AND 23
+				AND (f.crs_dep_time % 100) BETWEEN 0 AND 59
+		)
+		SELECT
+			origin,
+			dest,
+			COUNT(*)::int AS flights,
+			percentile_cont(0.5) WITHIN GROUP (
+				ORDER BY ((crs_dep_time / 100) * 60 + (crs_dep_time % 100))
+			) AS median_dep_min
+		FROM scoped
+		GROUP BY origin, dest
+		ORDER BY flights DESC, origin, dest`
+
 	// Single-statement read of completed-job watermarks and covered periods.
 	// $1 = completed status. $2..$8 = job types, in dataset order:
 	// flight performance, weather observations, weather stations, countries, regions, airports, airport MCT.

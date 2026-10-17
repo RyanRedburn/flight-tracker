@@ -63,6 +63,8 @@ type Store interface {
 	ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error
 	RouteStats(ctx context.Context, filter RouteStatsFilter) (*model.RouteStats, error)
+	RouteFlightDateRange(ctx context.Context, origin, dest, carrier string) (RouteFlightDateRange, error)
+	FlightNumberRoutes(ctx context.Context, filter FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error)
 	RouteOutlook(ctx context.Context, filter RouteOutlookFilter) (*model.RouteOutlook, error)
 	RouteTravelWindows(ctx context.Context, filter RouteTravelWindowsFilter) (*model.RouteTravelWindows, error)
 	RebuildRouteTravelWindows(ctx context.Context) error

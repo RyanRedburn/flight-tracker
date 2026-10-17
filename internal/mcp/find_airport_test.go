@@ -20,11 +20,24 @@ const (
 	findAirportArgLimit = "limit"
 	findAirportArgQuery = "query"
 
+	testCodeBOS     = "BOS"
 	testCodeORD     = "ORD"
+	testCodeLAX     = "LAX"
 	testCodeMDW     = "MDW"
 	testCityChicago = "Chicago"
 	testNameOHare   = "Chicago O'Hare International Airport"
 	testCountryUS   = "US"
+	testDateOct6    = "2026-10-06"
+	testStatsStart  = "2025-01-01"
+	testStatsEnd    = "2026-01-01"
+	testCarrierUA   = "UA"
+
+	jsonKeyCarrier = "carrier"
+	jsonKeyOrigin  = "origin"
+	jsonKeyDest    = "dest"
+	jsonKeyDate    = "date"
+	jsonKeyDepTime = "dep_time"
+	jsonKeyArrTime = "arr_time"
 )
 
 func testLogger() *slog.Logger {
@@ -339,8 +352,20 @@ func TestToolsAreReadOnlyFindAirport(t *testing.T) {
 		}
 	}
 
-	if len(names) != 1 || names[0] != toolFindAirport {
+	want := map[string]bool{
+		toolFindAirport:       true,
+		toolCheckItinerary:    true,
+		toolRouteReliability:  true,
+	}
+
+	if len(names) != len(want) {
 		t.Fatalf("tools = %#v", names)
+	}
+
+	for _, name := range names {
+		if !want[name] {
+			t.Fatalf("unexpected tool %q in %#v", name, names)
+		}
 	}
 }
 

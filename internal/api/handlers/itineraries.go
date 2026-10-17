@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
-	"sync"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -46,76 +44,11 @@ func (h *ItinerariesHandler) ItineraryOutlook(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ctx := r.Context()
-	outlooks := make([]*model.RouteOutlook, len(req.Legs))
-	legErrors := make([]string, len(req.Legs))
-
-	var (
-		wg         sync.WaitGroup
-		mu         sync.Mutex
-		hardErr    error
-		countries  map[string]string
-		countryErr error
-	)
-
-	wg.Add(1 + len(req.Legs))
-
-	go func() {
-		defer wg.Done()
-
-		countries, countryErr = h.store.ListAirportCountriesByIATA(ctx, itineraryAirportCodes(req.Legs))
-	}()
-
-	for i, leg := range req.Legs {
-		go func(i int, leg model.ItineraryLeg) {
-			defer wg.Done()
-
-			outlook, err := h.store.RouteOutlook(ctx, routeOutlookFilter(leg))
-			if err != nil {
-				if errors.Is(err, store.ErrNotFound) {
-					legErrors[i] = errRouteOutlookNotFound
-					return
-				}
-
-				mu.Lock()
-				hardErr = err
-				mu.Unlock()
-
-				return
-			}
-
-			outlooks[i] = outlook
-		}(i, leg)
-	}
-
-	wg.Wait()
-
-	if countryErr != nil || hardErr != nil {
+	out, err := store.ItineraryOutlook(r.Context(), h.store, req.Legs)
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedItineraryOutlook})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, store.BuildItineraryOutlook(req.Legs, outlooks, legErrors, countries))
-}
-
-func routeOutlookFilter(leg model.ItineraryLeg) store.RouteOutlookFilter {
-	day, _ := store.ISOWeekdayFromDate(leg.Date)
-
-	return store.RouteOutlookFilter{
-		Origin:               leg.Origin,
-		Dest:                 leg.Dest,
-		Carrier:              leg.Carrier,
-		DayOfWeek:            day,
-		DepTime:              store.FormatHHMM(leg.DepTime),
-		DepTimeWindowMinutes: store.ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
-	}
-}
-
-func itineraryAirportCodes(legs []model.ItineraryLeg) []string {
-	codes := make([]string, 0, len(legs)*2)
-	for _, leg := range legs {
-		codes = append(codes, leg.Origin, leg.Dest)
-	}
-
-	return codes
+	writeJSON(w, http.StatusOK, out)
 }

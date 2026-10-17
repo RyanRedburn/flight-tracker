@@ -67,6 +67,16 @@ func FormatHHMM(raw string) string {
 	return fmt.Sprintf("%04d", n)
 }
 
+func MinutesToHHMM(minutes int) string {
+	if minutes < 0 {
+		minutes = 0
+	}
+
+	minutes %= 24 * 60
+
+	return fmt.Sprintf("%02d%02d", minutes/60, minutes%60)
+}
+
 // ISOWeekday maps a calendar date to 1=Monday … 7=Sunday.
 func ISOWeekday(t time.Time) int {
 	if t.Weekday() == time.Sunday {
