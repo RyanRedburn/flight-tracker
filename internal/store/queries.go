@@ -1060,14 +1060,14 @@ const (
 		FROM flight_performance
 		WHERE origin = $1
 			AND dest = $2
-			AND ($3 = '' OR iata_code_marketing_airline = $3)`
+			AND iata_code_marketing_airline = $3`
 
 	QueryFlightNumberRoutes = `
 		WITH bounds AS (
 			SELECT MAX(flight_date) AS end_date
 			FROM flight_performance
 			WHERE iata_code_marketing_airline = $1
-				AND flight_number_marketing_airline::text = $2
+				AND flight_number_marketing_airline = $2::int
 		),
 		scoped AS (
 			SELECT
@@ -1078,12 +1078,9 @@ const (
 			CROSS JOIN bounds b
 			WHERE b.end_date IS NOT NULL
 				AND f.iata_code_marketing_airline = $1
-				AND f.flight_number_marketing_airline::text = $2
+				AND f.flight_number_marketing_airline = $2::int
 				AND f.flight_date >= (b.end_date - ($3::int * INTERVAL '1 day'))
 				AND f.flight_date <= b.end_date
-				AND f.crs_dep_time IS NOT NULL
-				AND f.crs_dep_time >= 0
-				AND f.crs_dep_time <= 2359
 				AND (f.crs_dep_time / 100) BETWEEN 0 AND 23
 				AND (f.crs_dep_time % 100) BETWEEN 0 AND 59
 		)

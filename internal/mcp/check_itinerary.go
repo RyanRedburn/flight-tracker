@@ -94,16 +94,6 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 	for i, legIn := range in.Legs {
 		window := store.ResolveDepTimeWindowMinutes(legIn.DepTimeWindowMinutes)
 
-		origin := normalizeIATACode(legIn.Origin)
-		dest := normalizeIATACode(legIn.Dest)
-
-		if legIn.FlightNumber == "" && (origin == "" || dest == "") {
-			return failureResult[checkItineraryData](&Failure{
-				Code:    CodeInvalidInput,
-				Message: "Each leg needs origin and destination, or carrier with flight_number.",
-			})
-		}
-
 		origin, dest, fail := resolveRouteFromFlightNumber(ctx, s,
 			legIn.Carrier, legIn.FlightNumber, legIn.DepTime,
 			legIn.Origin, legIn.Dest, window)

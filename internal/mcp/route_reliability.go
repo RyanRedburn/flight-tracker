@@ -22,6 +22,8 @@ const (
 
 	routeReliabilityMinDepTimes = 1
 	routeReliabilityMaxDepTimes = 5
+
+	routeNotFoundMessage = "No history for %s %s–%s. Check the airports and carrier."
 )
 
 type routeReliabilityInput struct {
@@ -107,16 +109,6 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 
 	window := store.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
 
-	origin := normalizeIATACode(in.Origin)
-	dest := normalizeIATACode(in.Dest)
-
-	if in.FlightNumber == "" && (origin == "" || dest == "") {
-		return failureResult[routeReliabilityData](&Failure{
-			Code:    CodeInvalidInput,
-			Message: "Pass origin and destination, or carrier with flight_number.",
-		})
-	}
-
 	origin, dest, fail := resolveRouteFromFlightNumber(ctx, s, carrier, in.FlightNumber, firstDepTime(in.DepTimes), in.Origin, in.Dest, window)
 	if fail != nil {
 		return failureResult[routeReliabilityData](fail)
@@ -170,7 +162,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			if errors.Is(err, store.ErrNotFound) {
 				return failureResult[routeReliabilityData](&Failure{
 					Code:    CodeRouteNotFound,
-					Message: fmt.Sprintf("No history for %s %s–%s. Check the airports and carrier.", carrier, origin, dest),
+					Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
 				})
 			}
 
@@ -210,7 +202,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		if errors.Is(err, store.ErrNotFound) {
 			return failureResult[routeReliabilityData](&Failure{
 				Code:    CodeRouteNotFound,
-				Message: fmt.Sprintf("No history for %s %s–%s. Check the airports and carrier.", carrier, origin, dest),
+				Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
 			})
 		}
 
@@ -225,6 +217,13 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 	if stats.Flights == 0 {
 		dates, err := s.RouteFlightDateRange(ctx, origin, dest, carrier)
 		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return failureResult[routeReliabilityData](&Failure{
+					Code:    CodeRouteNotFound,
+					Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
+				})
+			}
+
 			logger.Error(toolRouteReliability, "stage", "date_range", "error", err)
 
 			return failureResult[routeReliabilityData](&Failure{

@@ -35,6 +35,26 @@ func TestHHMMToMinutes(t *testing.T) {
 	}
 }
 
+func TestMinutesToHHMM(t *testing.T) {
+	tests := []struct {
+		minutes int
+		want    string
+	}{
+		{minutes: 0, want: "0000"},
+		{minutes: 420, want: "0700"},
+		{minutes: 1439, want: "2359"},
+		{minutes: 1440, want: "0000"},
+		{minutes: 1500, want: "0100"},
+		{minutes: -5, want: "0000"},
+	}
+
+	for _, tt := range tests {
+		if got := MinutesToHHMM(tt.minutes); got != tt.want {
+			t.Errorf("MinutesToHHMM(%d) = %q, want %q", tt.minutes, got, tt.want)
+		}
+	}
+}
+
 func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 	// Same classification as QueryRouteStats, including the per-carrier counts
 	// folded into that query: cancelled, else diverted, else delayed when
