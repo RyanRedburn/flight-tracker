@@ -46,26 +46,3 @@ func TestNormalizeFlightNumber(t *testing.T) {
 		}
 	}
 }
-
-func TestMissingFlightNumberRollupKey(t *testing.T) {
-	// Blank, whitespace, all zeros, and other rejected values share one bucket.
-	// Empty string compares equal, so GROUP BY and the primary key collapse them.
-	missing := []string{"", "   ", "0", "0000", "12a", "12345"}
-	for _, raw := range missing {
-		if got := WeatherRollupFlightNumber(raw); got != MissingFlightNumber {
-			t.Errorf("WeatherRollupFlightNumber(%q) = %q, want empty", raw, got)
-		}
-	}
-
-	if WeatherRollupFlightNumber("") != WeatherRollupFlightNumber("   ") {
-		t.Fatal("missing flight numbers must compare equal")
-	}
-
-	if got := WeatherRollupFlightNumber("0123"); got != "123" {
-		t.Fatalf("WeatherRollupFlightNumber(%q) = %q, want 123", "0123", got)
-	}
-
-	if WeatherRollupFlightNumber("0123") == MissingFlightNumber {
-		t.Fatal("a present flight number must not use the missing bucket")
-	}
-}

@@ -56,7 +56,7 @@ func TestNormalizeFlightNumbersRejectsBadValues(t *testing.T) {
 		{name: "too long", column: colFlightNumberMarketing, raw: "12345"},
 		{name: "non digits", column: colFlightNumberOperating, raw: "12A"},
 		{name: "all zeros", column: colFlightNumberCodeshare, raw: "0000"},
-		{name: "empty is not zero", column: colFlightNumberMarketing, raw: "0"},
+		{name: "zero", column: colFlightNumberMarketing, raw: "0"},
 	}
 
 	for _, tt := range tests {

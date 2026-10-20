@@ -49,14 +49,3 @@ func NormalizeFlightNumber(raw string) (string, error) {
 
 	return raw, nil
 }
-
-// WeatherRollupFlightNumber is the route_weather_category_buckets key for one stored marketing flight number.
-// Blank and any value NormalizeFlightNumber rejects share MissingFlightNumber so they compare equal.
-func WeatherRollupFlightNumber(raw string) string {
-	number, err := NormalizeFlightNumber(raw)
-	if err != nil {
-		return MissingFlightNumber
-	}
-
-	return number
-}

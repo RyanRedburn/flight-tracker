@@ -17,7 +17,7 @@ func normalizeFlightNumbers(rows [][]string) error {
 		for _, idx := range indexes {
 			raw := row[idx]
 			if strings.TrimSpace(raw) == "" {
-				row[idx] = store.WeatherRollupFlightNumber(raw)
+				row[idx] = store.MissingFlightNumber
 				continue
 			}
 
