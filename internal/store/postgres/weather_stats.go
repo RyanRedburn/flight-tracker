@@ -98,7 +98,7 @@ func buildRouteWeatherStatsQuery(filter store.RouteStatsFilter) (string, []any) 
 	}
 
 	if filter.FlightNumber != "" {
-		fmt.Fprintf(&extra, " AND flight_number::text = $%d", n)
+		fmt.Fprintf(&extra, " AND flight_number = $%d", n)
 
 		args = append(args, filter.FlightNumber)
 		n++

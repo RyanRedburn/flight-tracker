@@ -27,7 +27,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 //	@Param			start_date		query		string	true	"Range start (YYYY-MM-DD)"	Format(date)
 //	@Param			end_date		query		string	true	"Range end (YYYY-MM-DD), on or after start_date"	Format(date)
 //	@Param			carrier			query		string	false	"Marketing carrier code (required if flight_number is set)"	minlength(2)	maxlength(2)
-//	@Param			flight_number	query		string	false	"Flight number (requires carrier)"
+//	@Param			flight_number	query		string	false	"Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)"
 //	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
 //	@Success		200				{object}	model.RouteStats
 //	@Failure		400				{object}	ErrorResponse
@@ -155,7 +155,7 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 //	@Param			start_date		query		string	true	"Range start (YYYY-MM-DD)"	Format(date)
 //	@Param			end_date		query		string	true	"Range end (YYYY-MM-DD), on or after start_date"	Format(date)
 //	@Param			carrier			query		string	false	"Marketing carrier code (required if flight_number is set)"	minlength(2)	maxlength(2)
-//	@Param			flight_number	query		string	false	"Flight number (requires carrier)"
+//	@Param			flight_number	query		string	false	"Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)"
 //	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
 //	@Success		200				{object}	model.RouteWeatherStats
 //	@Failure		400				{object}	ErrorResponse

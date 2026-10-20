@@ -369,7 +369,7 @@ func TestRouteReliabilityNarrowsFlightNumberByDepTime(t *testing.T) {
 
 	res := callTool(t, stub, toolRouteReliability, map[string]any{
 		jsonKeyCarrier:      testCarrierUA,
-		jsonKeyFlightNumber: "200",
+		jsonKeyFlightNumber: "0200",
 		jsonKeyDayOfWeek:    2,
 		jsonKeyDepTimes:     []string{"1810"},
 	})
@@ -703,7 +703,7 @@ func TestRouteReliabilityInputSchema(t *testing.T) {
 	assertCodeSchema(t, schema.Properties["dest"], 3)
 
 	flightNumber := schema.Properties[jsonKeyFlightNumber]
-	if flightNumber == nil || flightNumber.MaxLength == nil || *flightNumber.MaxLength != store.FlightNumberMaxLen {
+	if flightNumber == nil || flightNumber.MaxLength == nil || *flightNumber.MaxLength != store.FlightNumberRawMaxLen || flightNumber.Pattern != store.FlightNumberPattern {
 		t.Fatalf("flight_number schema = %#v", flightNumber)
 	}
 

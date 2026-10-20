@@ -824,7 +824,8 @@ const (
 	// or no observation with a stored category in the window is UNMATCHED
 	// (not VFR_FAIR). Category is the value written at weather ingest.
 	// On time is not cancelled, then not diverted, then arr_del15 < 1.
-	// flight_number -1 stands in for a missing marketing flight number.
+	// flight_number '' (store.MissingFlightNumber) stands in for a missing marketing flight number.
+	// NULL and blank become that same key, so they share one GROUP BY bucket and one primary-key value.
 	QueryInsertRouteWeatherStats = `
 		WITH origin_stations AS (
 			SELECT aws.airport_code, btrim(aws.iem_sid) AS iem_sid, aws.tzname
@@ -853,7 +854,7 @@ const (
 					WHEN f.day_of_week BETWEEN 1 AND 7 THEN f.day_of_week
 					ELSE EXTRACT(ISODOW FROM f.flight_date)::int
 				END AS day_of_week,
-				COALESCE(f.flight_number_marketing_airline, -1) AS flight_number,
+				COALESCE(NULLIF(btrim(f.flight_number_marketing_airline), ''), '` + MissingFlightNumber + `') AS flight_number,
 				f.crs_dep_time,
 				f.crs_elapsed_time,
 				` + sqlIsOnTime + ` AS is_on_time
@@ -1060,7 +1061,7 @@ const (
 			SELECT MAX(flight_date) AS end_date
 			FROM flight_performance
 			WHERE iata_code_marketing_airline = $1
-				AND flight_number_marketing_airline = $2::int
+				AND flight_number_marketing_airline = $2
 		),
 		scoped AS (
 			SELECT
@@ -1071,7 +1072,7 @@ const (
 			CROSS JOIN bounds b
 			WHERE b.end_date IS NOT NULL
 				AND f.iata_code_marketing_airline = $1
-				AND f.flight_number_marketing_airline = $2::int
+				AND f.flight_number_marketing_airline = $2
 				AND f.flight_date >= (b.end_date - ($3::int * INTERVAL '1 day'))
 				AND f.flight_date <= b.end_date
 				AND (f.crs_dep_time / 100) BETWEEN 0 AND 23

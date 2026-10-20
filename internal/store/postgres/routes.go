@@ -276,7 +276,7 @@ func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (strin
 	}
 
 	if filter.FlightNumber != "" {
-		fmt.Fprintf(&extra, " AND flight_number_marketing_airline::text = $%d", n)
+		fmt.Fprintf(&extra, " AND flight_number_marketing_airline = $%d", n)
 
 		args = append(args, filter.FlightNumber)
 		n++

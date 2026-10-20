@@ -243,6 +243,9 @@ curl -H "Authorization: Bearer $API_KEY" http://localhost:8080/api/internal/data
 # Route performance stats
 curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&days_of_week=1,2,3,4,5"
 
+# One marketing flight. Leading zeros are ignored, so 0123 and 123 are the same flight.
+curl "http://localhost:8080/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-06-30&carrier=UA&flight_number=0123"
+
 # Booking outlook for one departure slot
 curl "http://localhost:8080/api/v1/routes/outlook?origin=ORD&dest=LAX&carrier=UA&day_of_week=2&dep_time=0700"
 
@@ -298,7 +301,7 @@ A successful flight-performance load queues travel-window and weather-category r
 
 #### Flight performance (`POST /api/internal/ingest/flight-performance`)
 
-Workers download the BTS TranStats Marketing Carrier On-Time Performance zip for the month and load `flight_performance`.
+Workers download the BTS TranStats Marketing Carrier On-Time Performance zip for the month and load `flight_performance`. Flight numbers are stored as text with leading zeros removed; a blank number is missing, not zero.
 
 #### Weather observations (`POST /api/internal/ingest/weather`)
 

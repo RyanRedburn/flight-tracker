@@ -43,8 +43,8 @@ func resolveRouteFromFlightNumber(
 		return origin, dest, false, nil
 	}
 
-	flightNumber, ok := store.NormalizeFlightNumber(flightNumber)
-	if !ok {
+	flightNumber, err := store.NormalizeFlightNumber(flightNumber)
+	if err != nil {
 		return "", "", false, &Failure{
 			Code:    CodeInvalidInput,
 			Message: "Flight number is required and must be 1 to 4 digits.",

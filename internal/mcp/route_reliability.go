@@ -36,7 +36,7 @@ type routeReliabilityInput struct {
 	Origin               string   `json:"origin,omitempty" jsonschema:"Origin IATA code"`
 	Dest                 string   `json:"dest,omitempty" jsonschema:"Destination IATA code"`
 	Carrier              string   `json:"carrier" jsonschema:"Marketing carrier code"`
-	FlightNumber         string   `json:"flight_number,omitempty" jsonschema:"Marketing flight number when origin and destination are unknown"`
+	FlightNumber         string   `json:"flight_number,omitempty" jsonschema:"Marketing flight number when origin and destination are unknown. 1 to 4 digits; leading zeros are ignored"`
 	Date                 string   `json:"date,omitempty" jsonschema:"Travel date (YYYY-MM-DD); use this or day_of_week"`
 	DayOfWeek            int      `json:"day_of_week,omitempty" jsonschema:"Weekday 1=Mon … 7=Sun; use this or date"`
 	DepTimes             []string `json:"dep_times" jsonschema:"Scheduled departure times (hhmm) to compare"`
@@ -85,7 +85,8 @@ func routeReliabilityInputSchema() *jsonschema.Schema {
 	schema.Properties["origin"].MaxLength = jsonschema.Ptr(3)
 	schema.Properties["dest"].MinLength = jsonschema.Ptr(3)
 	schema.Properties["dest"].MaxLength = jsonschema.Ptr(3)
-	schema.Properties["flight_number"].MaxLength = jsonschema.Ptr(store.FlightNumberMaxLen)
+	schema.Properties["flight_number"].MaxLength = jsonschema.Ptr(store.FlightNumberRawMaxLen)
+	schema.Properties["flight_number"].Pattern = store.FlightNumberPattern
 	schema.Properties["day_of_week"].Minimum = jsonschema.Ptr(1.0)
 	schema.Properties["day_of_week"].Maximum = jsonschema.Ptr(7.0)
 

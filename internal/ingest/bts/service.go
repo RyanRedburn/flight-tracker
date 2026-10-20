@@ -52,6 +52,10 @@ func (s *Service) ImportMonth(ctx context.Context, year, month int) (ImportResul
 		return ImportResult{}, fmt.Errorf("parse csv: %w", err)
 	}
 
+	if err := normalizeFlightNumbers(rows); err != nil {
+		return ImportResult{}, fmt.Errorf("normalize flight numbers: %w", err)
+	}
+
 	if err := s.store.ReplaceFlightPerformanceByMonth(ctx, year, month, columns, rows); err != nil {
 		return ImportResult{}, fmt.Errorf("load flights: %w", err)
 	}
