@@ -471,7 +471,7 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		},
 	}
 
-	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{nil, outlook}, []string{"route outlook not found", ""}, map[string]string{
+	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{nil, outlook}, []string{ItineraryLegOutlookNotFound, ""}, map[string]string{
 		testAirportBOS:   "US",
 		testTravelOrigin: "US",
 		testAirportLAX:   "US",

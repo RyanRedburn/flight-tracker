@@ -1,6 +1,7 @@
 package query
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -54,7 +55,7 @@ func ParseRouteStats(r *http.Request) (store.RouteStatsFilter, error) {
 		return store.RouteStatsFilter{}, err
 	}
 
-	return store.RouteStatsFilter{
+	filter := store.RouteStatsFilter{
 		Origin:       q.Origin,
 		Dest:         q.Dest,
 		StartDate:    q.StartDate.Format("2006-01-02"),
@@ -62,7 +63,12 @@ func ParseRouteStats(r *http.Request) (store.RouteStatsFilter, error) {
 		Carrier:      q.Carrier,
 		FlightNumber: q.FlightNumber,
 		DaysOfWeek:   uniqueDays(q.DaysOfWeek),
-	}, nil
+	}
+	if err := filter.Validate(); err != nil {
+		return store.RouteStatsFilter{}, err
+	}
+
+	return filter, nil
 }
 
 func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
@@ -79,21 +85,34 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 
 	window := store.ResolveDepTimeWindowMinutes(q.DepTimeWindowMinutes)
 
+	date := ""
+	if !q.Date.IsZero() {
+		date = q.Date.Format("2006-01-02")
+	}
+
 	dayOfWeek := 0
 	if q.DayOfWeek != nil {
 		dayOfWeek = *q.DayOfWeek
-	} else if !q.Date.IsZero() {
-		dayOfWeek = store.ISOWeekday(q.Date)
 	}
 
-	return store.RouteOutlookFilter{
+	day, err := store.ParseOutlookDay(date, dayOfWeek)
+	if err != nil {
+		return store.RouteOutlookFilter{}, err
+	}
+
+	filter := store.RouteOutlookFilter{
 		Origin:               q.Origin,
 		Dest:                 q.Dest,
 		Carrier:              q.Carrier,
-		DayOfWeek:            dayOfWeek,
+		DayOfWeek:            day,
 		DepTime:              store.FormatHHMM(q.DepTime),
 		DepTimeWindowMinutes: window,
-	}, nil
+	}
+	if err := filter.Validate(); err != nil {
+		return store.RouteOutlookFilter{}, err
+	}
+
+	return filter, nil
 }
 
 func ParseRouteTravelWindows(r *http.Request) (store.RouteTravelWindowsFilter, error) {
@@ -122,23 +141,28 @@ func validateRouteStatsSpan(sl validator.StructLevel) {
 
 func validateRouteOutlookSchedule(sl validator.StructLevel) {
 	q := sl.Current().Interface().(routeOutlookQuery)
-	hasDate := !q.Date.IsZero()
-	hasDay := q.DayOfWeek != nil
 
-	if hasDate == hasDay {
+	date := ""
+	if !q.Date.IsZero() {
+		date = q.Date.Format("2006-01-02")
+	}
+
+	day := 0
+	if q.DayOfWeek != nil {
+		day = *q.DayOfWeek
+	}
+
+	if _, err := store.ParseOutlookDay(date, day); errors.Is(err, store.ErrOutlookSchedule) {
 		sl.ReportError(q.Date, "Date", "date", "outlook_schedule", "")
 	}
 }
 
 func reportDateSpan(sl validator.StructLevel, start, end time.Time) {
-	if start.IsZero() || end.IsZero() || end.Before(start) {
+	if !store.ExceedsMaxStatsSpan(start, end) {
 		return
 	}
 
-	spanDays := int(end.Sub(start).Hours()/24) + 1
-	if spanDays > store.MaxStatsSpanDays {
-		sl.ReportError(end, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
-	}
+	sl.ReportError(end, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
 }
 
 func validateHHMM(fl validator.FieldLevel) bool {

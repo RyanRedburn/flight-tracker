@@ -13,6 +13,7 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -20,11 +21,31 @@ const (
 	findAirportArgLimit = "limit"
 	findAirportArgQuery = "query"
 
+	testCodeBOS     = "BOS"
 	testCodeORD     = "ORD"
+	testCodeDFW     = "DFW"
+	testCodeLAX     = "LAX"
 	testCodeMDW     = "MDW"
+	testCodeSFO     = "SFO"
+	testCodeORX     = "ORX"
 	testCityChicago = "Chicago"
 	testNameOHare   = "Chicago O'Hare International Airport"
 	testCountryUS   = "US"
+	testDateOct6    = "2026-10-06"
+	testStatsStart  = "2025-01-01"
+	testStatsEnd    = "2026-01-01"
+	testCarrierUA   = "UA"
+
+	jsonKeyCarrier      = "carrier"
+	jsonKeyOrigin       = "origin"
+	jsonKeyDest         = "dest"
+	jsonKeyDate         = "date"
+	jsonKeyDepTime      = "dep_time"
+	jsonKeyArrTime      = "arr_time"
+	jsonKeyLegs         = "legs"
+	jsonKeyFlightNumber = "flight_number"
+	jsonKeyDepTimes     = "dep_times"
+	jsonKeyDayOfWeek    = "day_of_week"
 )
 
 func testLogger() *slog.Logger {
@@ -122,21 +143,16 @@ func TestFindAirport(t *testing.T) {
 		},
 		{
 			name:  "close codes",
-			query: "ORX",
+			query: testCodeORX,
 			airports: []model.Airport{
 				{IATACode: testCodeORD, Name: testNameOHare, Match: model.AirportMatchCloseCode},
 				orf,
 			},
-			wantCall:  true,
-			wantLimit: store.AirportSearchDefaultLimit,
-			wantQuery: "ORX",
-			wantError: true,
-			wantCode:  CodeAirportNotFound,
-			wantSubstr: []string{
-				"Close matches",
-				testCodeORD,
-				"ORF",
-			},
+			wantCall:   true,
+			wantLimit:  store.AirportSearchDefaultLimit,
+			wantQuery:  testCodeORX,
+			wantConf:   model.ConfidenceLow,
+			wantSubstr: []string{testCodeORD, "ORF", summaryPickCode},
 		},
 		{
 			name:       "empty query",
@@ -234,10 +250,6 @@ func TestFindAirport(t *testing.T) {
 					}
 				}
 
-				if tt.name == "close codes" && len(out.Error.Matches) != 2 {
-					t.Fatalf("matches = %#v", out.Error.Matches)
-				}
-
 				return
 			}
 
@@ -247,10 +259,6 @@ func TestFindAirport(t *testing.T) {
 
 			if out.Data == nil || out.Data.Query != tt.wantQuery || len(out.Data.Airports) != len(tt.airports) {
 				t.Fatalf("data = %#v", out.Data)
-			}
-
-			if out.SampleSize != nil || out.SampleReason != "" {
-				t.Errorf("lookup set sample size=%v reason=%q", out.SampleSize, out.SampleReason)
 			}
 		})
 	}
@@ -339,8 +347,60 @@ func TestToolsAreReadOnlyFindAirport(t *testing.T) {
 		}
 	}
 
-	if len(names) != 1 || names[0] != toolFindAirport {
+	want := map[string]bool{
+		toolFindAirport:      true,
+		toolCheckItinerary:   true,
+		toolRouteReliability: true,
+	}
+
+	if len(names) != len(want) {
 		t.Fatalf("tools = %#v", names)
+	}
+
+	for _, name := range names {
+		if !want[name] {
+			t.Fatalf("unexpected tool %q in %#v", name, names)
+		}
+	}
+}
+
+func TestCheckItineraryAndRouteReliabilityAnnotations(t *testing.T) {
+	session := connectServer(t, &storetest.Stub{})
+
+	wantTitle := map[string]string{
+		toolCheckItinerary:   "Check itinerary",
+		toolRouteReliability: "Route reliability",
+	}
+	seen := 0
+
+	for tool, err := range session.Tools(context.Background(), nil) {
+		if err != nil {
+			t.Fatalf("tools: %v", err)
+		}
+
+		title, ok := wantTitle[tool.Name]
+		if !ok {
+			continue
+		}
+
+		seen++
+
+		ann := tool.Annotations
+		if ann == nil || !ann.ReadOnlyHint || ann.Title != title || ann.OpenWorldHint == nil || *ann.OpenWorldHint {
+			t.Errorf("%s annotations = %#v", tool.Name, ann)
+		}
+	}
+
+	if seen != len(wantTitle) {
+		t.Fatalf("seen %d tools, want %d", seen, len(wantTitle))
+	}
+}
+
+func assertCodeSchema(t *testing.T, schema *jsonschema.Schema, length int) {
+	t.Helper()
+
+	if schema == nil || schema.MinLength == nil || *schema.MinLength != length || schema.MaxLength == nil || *schema.MaxLength != length {
+		t.Fatalf("code schema = %#v, want length %d", schema, length)
 	}
 }
 

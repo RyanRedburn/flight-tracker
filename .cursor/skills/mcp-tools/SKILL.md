@@ -18,9 +18,9 @@ Also follow [development-practices](../development-practices/SKILL.md).
 
 Every tool returns `Result[T]` from `result.go` through `successResult` or `failureResult`.
 
-- `summary` is one short line the assistant can act on. Don't repeat `confidence` or other fields in it, and don't append caveats.
-- `confidence` uses the `model.Confidence*` values. Sample fields are only for tools backed by flight history.
-- Failures carry a stable `Code*` constant and a message that tells the assistant what to do next. Add close `matches` instead of making it guess. `failureResult` also puts the message in text content, so it survives SDK versions that drop structured data on errors.
+- `summary` is one short line the assistant can act on. State on-time odds and how many flights they come from when that is the answer, or say when the data is missing or thin. Don't repeat the confidence value, and don't append a caveat.
+- `confidence` uses the `model.Confidence*` values.
+- Failures carry a stable `Code*` constant and a message that tells the assistant what to do next. Add close `matches` instead of making it guess. Every result carries the same JSON in text and structuredContent.
 
 Bad input, no match, and store errors are tool errors (`IsError` result, nil Go error) so the model can recover. Log store errors and return a generic `CodeUnavailable` message. Only return a Go error for a real protocol failure.
 

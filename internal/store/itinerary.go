@@ -210,9 +210,9 @@ func BuildItineraryOutlook(legs []model.ItineraryLeg, outlooks []*model.RouteOut
 }
 
 func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutlookLeg, connections []model.ItineraryConnection) model.ItineraryOutlookSummary {
-	confidence := model.ConfidenceHigh
+	confidences := make([]string, 0, len(legs))
 	if len(legs) == 0 {
-		confidence = model.ConfidenceUnknown
+		confidences = append(confidences, model.ConfidenceUnknown)
 	}
 
 	for _, leg := range legs {
@@ -221,10 +221,10 @@ func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutl
 			legConfidence = leg.Outlook.DecisionConfidence()
 		}
 
-		if confidenceRank(legConfidence) < confidenceRank(confidence) {
-			confidence = legConfidence
-		}
+		confidences = append(confidences, legConfidence)
 	}
+
+	confidence := model.MinConfidence(confidences...)
 
 	connectionRisk := false
 
@@ -246,17 +246,6 @@ func itinerarySummary(requested []model.ItineraryLeg, legs []model.ItineraryOutl
 	}
 
 	return summary
-}
-
-func confidenceRank(confidence string) int {
-	switch confidence {
-	case model.ConfidenceHigh:
-		return 2
-	case model.ConfidenceLow:
-		return 1
-	default:
-		return 0
-	}
 }
 
 func localDateTime(date, hhmm string) (time.Time, bool) {
