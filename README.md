@@ -297,7 +297,7 @@ Every ingest returns **409** when a pending or running job already covers that m
 
 Load order for a consistent database (there are no foreign keys): **countries → regions → airports → at least one BTS month → weather-stations → weather observations**. Airport MCT does not depend on that order.
 
-Travel-window and weather-category rollups refresh only when a rebuild is queued. Ingest does not queue one. After a backfill, call both once: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending. A running rebuild does not block a new pending job. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
+Travel-window and weather-category rollups refresh only when a rebuild is executed. Ingest does not queue one. After a backfill, call both once: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending. A running rebuild does not block a new pending job. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
 
 #### Flight performance (`POST /api/internal/ingest/flight-performance`)
 
