@@ -389,10 +389,23 @@ func manyDepartureSummary(route string, departures []routeDepartureOutlook) stri
 }
 
 func rankedSummary(route string, ranked []rankedDeparture) string {
-	leaders, trailers := groupRanked(ranked)
+	sorted := append([]rankedDeparture(nil), ranked...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].percent > sorted[j].percent })
+
+	split := 1
+	for split < len(sorted) && sorted[0].percent-sorted[split].percent < routeReliabilitySamePointGap {
+		split++
+	}
+
+	leaders, trailers := sorted[:split], sorted[split:]
 
 	if len(trailers) == 0 {
 		return aboutTheSame(route, leaders)
+	}
+
+	// A trailer within the gap of the lowest leader is not clearly worse, so list every time in order instead.
+	if leaders[len(leaders)-1].percent-trailers[0].percent < routeReliabilitySamePointGap {
+		return orderedSummary(route, sorted)
 	}
 
 	if len(leaders) == 1 {
@@ -404,40 +417,25 @@ func rankedSummary(route string, ranked []rankedDeparture) string {
 		joinRankedTimes(leaders), joinRankedTimes(trailers), route, joinPercents(leaders), joinPercents(trailers))
 }
 
-// groupRanked calls a time less reliable only when it is at least the gap below every leading time.
-func groupRanked(ranked []rankedDeparture) (leaders, trailers []rankedDeparture) {
-	order := make([]int, len(ranked))
-	for i := range ranked {
-		order[i] = i
+// orderedSummary compares the displayed percents, so every time tied with the best leads.
+func orderedSummary(route string, sorted []rankedDeparture) string {
+	tied := 1
+	for tied < len(sorted) && sorted[tied].percent == sorted[0].percent {
+		tied++
 	}
 
-	sort.SliceStable(order, func(i, j int) bool {
-		return ranked[order[i]].percent > ranked[order[j]].percent
-	})
-
-	lead := make([]bool, len(ranked))
-	if len(order) > 0 {
-		lead[order[0]] = true
+	rest := make([]string, 0, len(sorted)-tied)
+	for _, item := range sorted[tied:] {
+		rest = append(rest, fmt.Sprintf("%s (%d%%)", item.time, item.percent))
 	}
 
-	for i := 1; i < len(order); i++ {
-		if ranked[order[i-1]].percent-ranked[order[i]].percent >= routeReliabilitySamePointGap {
-			break
-		}
-
-		lead[order[i]] = true
+	verb := "is"
+	if tied > 1 {
+		verb = "are"
 	}
 
-	for i, item := range ranked {
-		if lead[i] {
-			leaders = append(leaders, item)
-			continue
-		}
-
-		trailers = append(trailers, item)
-	}
-
-	return leaders, trailers
+	return fmt.Sprintf("%s %s most reliable on %s (%d%% on time), then %s.",
+		joinRankedTimes(sorted[:tied]), verb, route, sorted[0].percent, joinAnd(rest))
 }
 
 func aboutTheSame(route string, leaders []rankedDeparture) string {

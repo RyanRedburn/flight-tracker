@@ -10,6 +10,11 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
+const (
+	testDep0900 = "0900"
+	testDep1100 = "1100"
+)
+
 func TestRouteReliabilitySummaries(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -97,14 +102,110 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
-			name:  "small gaps stay together",
+			name:  "in-between time lists in order",
 			times: []string{"0700", "1400", "1800"},
 			byTime: map[string]model.RouteOutlook{
 				"0700": reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
 				"1400": reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800": reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "0700, 1400 and 1800 are about the same on UA ORD–LAX (85%, 83% and 81% on time).",
+			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 1400 (83%) and 1800 (81%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "steady slide lists in order",
+			times: []string{"0700", testDep0900, testDep1100, "1400", "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+				"1400":      reliabilityOutlook(0.79, 40, model.ConfidenceHigh),
+				"1800":      reliabilityOutlook(0.77, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 0900 (83%), 1100 (81%), 1400 (79%) and 1800 (77%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "two lead one trails",
+			times: []string{"0700", testDep0900, testDep1100},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.84, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 and 0900 are about the same and more reliable than 1100 on UA ORD–LAX (85% and 84% vs 80% on time).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "best listed first when given out of order",
+			times: []string{"0700", testDep0900, testDep1100},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+			},
+			want:           "0900 is most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 0700 (81%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "tied best then in-between times",
+			times: []string{"0700", testDep0900, testDep1100, "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 and 0900 are most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 1800 (81%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "three tied within the gap stay about the same",
+			times: []string{"0700", testDep0900, testDep1100, "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				"1400":      reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+			},
+			want:           "0700, 0900, 1100 and 1400 are about the same on UA ORD–LAX (85%, 85%, 85% and 83% on time).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "three tied best then in-between times",
+			times: []string{"0700", testDep0900, testDep1100, "1400", "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				"1400":      reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+			},
+			want:           "0700, 0900 and 1100 are most reliable on UA ORD–LAX (85% on time), then 1400 (83%) and 1800 (81%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "rounded percents tie",
+			times: []string{"0700", testDep0900, testDep1100, "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.851, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.849, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 and 0900 are most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 1800 (81%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "in-between time with thin data",
+			times: []string{"0700", testDep0900, testDep1100, "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				testDep0900: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				testDep1100: reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+				"1400":      reliabilityOutlook(0.95, 4, model.ConfidenceLow),
+			},
+			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 0900 (83%) and 1100 (81%). 1400 has thin data.",
 			wantConfidence: model.ConfidenceHigh,
 		},
 	}
