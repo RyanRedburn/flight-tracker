@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -23,10 +24,12 @@ const (
 	routeReliabilityMinDepTimes = 1
 	routeReliabilityMaxDepTimes = 5
 
-	// routeReliabilitySamePointGap is the on-time gap, in percentage points, that still counts as the same.
+	// routeReliabilitySamePointGap is the on-time gap, in percentage points. A gap under this is about the same.
 	routeReliabilitySamePointGap = 3
 
 	routeNotFoundMessage = "No history for %s %s–%s. Check the airports and carrier."
+
+	msgOutlookSchedule = "Exactly one of date or day_of_week is required."
 )
 
 type routeReliabilityInput struct {
@@ -38,10 +41,6 @@ type routeReliabilityInput struct {
 	DayOfWeek            int      `json:"day_of_week,omitempty" jsonschema:"Weekday 1=Mon … 7=Sun; use this or date"`
 	DepTimes             []string `json:"dep_times" jsonschema:"Scheduled departure times (hhmm) to compare"`
 	DepTimeWindowMinutes *int     `json:"dep_time_window_minutes,omitempty" jsonschema:"Minutes around each dep_time for history (1–120)"`
-}
-
-type routeReliabilityDeparture struct {
-	Outlook routeDepartureOutlook `json:"outlook"`
 }
 
 // routeDepartureOutlook is the time-specific outlook. Route fields stay on the stats object.
@@ -65,8 +64,8 @@ type routeDepartureOutlook struct {
 }
 
 type routeReliabilityData struct {
-	Stats      model.RouteStats            `json:"stats"`
-	Departures []routeReliabilityDeparture `json:"departures"`
+	Stats      model.RouteStats        `json:"stats"`
+	Departures []routeDepartureOutlook `json:"departures"`
 }
 
 type rankedDeparture struct {
@@ -145,6 +144,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 
 	window := store.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
 	depTimes := make([]string, 0, len(in.DepTimes))
+	seenDep := make(map[string]struct{}, len(in.DepTimes))
 
 	for _, dep := range in.DepTimes {
 		dep = strings.TrimSpace(dep)
@@ -152,6 +152,15 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			return failureResult[routeReliabilityData](depTimeFailure(err))
 		}
 
+		dep = store.FormatHHMM(dep)
+		if _, ok := seenDep[dep]; ok {
+			return failureResult[routeReliabilityData](&Failure{
+				Code:    CodeInvalidInput,
+				Message: "Each dep_times entry must be a different time.",
+			})
+		}
+
+		seenDep[dep] = struct{}{}
 		depTimes = append(depTimes, dep)
 	}
 
@@ -160,7 +169,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		return failureResult[routeReliabilityData](fail)
 	}
 
-	departures := make([]routeReliabilityDeparture, 0, len(depTimes))
+	departures := make([]routeDepartureOutlook, 0, len(depTimes))
 
 	for _, dep := range depTimes {
 		filter := store.RouteOutlookFilter{
@@ -168,7 +177,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			Dest:                 dest,
 			Carrier:              carrier,
 			DayOfWeek:            day,
-			DepTime:              store.FormatHHMM(dep),
+			DepTime:              dep,
 			DepTimeWindowMinutes: window,
 		}
 
@@ -186,16 +195,14 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			})
 		}
 
-		departures = append(departures, routeReliabilityDeparture{
-			Outlook: newRouteDepartureOutlook(*outlook, filter.DepTime, window),
-		})
+		departures = append(departures, newRouteDepartureOutlook(*outlook, filter.DepTime, window))
 	}
 
 	statsFilter := store.RouteStatsFilter{
 		Origin:     origin,
 		Dest:       dest,
-		StartDate:  departures[0].Outlook.Analysis.Start,
-		EndDate:    departures[0].Outlook.Analysis.End,
+		StartDate:  departures[0].Analysis.Start,
+		EndDate:    departures[0].Analysis.End,
 		Carrier:    carrier,
 		DaysOfWeek: []int{day},
 	}
@@ -215,22 +222,10 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	reported := *stats
-	if reported.Flights == 0 {
-		reported.Analysis.SampleSize = 0
-		if reported.Analysis.Confidence == "" {
-			reported.Analysis.Confidence = model.ConfidenceUnknown
-		}
-
-		if reported.Analysis.SampleReason == "" {
-			reported.Analysis.SampleReason = model.SampleReasonEmptySample
-		}
-	}
-
 	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
 
 	return successResult(summary, confidence, &routeReliabilityData{
-		Stats:      reported,
+		Stats:      *stats,
 		Departures: departures,
 	})
 }
@@ -259,7 +254,31 @@ func newRouteDepartureOutlook(out model.RouteOutlook, depTime string, window int
 }
 
 func invalidInput(err error) *Failure {
-	return &Failure{Code: CodeInvalidInput, Message: err.Error()}
+	return &Failure{Code: CodeInvalidInput, Message: validationMessage(err)}
+}
+
+func validationMessage(err error) string {
+	switch {
+	case errors.Is(err, store.ErrOutlookSchedule):
+		return msgOutlookSchedule
+	case errors.Is(err, store.ErrInvalidDate):
+		return "date must be a valid date (YYYY-MM-DD)."
+	case errors.Is(err, store.ErrInvalidWeekday):
+		return "day_of_week must be from 1 to 7."
+	case errors.Is(err, store.ErrInvalidHHMM):
+		return "dep_time must be a valid local time (hhmm)."
+	default:
+		return finishSentence(err.Error())
+	}
+}
+
+func finishSentence(msg string) string {
+	msg = strings.TrimSpace(msg)
+	if msg == "" || strings.HasSuffix(msg, ".") {
+		return msg
+	}
+
+	return msg + "."
 }
 
 func depTimeFailure(err error) *Failure {
@@ -273,7 +292,7 @@ func depTimeFailure(err error) *Failure {
 	return invalidInput(err)
 }
 
-func routeReliabilitySummary(carrier, origin, dest string, departures []routeReliabilityDeparture) (string, string) {
+func routeReliabilitySummary(carrier, origin, dest string, departures []routeDepartureOutlook) (string, string) {
 	route := carrier + " " + origin + "–" + dest
 	confidence := departureConfidence(departures)
 
@@ -284,13 +303,30 @@ func routeReliabilitySummary(carrier, origin, dest string, departures []routeRel
 	return manyDepartureSummary(route, departures), confidence
 }
 
-func departureConfidence(departures []routeReliabilityDeparture) string {
-	values := make([]string, len(departures))
+func departureConfidence(departures []routeDepartureOutlook) string {
+	ranked := make([]string, 0, len(departures))
+	all := make([]string, len(departures))
+
 	for i, dep := range departures {
-		values[i] = outlookConfidence(dep.Outlook.Analysis)
+		confidence := outlookConfidence(dep.Analysis)
+		all[i] = confidence
+
+		if confidence != model.ConfidenceHigh {
+			continue
+		}
+
+		if _, ok := outlookOnTimeRate(dep.OnTimeProbability); !ok {
+			continue
+		}
+
+		ranked = append(ranked, confidence)
 	}
 
-	return model.MinConfidence(values...)
+	if len(ranked) == 0 {
+		return model.MinConfidence(all...)
+	}
+
+	return model.MinConfidence(ranked...)
 }
 
 func outlookConfidence(analysis model.Analysis) string {
@@ -298,25 +334,25 @@ func outlookConfidence(analysis model.Analysis) string {
 	return outlook.DecisionConfidence()
 }
 
-func oneDepartureSummary(route string, dep routeReliabilityDeparture) string {
-	label := dep.Outlook.Filters.DepTime + " on " + route
+func oneDepartureSummary(route string, dep routeDepartureOutlook) string {
+	label := dep.Filters.DepTime + " on " + route
 
-	switch outlookConfidence(dep.Outlook.Analysis) {
+	switch outlookConfidence(dep.Analysis) {
 	case model.ConfidenceHigh:
-		rate, ok := outlookOnTimeRate(dep.Outlook.OnTimeProbability)
+		rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
 		if !ok {
 			return label + " has no reliable on-time rate."
 		}
 
-		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Outlook.Analysis.SampleSize)
+		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Analysis.SampleSize)
 	case model.ConfidenceLow:
-		return fmt.Sprintf("%s has thin data (%d flights), so there is no reliable on-time rate.", label, dep.Outlook.Analysis.SampleSize)
+		return fmt.Sprintf("%s has thin data (%d flights), so there is no reliable on-time rate.", label, dep.Analysis.SampleSize)
 	default:
 		return label + " has no data for this day and time."
 	}
 }
 
-func manyDepartureSummary(route string, departures []routeReliabilityDeparture) string {
+func manyDepartureSummary(route string, departures []routeDepartureOutlook) string {
 	var (
 		ranked []rankedDeparture
 		thin   []string
@@ -324,11 +360,11 @@ func manyDepartureSummary(route string, departures []routeReliabilityDeparture) 
 	)
 
 	for _, dep := range departures {
-		timeLabel := dep.Outlook.Filters.DepTime
+		timeLabel := dep.Filters.DepTime
 
-		switch outlookConfidence(dep.Outlook.Analysis) {
+		switch outlookConfidence(dep.Analysis) {
 		case model.ConfidenceHigh:
-			rate, ok := outlookOnTimeRate(dep.Outlook.OnTimeProbability)
+			rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
 			if !ok {
 				none = append(none, timeLabel)
 				continue
@@ -353,26 +389,7 @@ func manyDepartureSummary(route string, departures []routeReliabilityDeparture) 
 }
 
 func rankedSummary(route string, ranked []rankedDeparture) string {
-	best := ranked[0].percent
-	for _, item := range ranked[1:] {
-		if item.percent > best {
-			best = item.percent
-		}
-	}
-
-	var (
-		leaders  []rankedDeparture
-		trailers []rankedDeparture
-	)
-
-	for _, item := range ranked {
-		if best-item.percent < routeReliabilitySamePointGap {
-			leaders = append(leaders, item)
-			continue
-		}
-
-		trailers = append(trailers, item)
-	}
+	leaders, trailers := groupRanked(ranked)
 
 	if len(trailers) == 0 {
 		return aboutTheSame(route, leaders)
@@ -385,6 +402,42 @@ func rankedSummary(route string, ranked []rankedDeparture) string {
 
 	return fmt.Sprintf("%s are about the same and more reliable than %s on %s (%s vs %s on time).",
 		joinRankedTimes(leaders), joinRankedTimes(trailers), route, joinPercents(leaders), joinPercents(trailers))
+}
+
+// groupRanked calls a time less reliable only when it is at least the gap below every leading time.
+func groupRanked(ranked []rankedDeparture) (leaders, trailers []rankedDeparture) {
+	order := make([]int, len(ranked))
+	for i := range ranked {
+		order[i] = i
+	}
+
+	sort.SliceStable(order, func(i, j int) bool {
+		return ranked[order[i]].percent > ranked[order[j]].percent
+	})
+
+	lead := make([]bool, len(ranked))
+	if len(order) > 0 {
+		lead[order[0]] = true
+	}
+
+	for i := 1; i < len(order); i++ {
+		if ranked[order[i-1]].percent-ranked[order[i]].percent >= routeReliabilitySamePointGap {
+			break
+		}
+
+		lead[order[i]] = true
+	}
+
+	for i, item := range ranked {
+		if lead[i] {
+			leaders = append(leaders, item)
+			continue
+		}
+
+		trailers = append(trailers, item)
+	}
+
+	return leaders, trailers
 }
 
 func aboutTheSame(route string, leaders []rankedDeparture) string {

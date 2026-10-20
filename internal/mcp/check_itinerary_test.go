@@ -184,6 +184,95 @@ func TestCheckItineraryFlightNumberNotFound(t *testing.T) {
 	}
 }
 
+func TestCheckItineraryUnknownAirport(t *testing.T) {
+	stub := &storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			if filter.Origin == testCodeORX {
+				return nil, store.ErrNotFound
+			}
+
+			out := outlookWithConnectionMinutes(60, 90)
+			out.Analysis = model.Analysis{
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			}
+
+			return out, nil
+		},
+		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
+			return map[string]string{testCodeBOS: "US", testCodeORD: "US", testCodeLAX: "US"}, nil
+		},
+		SearchAirportsFn: func(_ context.Context, query string, _ int) ([]model.Airport, error) {
+			if query == testCodeORX {
+				return []model.Airport{{IATACode: testCodeORD, Name: testNameOHare, Match: model.AirportMatchCloseCode}}, nil
+			}
+
+			return []model.Airport{{IATACode: query, Match: model.AirportMatchExactIATA}}, nil
+		},
+	}
+
+	res, out, err := checkItinerary(context.Background(), stub, testLogger(), checkItineraryInput{Legs: []checkItineraryLegInput{
+		{Origin: testCodeBOS, Dest: testCodeORD, Carrier: testCarrierUA, Date: testDateOct6, DepTime: "0700", ArrTime: "905"},
+		{Origin: testCodeORX, Dest: testCodeLAX, Carrier: testCarrierUA, Date: testDateOct6, DepTime: "1100", ArrTime: "1400"},
+	}})
+	if err != nil {
+		t.Fatalf("checkItinerary: %v", err)
+	}
+
+	if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeAirportNotFound || out.Data != nil {
+		t.Fatalf("error = %#v data = %#v", out.Error, out.Data)
+	}
+
+	if len(out.Error.Matches) != 1 || out.Error.Matches[0].IATACode != testCodeORD {
+		t.Fatalf("matches = %#v", out.Error.Matches)
+	}
+}
+
+func TestCheckItineraryKnownAirportMissingOutlook(t *testing.T) {
+	stub := &storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			if filter.Dest == testCodeLAX {
+				return nil, store.ErrNotFound
+			}
+
+			out := outlookWithConnectionMinutes(60, 90)
+			out.Filters = model.Filters{Origin: filter.Origin, Dest: filter.Dest}
+			out.Analysis = model.Analysis{
+				SampleSize:   40,
+				SampleReason: model.SampleReasonSufficient,
+				Confidence:   model.ConfidenceHigh,
+			}
+
+			return out, nil
+		},
+		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
+			return map[string]string{testCodeBOS: "US", testCodeORD: "US", testCodeLAX: "US"}, nil
+		},
+		SearchAirportsFn: exactAirportSearch,
+	}
+
+	res, out, err := checkItinerary(context.Background(), stub, testLogger(), checkItineraryInput{Legs: []checkItineraryLegInput{
+		{Origin: testCodeBOS, Dest: testCodeORD, Carrier: testCarrierUA, Date: testDateOct6, DepTime: "0700", ArrTime: "905"},
+		{Origin: testCodeORD, Dest: testCodeLAX, Carrier: testCarrierUA, Date: testDateOct6, DepTime: "1100", ArrTime: "1400"},
+	}})
+	if err != nil {
+		t.Fatalf("checkItinerary: %v", err)
+	}
+
+	if res == nil || res.IsError || out.Error != nil || out.Data == nil || len(out.Data.Legs) != 2 {
+		t.Fatalf("error = %#v legs = %#v", out.Error, out.Data)
+	}
+
+	if out.Data.Legs[0].Outlook == nil || out.Data.Legs[0].Error != nil {
+		t.Fatalf("first leg = %+v", out.Data.Legs[0])
+	}
+
+	if out.Data.Legs[1].Outlook != nil || out.Data.Legs[1].Error == nil || *out.Data.Legs[1].Error != store.ItineraryLegOutlookNotFound {
+		t.Fatalf("second leg = %+v", out.Data.Legs[1])
+	}
+}
+
 func TestCheckItineraryBadInput(t *testing.T) {
 	valid := checkItineraryLegInput{
 		Origin: testCodeBOS, Dest: testCodeORD, Carrier: testCarrierUA,

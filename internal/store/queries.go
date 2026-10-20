@@ -1055,13 +1055,6 @@ const (
 		DELETE FROM rate_limit_buckets
 		WHERE last_refill_at < $1`
 
-	QueryRouteFlightDateRange = `
-		SELECT MIN(flight_date)::text, MAX(flight_date)::text
-		FROM flight_performance
-		WHERE origin = $1
-			AND dest = $2
-			AND iata_code_marketing_airline = $3`
-
 	QueryFlightNumberRoutes = `
 		WITH bounds AS (
 			SELECT MAX(flight_date) AS end_date

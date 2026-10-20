@@ -76,29 +76,22 @@ func resolveRouteFromFlightNumber(
 	}
 
 	filtered, near, matchedTimes := routesNearDepTimes(routes, depTimes, windowMinutes)
-	if near != "" {
-		switch len(filtered) {
-		case 1:
-			return filtered[0].Origin, filtered[0].Dest, true, nil
-		case 0:
-			return "", "", false, &Failure{
-				Code:         CodeFlightNumberAmbiguous,
-				Message:      fmt.Sprintf("No %s %s route leaves near %s; recent routes are listed. Pick origin and destination.", carrier, flightNumber, near),
-				FlightRoutes: routes,
-			}
-		default:
-			return "", "", false, &Failure{
-				Code:         CodeFlightNumberAmbiguous,
-				Message:      fmt.Sprintf("%s %s has more than one route near %s. Pick origin and destination.", carrier, flightNumber, joinAnd(matchedTimes)),
-				FlightRoutes: filtered,
-			}
-		}
-	}
 
-	return "", "", false, &Failure{
-		Code:         CodeFlightNumberAmbiguous,
-		Message:      fmt.Sprintf("%s %s has more than one route. Pick origin and destination.", carrier, flightNumber),
-		FlightRoutes: routes,
+	switch len(filtered) {
+	case 1:
+		return filtered[0].Origin, filtered[0].Dest, true, nil
+	case 0:
+		return "", "", false, &Failure{
+			Code:         CodeFlightNumberAmbiguous,
+			Message:      fmt.Sprintf("No %s %s route leaves near %s; recent routes are listed. Pick origin and destination.", carrier, flightNumber, near),
+			FlightRoutes: routes,
+		}
+	default:
+		return "", "", false, &Failure{
+			Code:         CodeFlightNumberAmbiguous,
+			Message:      fmt.Sprintf("%s %s has more than one route near %s. Pick origin and destination.", carrier, flightNumber, joinAnd(matchedTimes)),
+			FlightRoutes: filtered,
+		}
 	}
 }
 

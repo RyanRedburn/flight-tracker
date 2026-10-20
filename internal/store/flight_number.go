@@ -31,8 +31,3 @@ func NormalizeFlightNumber(raw string) (string, bool) {
 
 	return strconv.Itoa(n), true
 }
-
-type RouteFlightDateRange struct {
-	Start string
-	End   string
-}

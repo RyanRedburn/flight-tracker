@@ -74,7 +74,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
 			},
 			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has no data.",
-			wantConfidence: model.ConfidenceUnknown,
+			wantConfidence: model.ConfidenceHigh,
 		},
 		{
 			name:  "no times have data",
@@ -94,7 +94,18 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400": reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
 			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has thin data.",
-			wantConfidence: model.ConfidenceLow,
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "small gaps stay together",
+			times: []string{"0700", "1400", "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
+				"1800": reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
+			},
+			want:           "0700, 1400 and 1800 are about the same on UA ORD–LAX (85%, 83% and 81% on time).",
+			wantConfidence: model.ConfidenceHigh,
 		},
 	}
 
@@ -155,8 +166,8 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				t.Fatalf("departures = %d", len(out.Data.Departures))
 			}
 
-			if out.Data.Departures[0].Outlook.Filters.DepTime != tt.times[0] || out.Data.Departures[0].Outlook.Filters.Origin != "" {
-				t.Fatalf("departure filters = %+v", out.Data.Departures[0].Outlook.Filters)
+			if out.Data.Departures[0].Filters.DepTime != tt.times[0] || out.Data.Departures[0].Filters.Origin != "" {
+				t.Fatalf("departure filters = %+v", out.Data.Departures[0].Filters)
 			}
 		})
 	}
@@ -191,8 +202,9 @@ func TestRouteReliabilityEmptyStats(t *testing.T) {
 		t.Fatalf("error = %#v", out.Error)
 	}
 
-	if out.Data.Stats.Flights != 0 || out.Data.Stats.Analysis.SampleSize != 0 || out.Data.Stats.Analysis.Confidence != model.ConfidenceUnknown || out.Data.Stats.Analysis.SampleReason != model.SampleReasonEmptySample {
-		t.Fatalf("stats = %+v", out.Data.Stats.Analysis)
+	stats := out.Data.Stats
+	if stats.Flights != 0 || stats.Analysis.Start != testStatsStart || stats.Analysis.End != testStatsEnd || stats.Analysis.SampleSize != 0 || stats.Analysis.Confidence != "" || stats.Analysis.SampleReason != "" {
+		t.Fatalf("stats = %+v", stats)
 	}
 }
 
@@ -459,6 +471,88 @@ func TestRouteReliabilityFlightNumberSkipsAirportSearch(t *testing.T) {
 
 	if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeRouteNotFound {
 		t.Fatalf("error = %#v", out.Error)
+	}
+}
+
+func TestRouteReliabilityDuplicateDepTimes(t *testing.T) {
+	res, out, err := routeReliability(context.Background(), &storetest.Stub{}, testLogger(), routeReliabilityInput{
+		Origin:   testCodeORD,
+		Dest:     testCodeLAX,
+		Carrier:  testCarrierUA,
+		Date:     testDateOct6,
+		DepTimes: []string{"0700", "0700"},
+	})
+	if err != nil {
+		t.Fatalf("routeReliability: %v", err)
+	}
+
+	if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeInvalidInput {
+		t.Fatalf("error = %#v", out.Error)
+	}
+
+	if out.Error.Message != "Each dep_times entry must be a different time." {
+		t.Fatalf("message = %q", out.Error.Message)
+	}
+}
+
+func TestRouteReliabilityValidationMessages(t *testing.T) {
+	window := 0
+	base := routeReliabilityInput{
+		Origin:   testCodeORD,
+		Dest:     testCodeLAX,
+		Carrier:  testCarrierUA,
+		Date:     testDateOct6,
+		DepTimes: []string{"0700"},
+	}
+	tests := []struct {
+		name string
+		edit func(*routeReliabilityInput)
+		want string
+	}{
+		{
+			name: "neither date nor day",
+			edit: func(in *routeReliabilityInput) { in.Date = "" },
+			want: msgOutlookSchedule,
+		},
+		{
+			name: "both date and day",
+			edit: func(in *routeReliabilityInput) { in.DayOfWeek = 2 },
+			want: msgOutlookSchedule,
+		},
+		{
+			name: "bad date",
+			edit: func(in *routeReliabilityInput) { in.Date = "2026-13-01" },
+			want: "date must be a valid date (YYYY-MM-DD).",
+		},
+		{
+			name: "bad weekday",
+			edit: func(in *routeReliabilityInput) {
+				in.Date = ""
+				in.DayOfWeek = 8
+			},
+			want: "day_of_week must be from 1 to 7.",
+		},
+		{
+			name: "bad window",
+			edit: func(in *routeReliabilityInput) { in.DepTimeWindowMinutes = &window },
+			want: "dep_time_window_minutes must be from 1 to 120.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := base
+			tt.edit(&in)
+
+			res, out, err := routeReliability(context.Background(), &storetest.Stub{}, testLogger(), in)
+			if err != nil {
+				t.Fatalf("routeReliability: %v", err)
+			}
+
+			if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeInvalidInput || out.Error.Message != tt.want {
+				t.Fatalf("error = %#v", out.Error)
+			}
+		})
 	}
 }
 

@@ -9,21 +9,6 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-func (s *Store) RouteFlightDateRange(ctx context.Context, origin, dest, carrier string) (store.RouteFlightDateRange, error) {
-	var start, end sql.NullString
-
-	err := s.db.QueryRowContext(ctx, store.QueryRouteFlightDateRange, origin, dest, carrier).Scan(&start, &end)
-	if err != nil {
-		return store.RouteFlightDateRange{}, err
-	}
-
-	if !start.Valid || !end.Valid || start.String == "" || end.String == "" {
-		return store.RouteFlightDateRange{}, fmt.Errorf("route flight date range %s-%s: %w", origin, dest, store.ErrNotFound)
-	}
-
-	return store.RouteFlightDateRange{Start: start.String, End: end.String}, nil
-}
-
 func (s *Store) FlightNumberRoutes(ctx context.Context, filter store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
 	rows, err := s.db.QueryContext(ctx, store.QueryFlightNumberRoutes,
 		filter.Carrier,

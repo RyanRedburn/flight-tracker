@@ -218,7 +218,7 @@ func missingItineraryAirports(ctx context.Context, s store.Store, logger *slog.L
 			continue
 		}
 
-		if i >= len(fromFlightNumber) || fromFlightNumber[i] {
+		if fromFlightNumber[i] {
 			continue
 		}
 
