@@ -76,9 +76,9 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 }
 
 // RebuildRouteTravelWindows replaces route and route+carrier travel-window
-// rollups from flight_performance. Call after a successful flight-performance
-// month load. An advisory xact lock makes concurrent replicas serialize;
-// the rebuild is a full truncate+insert, so repeating it is idempotent.
+// rollups from flight_performance. An advisory xact lock makes concurrent
+// replicas serialize; the rebuild is a full truncate+insert, so repeating it
+// is idempotent.
 func (s *Store) RebuildRouteTravelWindows(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

@@ -3,7 +3,6 @@ package operator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -27,11 +26,6 @@ func (h *WeatherStationsIngestHandler) Process(ctx context.Context, _ *model.Job
 	result, err := h.ingest.ImportStations(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	// Station mapping and timezones change which observation matches a flight.
-	if err := enqueueRebuildJob(ctx, h.store.CreateRebuildRouteWeatherStatsJob); err != nil {
-		return nil, fmt.Errorf("enqueue route weather stats rebuild: %w", err)
 	}
 
 	return json.Marshal(result)

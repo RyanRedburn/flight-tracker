@@ -297,7 +297,7 @@ Every ingest returns **409** when a pending or running job already covers that m
 
 Load order for a consistent database (there are no foreign keys): **countries → regions → airports → at least one BTS month → weather-stations → weather observations**. Airport MCT does not depend on that order.
 
-A successful flight-performance load queues travel-window and weather-category rollup rebuilds. A successful weather-observation or weather-station load queues a weather-category rollup rebuild. Rollups refresh when that job runs. A pending rebuild of the same type is not queued again; a running rebuild does not block a new pending job. Admins can queue the same full rebuilds with an empty body: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
+Travel-window and weather-category rollups refresh only when a rebuild is queued. Ingest does not queue one. After a backfill, call both once: `POST /api/internal/rebuild/travel-windows` and `POST /api/internal/rebuild/weather-stats`. Each returns **409** when that rebuild type is already pending. A running rebuild does not block a new pending job. Category names and the ±30 minute join are in `internal/ingest/iem/documents/asos_observations.md`.
 
 #### Flight performance (`POST /api/internal/ingest/flight-performance`)
 
@@ -311,7 +311,7 @@ Source: Iowa Environmental Mesonet ASOS/METAR (`asos.py`).
 
 #### Weather stations (`POST /api/internal/ingest/weather-stations`)
 
-One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty. A weather-stats rebuild is queued because station ids and timezones change which observation matches a flight.
+One job downloads US IEM ASOS GeoJSON, replaces `weather_stations`, and rebuilds `airport_weather_stations` from distinct BTS origin and dest codes. Matching tries IEM `sid` against the BTS/IATA code, then OurAirports `local_code` (FAA), then `icao_code` / `ident`. Missing airports data falls back to exact IATA=`sid`. Unmatched airports are stored with `matched = false`. Empty BTS data still replaces the catalog and leaves the mapping empty.
 
 #### Reference data (`POST /api/internal/ingest/{countries|regions|airports}`)
 

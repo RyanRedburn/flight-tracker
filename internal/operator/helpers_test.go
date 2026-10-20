@@ -1,9 +1,11 @@
 package operator
 
 import (
+	"context"
 	"errors"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -26,5 +28,14 @@ func mustNewProcessor(t *testing.T, s store.Store, handlers ...JobHandler) *Proc
 var (
 	errRebuildFailed = errors.New("rebuild failed")
 	errImportFailed  = errors.New("import failed")
-	errEnqueueFailed = errors.New("enqueue failed")
 )
+
+func rejectRebuild(t *testing.T) func(context.Context) (*model.Job, error) {
+	t.Helper()
+
+	return func(context.Context) (*model.Job, error) {
+		t.Fatal("ingest queued a rollup rebuild")
+
+		return nil, nil
+	}
+}

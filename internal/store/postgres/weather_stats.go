@@ -54,10 +54,9 @@ func (s *Store) queryWeatherCategoryCounts(ctx context.Context, query string, ar
 }
 
 // RebuildRouteWeatherStats replaces per-side route weather rollups from
-// flight_performance joined to the nearest classified observation. Call after
-// a successful flight-performance load, weather-observation load, or weather
-// station mapping replace. An advisory xact lock serializes replicas; the
-// rebuild is a full truncate+insert, so repeating it is idempotent.
+// flight_performance joined to the nearest classified observation. An advisory
+// xact lock serializes replicas; the rebuild is a full truncate+insert, so
+// repeating it is idempotent.
 func (s *Store) RebuildRouteWeatherStats(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
