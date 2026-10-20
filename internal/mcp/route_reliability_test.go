@@ -2,7 +2,7 @@ package mcp
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -10,98 +10,214 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func TestRouteReliabilityPrefersHigherOnTime(t *testing.T) {
-	stub := &storetest.Stub{
-		SearchAirportsFn: exactAirportSearch,
-		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-			rate := 0.6
-			if filter.DepTime == "0700" {
-				rate = 0.85
+func TestRouteReliabilitySummaries(t *testing.T) {
+	tests := []struct {
+		name           string
+		times          []string
+		byTime         map[string]model.RouteOutlook
+		want           string
+		wantConfidence string
+	}{
+		{
+			name:  "one time with data",
+			times: []string{"0700"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+			},
+			want:           "0700 on UA ORD–LAX is on time about 85% of the time, from 30 flights.",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "one time with no data",
+			times: []string{"0700"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
+			},
+			want:           "0700 on UA ORD–LAX has no data for this day and time.",
+			wantConfidence: model.ConfidenceUnknown,
+		},
+		{
+			name:  "two times clear winner",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0.60, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 is more reliable than 1400 on UA ORD–LAX (85% vs 60% on time).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "two times tie",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0.80, 36, model.ConfidenceHigh),
+			},
+			want:           "0700 and 1400 are about the same on UA ORD–LAX (80% on time).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "two times near tie",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.82, 40, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
+			},
+			want:           "0700 and 1400 are about the same on UA ORD–LAX (82% and 80% on time).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
+			name:  "only one time has data",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
+			},
+			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has no data.",
+			wantConfidence: model.ConfidenceUnknown,
+		},
+		{
+			name:  "no times have data",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
+				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
+			},
+			want:           "No listed time on UA ORD–LAX has enough data to compare. 0700 and 1400 have no data.",
+			wantConfidence: model.ConfidenceUnknown,
+		},
+		{
+			name:  "low confidence time not ranked",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+				"1400": reliabilityOutlook(0.95, 4, model.ConfidenceLow),
+			},
+			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has thin data.",
+			wantConfidence: model.ConfidenceLow,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var statsFilter store.RouteStatsFilter
+
+			stub := &storetest.Stub{
+				RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+					outlook, ok := tt.byTime[filter.DepTime]
+					if !ok {
+						t.Fatalf("unexpected dep time %s", filter.DepTime)
+					}
+
+					outlook.Analysis.Start = testStatsStart
+					outlook.Analysis.End = testStatsEnd
+
+					return &outlook, nil
+				},
+				RouteStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+					statsFilter = filter
+
+					return &model.RouteStats{
+						Flights:  80,
+						Analysis: model.Analysis{SampleSize: 80, SampleReason: model.SampleReasonSufficient, Confidence: model.ConfidenceHigh},
+					}, nil
+				},
 			}
 
-			return &model.RouteOutlook{
-				Filters: model.Filters{DepTime: filter.DepTime},
-				OutlookResult: model.OutlookResult{
-					Analysis: model.Analysis{
-						Start:        testStatsStart,
-						End:          testStatsEnd,
-						SampleSize:   30,
-						SampleReason: model.SampleReasonSufficient,
-						Confidence:   model.ConfidenceHigh,
-					},
-					OnTimeProbability: &rate,
-				},
-			}, nil
-		},
-		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
-			return &model.RouteStats{
-				Flights:  120,
-				Analysis: model.Analysis{SampleSize: 120, SampleReason: model.SampleReasonSufficient, Confidence: model.ConfidenceHigh},
-			}, nil
-		},
-	}
+			res, out, err := routeReliability(context.Background(), stub, testLogger(), routeReliabilityInput{
+				Origin:   testCodeORD,
+				Dest:     testCodeLAX,
+				Carrier:  testCarrierUA,
+				Date:     testDateOct6,
+				DepTimes: tt.times,
+			})
+			if err != nil {
+				t.Fatalf("routeReliability: %v", err)
+			}
 
-	res := callTool(t, stub, toolRouteReliability, map[string]any{
-		jsonKeyOrigin:   testCodeORD,
-		jsonKeyDest:     testCodeLAX,
-		jsonKeyCarrier:  testCarrierUA,
-		jsonKeyDate:     testDateOct6,
-		jsonKeyDepTimes: []string{"0700", "1400"},
-	})
-	if res.IsError {
-		t.Fatalf("IsError content=%s", toolText(t, res))
-	}
+			if res == nil || res.IsError {
+				t.Fatalf("error = %#v", out.Error)
+			}
 
-	out := decodeResult[routeReliabilityData](t, res)
-	if !containsAll(out.Summary, "0700", "1400", "Prefer") {
-		t.Fatalf("summary = %q", out.Summary)
-	}
+			if out.Summary != tt.want {
+				t.Fatalf("summary = %q", out.Summary)
+			}
 
-	if len(out.Data.Departures) != 2 {
-		t.Fatalf("departures = %d", len(out.Data.Departures))
+			if out.Confidence != tt.wantConfidence {
+				t.Fatalf("confidence = %q, want %q", out.Confidence, tt.wantConfidence)
+			}
+
+			if statsFilter.StartDate != testStatsStart || statsFilter.EndDate != testStatsEnd || len(statsFilter.DaysOfWeek) != 1 || statsFilter.DaysOfWeek[0] != 2 {
+				t.Fatalf("stats filter = %+v", statsFilter)
+			}
+
+			if len(out.Data.Departures) != len(tt.times) {
+				t.Fatalf("departures = %d", len(out.Data.Departures))
+			}
+
+			if out.Data.Departures[0].Outlook.Filters.DepTime != tt.times[0] || out.Data.Departures[0].Outlook.Filters.Origin != "" {
+				t.Fatalf("departure filters = %+v", out.Data.Departures[0].Outlook.Filters)
+			}
+		})
 	}
 }
 
-func TestRouteReliabilityNoDataInWindow(t *testing.T) {
+func TestRouteReliabilityEmptyStats(t *testing.T) {
 	stub := &storetest.Stub{
-		SearchAirportsFn: exactAirportSearch,
-		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-			rate := 0.5
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			outlook := reliabilityOutlook(0.5, 4, model.ConfidenceLow)
+			outlook.Analysis.Start = testStatsStart
+			outlook.Analysis.End = testStatsEnd
 
-			return &model.RouteOutlook{
-				OutlookResult: model.OutlookResult{
-					Analysis:          model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 10, Confidence: model.ConfidenceLow},
-					OnTimeProbability: &rate,
-				},
-			}, nil
+			return &outlook, nil
 		},
 		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
-			return &model.RouteStats{Flights: 0, Analysis: model.Analysis{Start: "2025-01-01", End: "2026-01-01"}}, nil
-		},
-		RouteFlightDateRangeFn: func(context.Context, string, string, string) (store.RouteFlightDateRange, error) {
-			return store.RouteFlightDateRange{Start: "2024-06-01", End: "2026-05-31"}, nil
+			return &model.RouteStats{Flights: 0, Analysis: model.Analysis{Start: testStatsStart, End: testStatsEnd}}, nil
 		},
 	}
 
-	res := callTool(t, stub, toolRouteReliability, map[string]any{
-		jsonKeyOrigin:    testCodeORD,
-		jsonKeyDest:      testCodeLAX,
-		jsonKeyCarrier:   testCarrierUA,
-		jsonKeyDayOfWeek: 2,
-		jsonKeyDepTimes:  []string{"0700"},
+	res, out, err := routeReliability(context.Background(), stub, testLogger(), routeReliabilityInput{
+		Origin:    testCodeORD,
+		Dest:      testCodeLAX,
+		Carrier:   testCarrierUA,
+		DayOfWeek: 2,
+		DepTimes:  []string{"0700"},
 	})
-	if !res.IsError {
-		t.Fatal("expected error")
+	if err != nil {
+		t.Fatalf("routeReliability: %v", err)
 	}
 
-	out := decodeResult[routeReliabilityData](t, res)
-	if out.Error == nil || out.Error.Code != CodeNoDataInWindow {
+	if res == nil || res.IsError {
 		t.Fatalf("error = %#v", out.Error)
 	}
 
-	if out.Error.AvailableStart != "2024-06-01" || out.Error.AvailableEnd != "2026-05-31" {
-		t.Fatalf("available = %q..%q", out.Error.AvailableStart, out.Error.AvailableEnd)
+	if out.Data.Stats.Flights != 0 || out.Data.Stats.Analysis.SampleSize != 0 || out.Data.Stats.Analysis.Confidence != model.ConfidenceUnknown || out.Data.Stats.Analysis.SampleReason != model.SampleReasonEmptySample {
+		t.Fatalf("stats = %+v", out.Data.Stats.Analysis)
 	}
+}
+
+func reliabilityOutlook(rate float64, sample int, confidence string) model.RouteOutlook {
+	outlook := model.RouteOutlook{
+		OutlookResult: model.OutlookResult{
+			Analysis: model.Analysis{
+				SampleSize: sample,
+				Confidence: confidence,
+			},
+		},
+	}
+
+	switch confidence {
+	case model.ConfidenceHigh:
+		outlook.Analysis.SampleReason = model.SampleReasonSufficient
+		outlook.OnTimeProbability = &rate
+	case model.ConfidenceLow:
+		outlook.Analysis.SampleReason = model.SampleReasonInsufficientSample
+		outlook.OnTimeProbability = &rate
+	default:
+		outlook.Analysis.SampleReason = model.SampleReasonEmptySample
+	}
+
+	return outlook
 }
 
 func TestRouteReliabilityNarrowsFlightNumberByDepTime(t *testing.T) {
@@ -207,7 +323,7 @@ func TestRouteReliabilityFlightNumberAmbiguousDepTimes(t *testing.T) {
 
 	out := decodeResult[routeReliabilityData](t, res)
 
-	want := "UA 200 flies more than one route recently. Pick origin and destination from the list, or add dep_times."
+	want := "UA 200 has more than one route near 0700 and 1800. Pick origin and destination."
 	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous || out.Error.Message != want {
 		t.Fatalf("error = %#v", out.Error)
 	}
@@ -263,61 +379,86 @@ func TestRouteReliabilityFlightNumberMatchesLaterDepTime(t *testing.T) {
 }
 
 func TestRouteReliabilityRouteNotFound(t *testing.T) {
-	tests := []struct {
-		name string
-		stub *storetest.Stub
-	}{
-		{
-			name: "outlook missing",
-			stub: &storetest.Stub{
-				SearchAirportsFn: exactAirportSearch,
-				RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-					return nil, store.ErrNotFound
-				},
-			},
-		},
-		{
-			name: "no flights at all",
-			stub: &storetest.Stub{
-				SearchAirportsFn: exactAirportSearch,
-				RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
-					rate := 0.5
-
-					return &model.RouteOutlook{
-						OutlookResult: model.OutlookResult{
-							Analysis:          model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 10, Confidence: model.ConfidenceLow},
-							OnTimeProbability: &rate,
-						},
-					}, nil
-				},
-				RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
-					return &model.RouteStats{Flights: 0}, nil
-				},
-				RouteFlightDateRangeFn: func(context.Context, string, string, string) (store.RouteFlightDateRange, error) {
-					return store.RouteFlightDateRange{}, store.ErrNotFound
-				},
-			},
+	stub := &storetest.Stub{
+		SearchAirportsFn: exactAirportSearch,
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return nil, store.ErrNotFound
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			res := callTool(t, tt.stub, toolRouteReliability, map[string]any{
-				jsonKeyOrigin:   testCodeORD,
-				jsonKeyDest:     testCodeLAX,
-				jsonKeyCarrier:  testCarrierUA,
-				jsonKeyDate:     testDateOct6,
-				jsonKeyDepTimes: []string{"0700"},
-			})
-			if !res.IsError {
-				t.Fatal("expected error")
+	res := callTool(t, stub, toolRouteReliability, map[string]any{
+		jsonKeyOrigin:   testCodeORD,
+		jsonKeyDest:     testCodeLAX,
+		jsonKeyCarrier:  testCarrierUA,
+		jsonKeyDate:     testDateOct6,
+		jsonKeyDepTimes: []string{"0700"},
+	})
+	if !res.IsError {
+		t.Fatal("expected error")
+	}
+
+	out := decodeResult[routeReliabilityData](t, res)
+	if out.Error == nil || out.Error.Code != CodeRouteNotFound {
+		t.Fatalf("error = %#v", out.Error)
+	}
+}
+
+func TestRouteReliabilityUnknownAirport(t *testing.T) {
+	stub := &storetest.Stub{
+		SearchAirportsFn: func(_ context.Context, query string, _ int) ([]model.Airport, error) {
+			if query == testCodeORX {
+				return []model.Airport{{IATACode: testCodeORD, Name: testNameOHare, Match: model.AirportMatchCloseCode}}, nil
 			}
 
-			out := decodeResult[routeReliabilityData](t, res)
-			if out.Error == nil || out.Error.Code != CodeRouteNotFound {
-				t.Fatalf("error = %#v", out.Error)
-			}
-		})
+			return []model.Airport{{IATACode: query, Match: model.AirportMatchExactIATA}}, nil
+		},
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return nil, store.ErrNotFound
+		},
+	}
+
+	res, out, err := routeReliability(context.Background(), stub, testLogger(), routeReliabilityInput{
+		Origin:   testCodeORX,
+		Dest:     testCodeLAX,
+		Carrier:  testCarrierUA,
+		Date:     testDateOct6,
+		DepTimes: []string{"0700"},
+	})
+	if err != nil {
+		t.Fatalf("routeReliability: %v", err)
+	}
+
+	if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeAirportNotFound {
+		t.Fatalf("error = %#v", out.Error)
+	}
+
+	if len(out.Error.Matches) != 1 || out.Error.Matches[0].IATACode != testCodeORD {
+		t.Fatalf("matches = %#v", out.Error.Matches)
+	}
+}
+
+func TestRouteReliabilityFlightNumberSkipsAirportSearch(t *testing.T) {
+	stub := &storetest.Stub{
+		FlightNumberRoutesFn: func(context.Context, store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
+			return []model.FlightNumberRoute{{Origin: testCodeORD, Dest: testCodeLAX, Flights: 10, UsualDepTime: "0700"}}, nil
+		},
+		RouteOutlookFn: func(context.Context, store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return nil, store.ErrNotFound
+		},
+	}
+
+	res, out, err := routeReliability(context.Background(), stub, testLogger(), routeReliabilityInput{
+		Carrier:      testCarrierUA,
+		FlightNumber: "200",
+		Date:         testDateOct6,
+		DepTimes:     []string{"0700"},
+	})
+	if err != nil {
+		t.Fatalf("routeReliability: %v", err)
+	}
+
+	if res == nil || !res.IsError || out.Error == nil || out.Error.Code != CodeRouteNotFound {
+		t.Fatalf("error = %#v", out.Error)
 	}
 }
 
@@ -341,7 +482,7 @@ func TestRouteReliabilityBadInput(t *testing.T) {
 		{name: "empty dep times", edit: func(in *routeReliabilityInput) { in.DepTimes = nil }},
 	}
 
-	stub := &storetest.Stub{SearchAirportsFn: exactAirportSearch}
+	stub := &storetest.Stub{}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -416,12 +557,35 @@ func TestRouteReliabilityInputSchema(t *testing.T) {
 	}
 }
 
-func containsAll(s string, parts ...string) bool {
-	for _, part := range parts {
-		if !strings.Contains(s, part) {
-			return false
-		}
+func TestRouteDepartureOutlookJSON(t *testing.T) {
+	rate := 0.85
+
+	body, err := json.Marshal(newRouteDepartureOutlook(model.RouteOutlook{
+		OutlookResult: model.OutlookResult{
+			Analysis:          model.Analysis{SampleSize: 30, Confidence: model.ConfidenceHigh},
+			OnTimeProbability: &rate,
+			Connection:        model.ConnectionGuidance{DomesticToDomestic: model.NewConnectionMinutes(45)},
+		},
+	}, "0700", 30))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
 
-	return true
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if _, ok := payload["connection"]; ok {
+		t.Fatalf("connection present in %s", body)
+	}
+
+	filters, ok := payload["filters"].(map[string]any)
+	if !ok || filters["dep_time"] != "0700" {
+		t.Fatalf("filters = %#v", payload["filters"])
+	}
+
+	if _, ok := filters["origin"]; ok {
+		t.Fatalf("origin repeated in %s", body)
+	}
 }

@@ -32,8 +32,8 @@ func TestCheckItineraryTightConnection(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
-	if !out.Data.Itinerary.Summary.ConnectionRisk {
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	if !out.Data.Summary.ConnectionRisk {
 		t.Fatalf("connection_risk = false")
 	}
 
@@ -54,7 +54,7 @@ func TestCheckItineraryTwoTightConnections(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
 
 	want := "Connections at ORD and DFW look tight; allow more time or pick later outbounds."
 	if out.Summary != want {
@@ -70,7 +70,7 @@ func TestCheckItineraryTightAndUnknownConnections(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
 
 	want := "Connection at ORD looks tight and risk at DFW is unknown; allow more time or pick a later outbound."
 	if out.Summary != want {
@@ -104,7 +104,7 @@ func TestCheckItineraryFlightNumberAmbiguous(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
 	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous {
 		t.Fatalf("error = %#v", out.Error)
 	}
@@ -113,7 +113,7 @@ func TestCheckItineraryFlightNumberAmbiguous(t *testing.T) {
 		t.Fatalf("flight_routes = %#v", out.Error.FlightRoutes)
 	}
 
-	want := "UA 100 flies more than one route recently. Pick origin and destination from the list, or add dep_time."
+	want := "UA 100 has more than one route near 0700. Pick origin and destination."
 	if out.Error.Message != want {
 		t.Fatalf("message = %q", out.Error.Message)
 	}
@@ -147,8 +147,8 @@ func TestCheckItineraryResolvesFlightNumber(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
-	leg := out.Data.Itinerary.Legs[0]
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	leg := out.Data.Legs[0]
 
 	if leg.Outlook == nil || leg.Outlook.Filters.Origin != testCodeBOS || leg.Outlook.Filters.Dest != testCodeORD {
 		t.Fatalf("resolved leg = %+v", leg)
@@ -178,7 +178,7 @@ func TestCheckItineraryFlightNumberNotFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	out := decodeResult[checkItineraryData](t, res)
+	out := decodeResult[model.ItineraryOutlookResponse](t, res)
 	if out.Error == nil || out.Error.Code != CodeFlightNumberNotFound {
 		t.Fatalf("error = %#v", out.Error)
 	}
@@ -202,6 +202,18 @@ func TestCheckItineraryBadInput(t *testing.T) {
 		{name: "five legs", legs: []checkItineraryLegInput{valid, valid, valid, valid, valid}},
 		{name: "only origin", legs: []checkItineraryLegInput{onlyOrigin, valid}},
 		{name: "only dest", legs: []checkItineraryLegInput{onlyDest, valid}},
+		{name: "bad date", legs: []checkItineraryLegInput{func() checkItineraryLegInput {
+			leg := valid
+			leg.Date = "2026-13-01"
+
+			return leg
+		}(), valid}},
+		{name: "bad dep time", legs: []checkItineraryLegInput{func() checkItineraryLegInput {
+			leg := valid
+			leg.DepTime = "2460"
+
+			return leg
+		}(), valid}},
 	}
 
 	for _, tt := range tests {

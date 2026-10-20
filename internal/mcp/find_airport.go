@@ -106,30 +106,12 @@ func findAirport(ctx context.Context, s store.Store, logger *slog.Logger, in fin
 		})
 	}
 
-	if allCloseCodes(airports) {
-		return failureResult[findAirportData](&Failure{
-			Code:    CodeAirportNotFound,
-			Message: closeMatchMessage(query, airports),
-			Matches: airports,
-		})
-	}
-
 	summary, confidence := airportSummary(query, airports)
 
 	return successResult(summary, confidence, &findAirportData{
 		Query:    query,
 		Airports: airports,
 	})
-}
-
-func allCloseCodes(airports []model.Airport) bool {
-	for _, airport := range airports {
-		if airport.Match != model.AirportMatchCloseCode {
-			return false
-		}
-	}
-
-	return true
 }
 
 func airportSummary(query string, airports []model.Airport) (string, string) {
@@ -188,23 +170,4 @@ func airportPlace(airport model.Airport) string {
 	default:
 		return name
 	}
-}
-
-func closeMatchMessage(query string, airports []model.Airport) string {
-	limit := len(airports)
-	if limit > 3 {
-		limit = 3
-	}
-
-	parts := make([]string, 0, limit)
-	for _, airport := range airports[:limit] {
-		if airport.Name == "" {
-			parts = append(parts, airport.IATACode)
-			continue
-		}
-
-		parts = append(parts, airport.IATACode+" ("+airport.Name+")")
-	}
-
-	return fmt.Sprintf("No airport has IATA code %q. Close matches: %s. Search again with one of those codes or a city name.", query, strings.Join(parts, ", "))
 }

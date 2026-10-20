@@ -37,10 +37,6 @@ type checkItineraryInput struct {
 	Legs []checkItineraryLegInput `json:"legs" jsonschema:"Ordered flight legs, 2 to 4"`
 }
 
-type checkItineraryData struct {
-	Itinerary model.ItineraryOutlookResponse `json:"itinerary"`
-}
-
 func checkItineraryInputSchema() *jsonschema.Schema {
 	schema, err := jsonschema.ForType(reflect.TypeFor[checkItineraryInput](), &jsonschema.ForOptions{})
 	if err != nil {
@@ -76,73 +72,165 @@ func addCheckItinerary(server *mcpsdk.Server, s store.Store, logger *slog.Logger
 			ReadOnlyHint:  true,
 			OpenWorldHint: &closedWorld,
 		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
+	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[model.ItineraryOutlookResponse], error) {
 		return checkItinerary(ctx, s, logger, in)
 	})
 }
 
-func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
+func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[model.ItineraryOutlookResponse], error) {
 	if len(in.Legs) < checkItineraryMinLegs || len(in.Legs) > checkItineraryMaxLegs {
-		return failureResult[checkItineraryData](&Failure{
+		return failureResult[model.ItineraryOutlookResponse](&Failure{
 			Code:    CodeInvalidInput,
 			Message: "Legs must contain from " + strconv.Itoa(checkItineraryMinLegs) + " to " + strconv.Itoa(checkItineraryMaxLegs) + " flights.",
 		})
 	}
 
 	legs := make([]model.ItineraryLeg, len(in.Legs))
+	fromFlightNumber := make([]bool, len(in.Legs))
+	needLookup := false
 
 	for i, legIn := range in.Legs {
+		leg, lookup, fail := prepareItineraryLeg(legIn)
+		if fail != nil {
+			return failureResult[model.ItineraryOutlookResponse](fail)
+		}
+
+		legs[i] = leg
+
+		fromFlightNumber[i] = lookup
+		if lookup {
+			needLookup = true
+		}
+	}
+
+	if !needLookup {
+		if fail := validateItineraryLegs(legs); fail != nil {
+			return failureResult[model.ItineraryOutlookResponse](fail)
+		}
+	}
+
+	for i, legIn := range in.Legs {
+		if !fromFlightNumber[i] {
+			continue
+		}
+
 		window := store.ResolveDepTimeWindowMinutes(legIn.DepTimeWindowMinutes)
 
-		origin, dest, fail := resolveRouteFromFlightNumber(ctx, s,
-			legIn.Carrier, legIn.FlightNumber, []string{legIn.DepTime}, fieldDepTime,
-			legIn.Origin, legIn.Dest, window)
+		origin, dest, _, fail := resolveRouteFromFlightNumber(ctx, s, logger, toolCheckItinerary,
+			legIn.Carrier, legIn.FlightNumber, []string{legIn.DepTime}, legIn.Origin, legIn.Dest, window)
 		if fail != nil {
-			return failureResult[checkItineraryData](fail)
+			return failureResult[model.ItineraryOutlookResponse](fail)
 		}
 
-		origin, fail = resolveAirportCode(ctx, s, "origin", origin)
-		if fail != nil {
-			return failureResult[checkItineraryData](fail)
-		}
+		legs[i].Origin = origin
+		legs[i].Dest = dest
+	}
 
-		dest, fail = resolveAirportCode(ctx, s, "dest", dest)
-		if fail != nil {
-			return failureResult[checkItineraryData](fail)
-		}
-
-		legs[i] = model.ItineraryLeg{
-			Origin:               origin,
-			Dest:                 dest,
-			Carrier:              normalizeCarrier(legIn.Carrier),
-			Date:                 strings.TrimSpace(legIn.Date),
-			DepTime:              strings.TrimSpace(legIn.DepTime),
-			ArrTime:              strings.TrimSpace(legIn.ArrTime),
-			DepTimeWindowMinutes: legIn.DepTimeWindowMinutes,
+	if needLookup {
+		if fail := validateItineraryLegs(legs); fail != nil {
+			return failureResult[model.ItineraryOutlookResponse](fail)
 		}
 	}
 
-	req := model.ItineraryOutlookRequest{Legs: legs}
-	if err := req.Validate(); err != nil {
-		return failureResult[checkItineraryData](&Failure{
-			Code:    CodeInvalidInput,
-			Message: err.Error(),
-		})
-	}
-
-	out, err := store.ItineraryOutlook(ctx, s, req.Legs)
+	out, err := store.ItineraryOutlook(ctx, s, legs)
 	if err != nil {
 		logger.Error(toolCheckItinerary, "error", err)
 
-		return failureResult[checkItineraryData](&Failure{
+		return failureResult[model.ItineraryOutlookResponse](&Failure{
 			Code:    CodeUnavailable,
 			Message: "Itinerary outlook is unavailable. Try again.",
 		})
 	}
 
+	if fail := missingItineraryAirports(ctx, s, logger, legs, fromFlightNumber, out); fail != nil {
+		return failureResult[model.ItineraryOutlookResponse](fail)
+	}
+
 	summary, confidence := itineraryToolResult(out)
 
-	return successResult(summary, confidence, &checkItineraryData{Itinerary: out})
+	return successResult(summary, confidence, &out)
+}
+
+func prepareItineraryLeg(in checkItineraryLegInput) (model.ItineraryLeg, bool, *Failure) {
+	carrier := normalizeCarrier(in.Carrier)
+	if len(carrier) != 2 {
+		return model.ItineraryLeg{}, false, &Failure{Code: CodeInvalidInput, Message: msgCarrierCode}
+	}
+
+	if in.DepTimeWindowMinutes != nil {
+		if err := store.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
+			return model.ItineraryLeg{}, false, invalidInput(err)
+		}
+	}
+
+	if _, ok := store.ISOWeekdayFromDate(in.Date); !ok {
+		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidDate)
+	}
+
+	if _, ok := store.HHMMToMinutes(in.DepTime); !ok {
+		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidHHMM)
+	}
+
+	if _, ok := store.HHMMToMinutes(in.ArrTime); !ok {
+		return model.ItineraryLeg{}, false, &Failure{
+			Code:    CodeInvalidInput,
+			Message: "arr_time must be a valid local time (hhmm).",
+		}
+	}
+
+	origin, dest, supplied, fail := normalizeSuppliedRoute(in.Origin, in.Dest)
+	if fail != nil {
+		return model.ItineraryLeg{}, false, fail
+	}
+
+	if !supplied {
+		if _, ok := store.NormalizeFlightNumber(in.FlightNumber); !ok {
+			return model.ItineraryLeg{}, false, &Failure{
+				Code:    CodeInvalidInput,
+				Message: "Flight number is required and must be 1 to 4 digits.",
+			}
+		}
+	}
+
+	return model.ItineraryLeg{
+		Origin:               origin,
+		Dest:                 dest,
+		Carrier:              carrier,
+		Date:                 strings.TrimSpace(in.Date),
+		DepTime:              strings.TrimSpace(in.DepTime),
+		ArrTime:              strings.TrimSpace(in.ArrTime),
+		DepTimeWindowMinutes: in.DepTimeWindowMinutes,
+	}, !supplied, nil
+}
+
+func validateItineraryLegs(legs []model.ItineraryLeg) *Failure {
+	req := model.ItineraryOutlookRequest{Legs: legs}
+	if err := req.Validate(); err != nil {
+		return &Failure{Code: CodeInvalidInput, Message: err.Error()}
+	}
+
+	return nil
+}
+
+func missingItineraryAirports(ctx context.Context, s store.Store, logger *slog.Logger, legs []model.ItineraryLeg, fromFlightNumber []bool, out model.ItineraryOutlookResponse) *Failure {
+	for i, leg := range out.Legs {
+		if leg.Error == nil || *leg.Error != store.ItineraryLegOutlookNotFound {
+			continue
+		}
+
+		if i >= len(fromFlightNumber) || fromFlightNumber[i] {
+			continue
+		}
+
+		fail := explainMissingRoute(ctx, s, logger, toolCheckItinerary, legs[i].Carrier, legs[i].Origin, legs[i].Dest, false)
+		if fail.Code == CodeRouteNotFound {
+			continue
+		}
+
+		return fail
+	}
+
+	return nil
 }
 
 func itineraryToolResult(out model.ItineraryOutlookResponse) (string, string) {

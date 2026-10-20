@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -16,6 +17,14 @@ const (
 	MaxStatsSpanDays            = 366
 	DefaultDepTimeWindowMinutes = 30
 	MaxDepTimeWindowMinutes     = 120
+)
+
+var (
+	ErrOutlookSchedule = errors.New("exactly one of date or day_of_week is required")
+	ErrInvalidDate     = errors.New("date must be a valid date (YYYY-MM-DD)")
+	ErrInvalidWeekday  = errors.New("day_of_week must be from 1 to 7")
+	ErrInvalidHHMM     = errors.New("dep_time must be a valid local time (hhmm)")
+	ErrStatsDateOrder  = errors.New("end_date must be on or after start_date")
 )
 
 type RouteStatsFilter struct {
@@ -35,6 +44,93 @@ type RouteOutlookFilter struct {
 	DayOfWeek            int
 	DepTime              string
 	DepTimeWindowMinutes int
+}
+
+// ParseOutlookDay resolves an outlook weekday. Exactly one of date or dayOfWeek must be set.
+func ParseOutlookDay(date string, dayOfWeek int) (int, error) {
+	date = strings.TrimSpace(date)
+	hasDate := date != ""
+	hasDay := dayOfWeek != 0
+
+	if hasDate == hasDay {
+		return 0, ErrOutlookSchedule
+	}
+
+	if hasDay {
+		if dayOfWeek < 1 || dayOfWeek > 7 {
+			return 0, ErrInvalidWeekday
+		}
+
+		return dayOfWeek, nil
+	}
+
+	day, ok := ISOWeekdayFromDate(date)
+	if !ok {
+		return 0, ErrInvalidDate
+	}
+
+	return day, nil
+}
+
+// Validate checks the weekday, departure time, and departure window.
+func (f RouteOutlookFilter) Validate() error {
+	if f.DayOfWeek < 1 || f.DayOfWeek > 7 {
+		return ErrInvalidWeekday
+	}
+
+	if _, ok := HHMMToMinutes(f.DepTime); !ok {
+		return ErrInvalidHHMM
+	}
+
+	return DepTimeWindowError(f.DepTimeWindowMinutes)
+}
+
+// DepTimeWindowError reports a window outside 1–MaxDepTimeWindowMinutes.
+func DepTimeWindowError(minutes int) error {
+	if minutes >= 1 && minutes <= MaxDepTimeWindowMinutes {
+		return nil
+	}
+
+	return fmt.Errorf("dep_time_window_minutes must be from 1 to %d", MaxDepTimeWindowMinutes)
+}
+
+// Validate checks the stats dates, the inclusive span, and each weekday.
+func (f RouteStatsFilter) Validate() error {
+	start, err := time.Parse("2006-01-02", strings.TrimSpace(f.StartDate))
+	if err != nil {
+		return ErrInvalidDate
+	}
+
+	end, err := time.Parse("2006-01-02", strings.TrimSpace(f.EndDate))
+	if err != nil {
+		return ErrInvalidDate
+	}
+
+	if end.Before(start) {
+		return ErrStatsDateOrder
+	}
+
+	if ExceedsMaxStatsSpan(start, end) {
+		return fmt.Errorf("date range must be at most %d days", MaxStatsSpanDays)
+	}
+
+	for _, day := range f.DaysOfWeek {
+		if day < 1 || day > 7 {
+			return ErrInvalidWeekday
+		}
+	}
+
+	return nil
+}
+
+// ExceedsMaxStatsSpan reports whether the inclusive range is longer than MaxStatsSpanDays.
+// A zero or reversed range does not.
+func ExceedsMaxStatsSpan(start, end time.Time) bool {
+	if start.IsZero() || end.IsZero() || end.Before(start) {
+		return false
+	}
+
+	return int(end.Sub(start).Hours()/24)+1 > MaxStatsSpanDays
 }
 
 func HHMMToMinutes(hhmm string) (int, bool) {

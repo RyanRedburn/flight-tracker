@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -23,6 +23,9 @@ const (
 	routeReliabilityMinDepTimes = 1
 	routeReliabilityMaxDepTimes = 5
 
+	// routeReliabilitySamePointGap is the on-time gap, in percentage points, that still counts as the same.
+	routeReliabilitySamePointGap = 3
+
 	routeNotFoundMessage = "No history for %s %s–%s. Check the airports and carrier."
 )
 
@@ -34,19 +37,41 @@ type routeReliabilityInput struct {
 	Date                 string   `json:"date,omitempty" jsonschema:"Travel date (YYYY-MM-DD); use this or day_of_week"`
 	DayOfWeek            int      `json:"day_of_week,omitempty" jsonschema:"Weekday 1=Mon … 7=Sun; use this or date"`
 	DepTimes             []string `json:"dep_times" jsonschema:"Scheduled departure times (hhmm) to compare"`
-	StartDate            string   `json:"start_date,omitempty" jsonschema:"Stats range start (YYYY-MM-DD); defaults to the outlook lookback"`
-	EndDate              string   `json:"end_date,omitempty" jsonschema:"Stats range end (YYYY-MM-DD); defaults to the latest history"`
-	DepTimeWindowMinutes *int     `json:"dep_time_window_minutes,omitempty" jsonschema:"Minutes around each dep_time for outlook history (1–120)"`
+	DepTimeWindowMinutes *int     `json:"dep_time_window_minutes,omitempty" jsonschema:"Minutes around each dep_time for history (1–120)"`
 }
 
 type routeReliabilityDeparture struct {
-	DepTime string             `json:"dep_time"`
-	Outlook model.RouteOutlook `json:"outlook"`
+	Outlook routeDepartureOutlook `json:"outlook"`
+}
+
+// routeDepartureOutlook is the time-specific outlook. Route fields stay on the stats object.
+// Connection guidance is left out; this tool does not judge a connection.
+type routeDepartureOutlook struct {
+	Filters                         model.Filters             `json:"filters"`
+	Analysis                        model.Analysis            `json:"analysis"`
+	OnTimeProbability               *float64                  `json:"on_time_probability"`
+	DelayProbability                *float64                  `json:"delay_probability"`
+	CancellationProbability         *float64                  `json:"cancellation_probability"`
+	DiversionProbability            *float64                  `json:"diversion_probability"`
+	LikelyArrivalDelayMinutes       *float64                  `json:"likely_arrival_delay_minutes"`
+	MedianArrivalDelayMinutes       *float64                  `json:"median_arrival_delay_minutes"`
+	LikelyArrivalDelayWhenDelayed   *float64                  `json:"likely_arrival_delay_when_delayed"`
+	MedianArrivalDelayWhenDelayed   *float64                  `json:"median_arrival_delay_when_delayed"`
+	LikelyDepartureDelayMinutes     *float64                  `json:"likely_departure_delay_minutes"`
+	MedianDepartureDelayMinutes     *float64                  `json:"median_departure_delay_minutes"`
+	LikelyDepartureDelayWhenDelayed *float64                  `json:"likely_departure_delay_when_delayed"`
+	MedianDepartureDelayWhenDelayed *float64                  `json:"median_departure_delay_when_delayed"`
+	Weather                         model.RouteOutlookWeather `json:"weather"`
 }
 
 type routeReliabilityData struct {
 	Stats      model.RouteStats            `json:"stats"`
 	Departures []routeReliabilityDeparture `json:"departures"`
+}
+
+type rankedDeparture struct {
+	time    string
+	percent int
 }
 
 func routeReliabilityInputSchema() *jsonschema.Schema {
@@ -79,7 +104,7 @@ func addRouteReliability(server *mcpsdk.Server, s store.Store, logger *slog.Logg
 	closedWorld := false
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        toolRouteReliability,
-		Description: "Route performance stats plus booking outlook for one or more departure times on the same day. Use when comparing which flight time is more reliable.",
+		Description: "Route performance stats and booking outlook for one or more departure times on the same day. Stats use the same dates as the outlook. Use when comparing which flight time is more reliable.",
 		InputSchema: routeReliabilityInputSchema(),
 		Annotations: &mcpsdk.ToolAnnotations{
 			Title:         "Route reliability",
@@ -96,7 +121,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 	if len(carrier) != 2 {
 		return failureResult[routeReliabilityData](&Failure{
 			Code:    CodeInvalidInput,
-			Message: "Carrier must be a 2-letter marketing airline code.",
+			Message: msgCarrierCode,
 		})
 	}
 
@@ -107,63 +132,50 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
+	if in.DepTimeWindowMinutes != nil {
+		if err := store.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
+			return failureResult[routeReliabilityData](invalidInput(err))
+		}
+	}
+
+	day, err := store.ParseOutlookDay(in.Date, in.DayOfWeek)
+	if err != nil {
+		return failureResult[routeReliabilityData](invalidInput(err))
+	}
+
 	window := store.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
-
-	origin, dest, fail := resolveRouteFromFlightNumber(ctx, s, carrier, in.FlightNumber, in.DepTimes, fieldDepTimes, in.Origin, in.Dest, window)
-	if fail != nil {
-		return failureResult[routeReliabilityData](fail)
-	}
-
-	origin, fail = resolveAirportCode(ctx, s, "origin", origin)
-	if fail != nil {
-		return failureResult[routeReliabilityData](fail)
-	}
-
-	dest, fail = resolveAirportCode(ctx, s, "dest", dest)
-	if fail != nil {
-		return failureResult[routeReliabilityData](fail)
-	}
-
-	day, fail := resolveOutlookDay(in.Date, in.DayOfWeek)
-	if fail != nil {
-		return failureResult[routeReliabilityData](fail)
-	}
-
 	depTimes := make([]string, 0, len(in.DepTimes))
+
 	for _, dep := range in.DepTimes {
 		dep = strings.TrimSpace(dep)
-		if _, ok := store.HHMMToMinutes(dep); !ok {
-			return failureResult[routeReliabilityData](&Failure{
-				Code:    CodeInvalidInput,
-				Message: "Each dep_times entry must be a valid local time (hhmm).",
-			})
+		if err := (store.RouteOutlookFilter{DayOfWeek: day, DepTime: dep, DepTimeWindowMinutes: window}).Validate(); err != nil {
+			return failureResult[routeReliabilityData](depTimeFailure(err))
 		}
 
 		depTimes = append(depTimes, dep)
 	}
 
+	origin, dest, fromFlightNumber, fail := resolveRouteFromFlightNumber(ctx, s, logger, toolRouteReliability, carrier, in.FlightNumber, depTimes, in.Origin, in.Dest, window)
+	if fail != nil {
+		return failureResult[routeReliabilityData](fail)
+	}
+
 	departures := make([]routeReliabilityDeparture, 0, len(depTimes))
 
-	var (
-		analysisStart string
-		analysisEnd   string
-	)
-
 	for _, dep := range depTimes {
-		outlook, err := s.RouteOutlook(ctx, store.RouteOutlookFilter{
+		filter := store.RouteOutlookFilter{
 			Origin:               origin,
 			Dest:                 dest,
 			Carrier:              carrier,
 			DayOfWeek:            day,
 			DepTime:              store.FormatHHMM(dep),
 			DepTimeWindowMinutes: window,
-		})
+		}
+
+		outlook, err := s.RouteOutlook(ctx, filter)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
-				return failureResult[routeReliabilityData](&Failure{
-					Code:    CodeRouteNotFound,
-					Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
-				})
+				return failureResult[routeReliabilityData](explainMissingRoute(ctx, s, logger, toolRouteReliability, carrier, origin, dest, fromFlightNumber))
 			}
 
 			logger.Error(toolRouteReliability, "stage", "outlook", "error", err)
@@ -174,36 +186,25 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			})
 		}
 
-		if analysisStart == "" {
-			analysisStart = outlook.Analysis.Start
-			analysisEnd = outlook.Analysis.End
-		}
-
 		departures = append(departures, routeReliabilityDeparture{
-			DepTime: store.FormatHHMM(dep),
-			Outlook: *outlook,
+			Outlook: newRouteDepartureOutlook(*outlook, filter.DepTime, window),
 		})
 	}
 
-	startDate, endDate, fail := resolveStatsWindow(in.StartDate, in.EndDate, analysisStart, analysisEnd)
-	if fail != nil {
-		return failureResult[routeReliabilityData](fail)
-	}
-
-	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
+	statsFilter := store.RouteStatsFilter{
 		Origin:     origin,
 		Dest:       dest,
-		StartDate:  startDate,
-		EndDate:    endDate,
+		StartDate:  departures[0].Outlook.Analysis.Start,
+		EndDate:    departures[0].Outlook.Analysis.End,
 		Carrier:    carrier,
 		DaysOfWeek: []int{day},
-	})
+	}
+
+	stats, err := s.RouteStats(ctx, statsFilter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return failureResult[routeReliabilityData](&Failure{
-				Code:    CodeRouteNotFound,
-				Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
-			})
+			// The outlook already found this route, so this is not an unknown airport.
+			return failureResult[routeReliabilityData](routeNotFoundFailure(carrier, origin, dest))
 		}
 
 		logger.Error(toolRouteReliability, "stage", "stats", "error", err)
@@ -214,210 +215,256 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	if stats.Flights == 0 {
-		dates, err := s.RouteFlightDateRange(ctx, origin, dest, carrier)
-		if err != nil {
-			if errors.Is(err, store.ErrNotFound) {
-				return failureResult[routeReliabilityData](&Failure{
-					Code:    CodeRouteNotFound,
-					Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),
-				})
-			}
-
-			logger.Error(toolRouteReliability, "stage", "date_range", "error", err)
-
-			return failureResult[routeReliabilityData](&Failure{
-				Code:    CodeUnavailable,
-				Message: "Route stats are unavailable. Try again.",
-			})
+	reported := *stats
+	if reported.Flights == 0 {
+		reported.Analysis.SampleSize = 0
+		if reported.Analysis.Confidence == "" {
+			reported.Analysis.Confidence = model.ConfidenceUnknown
 		}
 
-		return failureResult[routeReliabilityData](&Failure{
-			Code: CodeNoDataInWindow,
-			Message: fmt.Sprintf("No flights for %s %s–%s between %s and %s. Retry with dates from %s through %s.",
-				carrier, origin, dest, startDate, endDate, dates.Start, dates.End),
-			AvailableStart: dates.Start,
-			AvailableEnd:   dates.End,
-		})
+		if reported.Analysis.SampleReason == "" {
+			reported.Analysis.SampleReason = model.SampleReasonEmptySample
+		}
 	}
 
 	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
 
 	return successResult(summary, confidence, &routeReliabilityData{
-		Stats:      *stats,
+		Stats:      reported,
 		Departures: departures,
 	})
 }
 
-func resolveOutlookDay(date string, dayOfWeek int) (int, *Failure) {
-	date = strings.TrimSpace(date)
-	hasDate := date != ""
-	hasDay := dayOfWeek != 0
-
-	if hasDate == hasDay {
-		return 0, &Failure{
-			Code:    CodeInvalidInput,
-			Message: "Set exactly one of date or day_of_week.",
-		}
+func newRouteDepartureOutlook(out model.RouteOutlook, depTime string, window int) routeDepartureOutlook {
+	return routeDepartureOutlook{
+		Filters: model.Filters{
+			DepTime:              depTime,
+			DepTimeWindowMinutes: window,
+		},
+		Analysis:                        out.Analysis,
+		OnTimeProbability:               out.OnTimeProbability,
+		DelayProbability:                out.DelayProbability,
+		CancellationProbability:         out.CancellationProbability,
+		DiversionProbability:            out.DiversionProbability,
+		LikelyArrivalDelayMinutes:       out.LikelyArrivalDelayMinutes,
+		MedianArrivalDelayMinutes:       out.MedianArrivalDelayMinutes,
+		LikelyArrivalDelayWhenDelayed:   out.LikelyArrivalDelayWhenDelayed,
+		MedianArrivalDelayWhenDelayed:   out.MedianArrivalDelayWhenDelayed,
+		LikelyDepartureDelayMinutes:     out.LikelyDepartureDelayMinutes,
+		MedianDepartureDelayMinutes:     out.MedianDepartureDelayMinutes,
+		LikelyDepartureDelayWhenDelayed: out.LikelyDepartureDelayWhenDelayed,
+		MedianDepartureDelayWhenDelayed: out.MedianDepartureDelayWhenDelayed,
+		Weather:                         out.Weather,
 	}
-
-	if hasDay {
-		if dayOfWeek < 1 || dayOfWeek > 7 {
-			return 0, &Failure{
-				Code:    CodeInvalidInput,
-				Message: "day_of_week must be from 1 to 7.",
-			}
-		}
-
-		return dayOfWeek, nil
-	}
-
-	day, ok := store.ISOWeekdayFromDate(date)
-	if !ok {
-		return 0, &Failure{
-			Code:    CodeInvalidInput,
-			Message: "date must be a valid date (YYYY-MM-DD).",
-		}
-	}
-
-	return day, nil
 }
 
-func resolveStatsWindow(startIn, endIn, defaultStart, defaultEnd string) (string, string, *Failure) {
-	startIn = strings.TrimSpace(startIn)
-	endIn = strings.TrimSpace(endIn)
+func invalidInput(err error) *Failure {
+	return &Failure{Code: CodeInvalidInput, Message: err.Error()}
+}
 
-	if startIn == "" && endIn == "" {
-		return defaultStart, defaultEnd, nil
-	}
-
-	if startIn == "" || endIn == "" {
-		return "", "", &Failure{
+func depTimeFailure(err error) *Failure {
+	if errors.Is(err, store.ErrInvalidHHMM) {
+		return &Failure{
 			Code:    CodeInvalidInput,
-			Message: "start_date and end_date must both be set, or both omitted.",
+			Message: "Each dep_times entry must be a valid local time (hhmm).",
 		}
 	}
 
-	start, err := time.Parse("2006-01-02", startIn)
-	if err != nil {
-		return "", "", &Failure{
-			Code:    CodeInvalidInput,
-			Message: "start_date must be a valid date (YYYY-MM-DD).",
-		}
-	}
-
-	end, err := time.Parse("2006-01-02", endIn)
-	if err != nil {
-		return "", "", &Failure{
-			Code:    CodeInvalidInput,
-			Message: "end_date must be a valid date (YYYY-MM-DD).",
-		}
-	}
-
-	if end.Before(start) {
-		return "", "", &Failure{
-			Code:    CodeInvalidInput,
-			Message: "end_date must be on or after start_date.",
-		}
-	}
-
-	span := int(end.Sub(start).Hours()/24) + 1
-	if span > store.MaxStatsSpanDays {
-		return "", "", &Failure{
-			Code:    CodeInvalidInput,
-			Message: "The stats date range must be at most " + strconv.Itoa(store.MaxStatsSpanDays) + " days.",
-		}
-	}
-
-	return startIn, endIn, nil
+	return invalidInput(err)
 }
 
 func routeReliabilitySummary(carrier, origin, dest string, departures []routeReliabilityDeparture) (string, string) {
-	bestDep, bestRate, canRank := bestDepartureByOnTime(departures)
-	confidence := minOutlookConfidence(departures)
-
-	routeLabel := fmt.Sprintf("%s %s–%s", carrier, origin, dest)
+	route := carrier + " " + origin + "–" + dest
+	confidence := departureConfidence(departures)
 
 	if len(departures) == 1 {
-		return fmt.Sprintf("%s at %s is the only time compared; see on-time odds in the outlook.", routeLabel, departures[0].DepTime), confidence
+		return oneDepartureSummary(route, departures[0]), confidence
 	}
 
-	if !canRank || bestDep == "" {
-		return fmt.Sprintf("On-time odds for %s differ by time, but samples are too thin to rank them.", routeLabel), confidence
-	}
-
-	if len(departures) == 2 {
-		other := departures[0].DepTime
-		if other == bestDep {
-			other = departures[1].DepTime
-		}
-
-		otherRate, ok := outlookOnTimeRate(departures[0].Outlook)
-		if departures[0].DepTime == bestDep {
-			otherRate, ok = outlookOnTimeRate(departures[1].Outlook)
-		}
-
-		if ok {
-			return fmt.Sprintf("Prefer %s over %s on %s (%.0f%% vs %.0f%% on-time in outlook history).",
-				bestDep, other, routeLabel, bestRate*100, otherRate*100), confidence
-		}
-	}
-
-	return fmt.Sprintf("%s is the strongest departure time on %s among the times you listed.", bestDep, routeLabel), confidence
+	return manyDepartureSummary(route, departures), confidence
 }
 
-func bestDepartureByOnTime(departures []routeReliabilityDeparture) (string, float64, bool) {
+func departureConfidence(departures []routeReliabilityDeparture) string {
+	values := make([]string, len(departures))
+	for i, dep := range departures {
+		values[i] = outlookConfidence(dep.Outlook.Analysis)
+	}
+
+	return model.MinConfidence(values...)
+}
+
+func outlookConfidence(analysis model.Analysis) string {
+	outlook := model.RouteOutlook{OutlookResult: model.OutlookResult{Analysis: analysis}}
+	return outlook.DecisionConfidence()
+}
+
+func oneDepartureSummary(route string, dep routeReliabilityDeparture) string {
+	label := dep.Outlook.Filters.DepTime + " on " + route
+
+	switch outlookConfidence(dep.Outlook.Analysis) {
+	case model.ConfidenceHigh:
+		rate, ok := outlookOnTimeRate(dep.Outlook.OnTimeProbability)
+		if !ok {
+			return label + " has no reliable on-time rate."
+		}
+
+		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Outlook.Analysis.SampleSize)
+	case model.ConfidenceLow:
+		return fmt.Sprintf("%s has thin data (%d flights), so there is no reliable on-time rate.", label, dep.Outlook.Analysis.SampleSize)
+	default:
+		return label + " has no data for this day and time."
+	}
+}
+
+func manyDepartureSummary(route string, departures []routeReliabilityDeparture) string {
 	var (
-		bestDep  string
-		bestRate float64 = -1
-		seen     bool
+		ranked []rankedDeparture
+		thin   []string
+		none   []string
 	)
 
 	for _, dep := range departures {
-		rate, ok := outlookOnTimeRate(dep.Outlook)
-		if !ok {
+		timeLabel := dep.Outlook.Filters.DepTime
+
+		switch outlookConfidence(dep.Outlook.Analysis) {
+		case model.ConfidenceHigh:
+			rate, ok := outlookOnTimeRate(dep.Outlook.OnTimeProbability)
+			if !ok {
+				none = append(none, timeLabel)
+				continue
+			}
+
+			ranked = append(ranked, rankedDeparture{time: timeLabel, percent: onTimePercent(rate)})
+		case model.ConfidenceLow:
+			thin = append(thin, timeLabel)
+		default:
+			none = append(none, timeLabel)
+		}
+	}
+
+	switch len(ranked) {
+	case 0:
+		return appendDataNote("No listed time on "+route+" has enough data to compare.", thin, none)
+	case 1:
+		return appendDataNote(fmt.Sprintf("%s is the only listed time with enough data on %s (%d%% on time).", ranked[0].time, route, ranked[0].percent), thin, none)
+	default:
+		return appendDataNote(rankedSummary(route, ranked), thin, none)
+	}
+}
+
+func rankedSummary(route string, ranked []rankedDeparture) string {
+	best := ranked[0].percent
+	for _, item := range ranked[1:] {
+		if item.percent > best {
+			best = item.percent
+		}
+	}
+
+	var (
+		leaders  []rankedDeparture
+		trailers []rankedDeparture
+	)
+
+	for _, item := range ranked {
+		if best-item.percent < routeReliabilitySamePointGap {
+			leaders = append(leaders, item)
 			continue
 		}
 
-		seen = true
+		trailers = append(trailers, item)
+	}
 
-		if rate > bestRate {
-			bestRate = rate
-			bestDep = dep.DepTime
+	if len(trailers) == 0 {
+		return aboutTheSame(route, leaders)
+	}
+
+	if len(leaders) == 1 {
+		return fmt.Sprintf("%s is more reliable than %s on %s (%d%% vs %s on time).",
+			leaders[0].time, joinRankedTimes(trailers), route, leaders[0].percent, joinPercents(trailers))
+	}
+
+	return fmt.Sprintf("%s are about the same and more reliable than %s on %s (%s vs %s on time).",
+		joinRankedTimes(leaders), joinRankedTimes(trailers), route, joinPercents(leaders), joinPercents(trailers))
+}
+
+func aboutTheSame(route string, leaders []rankedDeparture) string {
+	if samePercent(leaders) {
+		return fmt.Sprintf("%s are about the same on %s (%d%% on time).", joinRankedTimes(leaders), route, leaders[0].percent)
+	}
+
+	return fmt.Sprintf("%s are about the same on %s (%s on time).", joinRankedTimes(leaders), route, joinPercents(leaders))
+}
+
+func appendDataNote(base string, thin, none []string) string {
+	note := dataGapSentence(thin, none)
+	if note == "" {
+		return base
+	}
+
+	return base + " " + note
+}
+
+func dataGapSentence(thin, none []string) string {
+	parts := make([]string, 0, 2)
+	if len(thin) > 0 {
+		parts = append(parts, joinAnd(thin)+" "+haveVerb(len(thin))+" thin data")
+	}
+
+	if len(none) > 0 {
+		parts = append(parts, joinAnd(none)+" "+haveVerb(len(none))+" no data")
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return strings.Join(parts, " and ") + "."
+}
+
+func haveVerb(n int) string {
+	if n == 1 {
+		return "has"
+	}
+
+	return "have"
+}
+
+func samePercent(items []rankedDeparture) bool {
+	for _, item := range items[1:] {
+		if item.percent != items[0].percent {
+			return false
 		}
 	}
 
-	return bestDep, bestRate, seen
+	return true
 }
 
-func outlookOnTimeRate(outlook model.RouteOutlook) (float64, bool) {
-	if outlook.OnTimeProbability == nil {
+func joinRankedTimes(items []rankedDeparture) string {
+	times := make([]string, len(items))
+	for i, item := range items {
+		times[i] = item.time
+	}
+
+	return joinAnd(times)
+}
+
+func joinPercents(items []rankedDeparture) string {
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = strconv.Itoa(item.percent) + "%"
+	}
+
+	return joinAnd(parts)
+}
+
+func outlookOnTimeRate(rate *float64) (float64, bool) {
+	if rate == nil {
 		return 0, false
 	}
 
-	return *outlook.OnTimeProbability, true
+	return *rate, true
 }
 
-func minOutlookConfidence(departures []routeReliabilityDeparture) string {
-	confidence := model.ConfidenceHigh
-
-	for _, dep := range departures {
-		leg := dep.Outlook.DecisionConfidence()
-		if confidenceRankOutlook(leg) < confidenceRankOutlook(confidence) {
-			confidence = leg
-		}
-	}
-
-	return confidence
-}
-
-func confidenceRankOutlook(confidence string) int {
-	switch confidence {
-	case model.ConfidenceHigh:
-		return 2
-	case model.ConfidenceLow:
-		return 1
-	default:
-		return 0
-	}
+func onTimePercent(rate float64) int {
+	return int(math.Round(rate * 100))
 }

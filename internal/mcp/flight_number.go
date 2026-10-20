@@ -4,16 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-const (
-	fieldDepTime  = "dep_time"
-	fieldDepTimes = "dep_times"
-)
+const msgCarrierCode = "Carrier must be a 2-letter marketing airline code."
 
 func normalizeCarrier(code string) string {
 	return strings.ToUpper(strings.TrimSpace(code))
@@ -22,37 +20,32 @@ func normalizeCarrier(code string) string {
 func resolveRouteFromFlightNumber(
 	ctx context.Context,
 	s store.Store,
-	carrier, flightNumber string,
+	logger *slog.Logger,
+	tool, carrier, flightNumber string,
 	depTimes []string,
-	depTimeField string,
 	origin, dest string,
 	windowMinutes int,
-) (string, string, *Failure) {
+) (string, string, bool, *Failure) {
 	carrier = normalizeCarrier(carrier)
 	if len(carrier) != 2 {
-		return "", "", &Failure{
+		return "", "", false, &Failure{
 			Code:    CodeInvalidInput,
-			Message: "Carrier must be a 2-letter marketing airline code.",
+			Message: msgCarrierCode,
 		}
 	}
 
-	origin = normalizeIATACode(origin)
-	dest = normalizeIATACode(dest)
-
-	if origin != "" && dest != "" {
-		return origin, dest, nil
+	origin, dest, supplied, fail := normalizeSuppliedRoute(origin, dest)
+	if fail != nil {
+		return "", "", false, fail
 	}
 
-	if origin != "" || dest != "" {
-		return "", "", &Failure{
-			Code:    CodeInvalidInput,
-			Message: "Pass both origin and destination, or pass carrier and flight_number without them.",
-		}
+	if supplied {
+		return origin, dest, false, nil
 	}
 
 	flightNumber, ok := store.NormalizeFlightNumber(flightNumber)
 	if !ok {
-		return "", "", &Failure{
+		return "", "", false, &Failure{
 			Code:    CodeInvalidInput,
 			Message: "Flight number is required and must be 1 to 4 digits.",
 		}
@@ -64,48 +57,54 @@ func resolveRouteFromFlightNumber(
 	})
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return "", "", &Failure{
+			return "", "", false, &Failure{
 				Code:    CodeFlightNumberNotFound,
 				Message: fmt.Sprintf("No recent history for %s %s. Check the carrier and flight number.", carrier, flightNumber),
 			}
 		}
 
-		return "", "", &Failure{
+		logger.Error(tool, "stage", "flight_number", "error", err)
+
+		return "", "", false, &Failure{
 			Code:    CodeUnavailable,
 			Message: "Flight-number lookup is unavailable. Try again.",
 		}
 	}
 
 	if len(routes) == 1 {
-		return routes[0].Origin, routes[0].Dest, nil
+		return routes[0].Origin, routes[0].Dest, true, nil
 	}
 
-	filtered, near := routesNearDepTimes(routes, depTimes, windowMinutes)
+	filtered, near, matchedTimes := routesNearDepTimes(routes, depTimes, windowMinutes)
 	if near != "" {
 		switch len(filtered) {
 		case 1:
-			return filtered[0].Origin, filtered[0].Dest, nil
+			return filtered[0].Origin, filtered[0].Dest, true, nil
 		case 0:
-			return "", "", &Failure{
+			return "", "", false, &Failure{
 				Code:         CodeFlightNumberAmbiguous,
 				Message:      fmt.Sprintf("No %s %s route leaves near %s; recent routes are listed. Pick origin and destination.", carrier, flightNumber, near),
 				FlightRoutes: routes,
 			}
 		default:
-			routes = filtered
+			return "", "", false, &Failure{
+				Code:         CodeFlightNumberAmbiguous,
+				Message:      fmt.Sprintf("%s %s has more than one route near %s. Pick origin and destination.", carrier, flightNumber, joinAnd(matchedTimes)),
+				FlightRoutes: filtered,
+			}
 		}
 	}
 
-	return "", "", &Failure{
+	return "", "", false, &Failure{
 		Code:         CodeFlightNumberAmbiguous,
-		Message:      fmt.Sprintf("%s %s flies more than one route recently. Pick origin and destination from the list, or add %s.", carrier, flightNumber, depTimeField),
+		Message:      fmt.Sprintf("%s %s has more than one route. Pick origin and destination.", carrier, flightNumber),
 		FlightRoutes: routes,
 	}
 }
 
 // routesNearDepTimes keeps routes whose usual departure is within the window of any given time.
-// near is empty when no time could be parsed, so the caller keeps the full list.
-func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, windowMinutes int) ([]model.FlightNumberRoute, string) {
+// near is empty when no time could be parsed. matchedTimes are the given times that hit a route.
+func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, windowMinutes int) ([]model.FlightNumberRoute, string, []string) {
 	if windowMinutes <= 0 {
 		windowMinutes = store.DefaultDepTimeWindowMinutes
 	}
@@ -124,10 +123,11 @@ func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, win
 	}
 
 	if len(targets) == 0 {
-		return nil, ""
+		return nil, "", nil
 	}
 
 	out := make([]model.FlightNumberRoute, 0, len(routes))
+	hit := make([]bool, len(targets))
 
 	for _, route := range routes {
 		usual, ok := store.HHMMToMinutes(route.UsualDepTime)
@@ -135,15 +135,28 @@ func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, win
 			continue
 		}
 
-		for _, target := range targets {
+		matched := false
+
+		for i, target := range targets {
 			if absCircularMinuteDelta(target, usual) <= windowMinutes {
-				out = append(out, route)
-				break
+				matched = true
+				hit[i] = true
 			}
+		}
+
+		if matched {
+			out = append(out, route)
 		}
 	}
 
-	return out, joinAnd(labels)
+	matchedTimes := make([]string, 0, len(labels))
+	for i, label := range labels {
+		if hit[i] {
+			matchedTimes = append(matchedTimes, label)
+		}
+	}
+
+	return out, joinAnd(labels), matchedTimes
 }
 
 func absCircularMinuteDelta(a, b int) int {

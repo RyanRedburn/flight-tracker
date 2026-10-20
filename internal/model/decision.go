@@ -129,6 +129,34 @@ func ConnectionStatus(layover int, minutes *ConnectionMinutes) string {
 	return ConnectionTight
 }
 
+// MinConfidence returns the weakest value. Unknown is weaker than low, and low is weaker than high.
+// An empty list is unknown. Any other word counts as unknown.
+func MinConfidence(values ...string) string {
+	if len(values) == 0 {
+		return ConfidenceUnknown
+	}
+
+	weakest := values[0]
+	for _, value := range values[1:] {
+		if confidenceRank(value) < confidenceRank(weakest) {
+			weakest = value
+		}
+	}
+
+	return weakest
+}
+
+func confidenceRank(confidence string) int {
+	switch confidence {
+	case ConfidenceHigh:
+		return 2
+	case ConfidenceLow:
+		return 1
+	default:
+		return 0
+	}
+}
+
 // OutlookConfidence maps an outlook sample onto high, low, or unknown.
 // insufficientSample is the existing thin-history flag (some rows, below the minimum).
 // An empty sample is unknown even when that flag is false.

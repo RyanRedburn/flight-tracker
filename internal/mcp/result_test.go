@@ -17,11 +17,9 @@ func TestResultJSON(t *testing.T) {
 		Summary:    "UA is steadier on this route, but the sample is thin.",
 		Confidence: model.ConfidenceLow,
 		Error: &Failure{
-			Code:           CodeAirportNotFound,
-			Message:        "No flights in that window.",
-			AvailableStart: "2024-01-01",
-			AvailableEnd:   "2025-06-30",
-			Matches:        []model.Airport{{IATACode: testCodeORD, Name: testNameOHare}},
+			Code:    CodeAirportNotFound,
+			Message: "No airport has IATA code \"ORX\".",
+			Matches: []model.Airport{{IATACode: testCodeORD, Name: testNameOHare}},
 		},
 	})
 	if err != nil {
@@ -44,7 +42,7 @@ func TestResultJSON(t *testing.T) {
 		t.Fatalf("error = %#v", got["error"])
 	}
 
-	for _, key := range []string{"code", "message", "matches", "available_start", "available_end"} {
+	for _, key := range []string{"code", "message", "matches"} {
 		if _, ok := errObj[key]; !ok {
 			t.Errorf("missing error.%s in %s", key, body)
 		}

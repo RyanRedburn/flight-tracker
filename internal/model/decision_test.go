@@ -31,6 +31,31 @@ func TestConnectionStatus(t *testing.T) {
 	}
 }
 
+func TestMinConfidence(t *testing.T) {
+	if got := MinConfidence(); got != ConfidenceUnknown {
+		t.Fatalf("MinConfidence() = %q", got)
+	}
+
+	tests := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{name: "high alone", values: []string{ConfidenceHigh}, want: ConfidenceHigh},
+		{name: "low weakens high", values: []string{ConfidenceHigh, ConfidenceLow}, want: ConfidenceLow},
+		{name: "unknown weakest", values: []string{ConfidenceLow, ConfidenceUnknown, ConfidenceHigh}, want: ConfidenceUnknown},
+		{name: "blank is weaker than high", values: []string{ConfidenceHigh, ""}, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MinConfidence(tt.values...); got != tt.want {
+				t.Fatalf("MinConfidence() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOutlookConfidence(t *testing.T) {
 	tests := []struct {
 		name         string

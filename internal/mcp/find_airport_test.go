@@ -27,6 +27,7 @@ const (
 	testCodeLAX     = "LAX"
 	testCodeMDW     = "MDW"
 	testCodeSFO     = "SFO"
+	testCodeORX     = "ORX"
 	testCityChicago = "Chicago"
 	testNameOHare   = "Chicago O'Hare International Airport"
 	testCountryUS   = "US"
@@ -142,21 +143,16 @@ func TestFindAirport(t *testing.T) {
 		},
 		{
 			name:  "close codes",
-			query: "ORX",
+			query: testCodeORX,
 			airports: []model.Airport{
 				{IATACode: testCodeORD, Name: testNameOHare, Match: model.AirportMatchCloseCode},
 				orf,
 			},
-			wantCall:  true,
-			wantLimit: store.AirportSearchDefaultLimit,
-			wantQuery: "ORX",
-			wantError: true,
-			wantCode:  CodeAirportNotFound,
-			wantSubstr: []string{
-				"Close matches",
-				testCodeORD,
-				"ORF",
-			},
+			wantCall:   true,
+			wantLimit:  store.AirportSearchDefaultLimit,
+			wantQuery:  testCodeORX,
+			wantConf:   model.ConfidenceLow,
+			wantSubstr: []string{testCodeORD, "ORF", summaryPickCode},
 		},
 		{
 			name:       "empty query",
@@ -252,10 +248,6 @@ func TestFindAirport(t *testing.T) {
 					if out.Error == nil || out.Error.Code != tt.wantCode {
 						t.Fatalf("error = %#v, want code %s", out.Error, tt.wantCode)
 					}
-				}
-
-				if tt.name == "close codes" && len(out.Error.Matches) != 2 {
-					t.Fatalf("matches = %#v", out.Error.Matches)
 				}
 
 				return

@@ -1,7 +1,9 @@
 package store
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
@@ -238,6 +240,71 @@ func TestDelayPercentilesMatchFilteredSubset(t *testing.T) {
 		if containsFloat(arrivedArr, *row.arr) {
 			t.Fatalf("excluded delay %v entered the arrival median", *row.arr)
 		}
+	}
+}
+
+func TestParseOutlookDay(t *testing.T) {
+	day, err := ParseOutlookDay("2026-10-06", 0)
+	if err != nil || day != 2 {
+		t.Fatalf("date day = %d, %v", day, err)
+	}
+
+	day, err = ParseOutlookDay("", 7)
+	if err != nil || day != 7 {
+		t.Fatalf("weekday = %d, %v", day, err)
+	}
+
+	if _, err := ParseOutlookDay("", 0); !errors.Is(err, ErrOutlookSchedule) {
+		t.Fatalf("missing schedule error = %v", err)
+	}
+
+	if _, err := ParseOutlookDay("2026-10-06", 2); !errors.Is(err, ErrOutlookSchedule) {
+		t.Fatalf("both set error = %v", err)
+	}
+
+	if _, err := ParseOutlookDay("2026-13-01", 0); !errors.Is(err, ErrInvalidDate) {
+		t.Fatalf("bad date error = %v", err)
+	}
+
+	if _, err := ParseOutlookDay("", 8); !errors.Is(err, ErrInvalidWeekday) {
+		t.Fatalf("bad weekday error = %v", err)
+	}
+}
+
+func TestRouteFilterValidate(t *testing.T) {
+	outlook := RouteOutlookFilter{DayOfWeek: 2, DepTime: "0700", DepTimeWindowMinutes: 30}
+	if err := outlook.Validate(); err != nil {
+		t.Fatalf("outlook Validate: %v", err)
+	}
+
+	outlook.DepTime = "2500"
+	if !errors.Is(outlook.Validate(), ErrInvalidHHMM) {
+		t.Fatal("expected invalid departure time")
+	}
+
+	if err := DepTimeWindowError(0); err == nil {
+		t.Fatal("expected window error")
+	}
+
+	stats := RouteStatsFilter{StartDate: "2025-01-01", EndDate: "2025-01-31", DaysOfWeek: []int{1, 2}}
+	if err := stats.Validate(); err != nil {
+		t.Fatalf("stats Validate: %v", err)
+	}
+
+	stats.EndDate = "2026-12-31"
+	if err := stats.Validate(); err == nil {
+		t.Fatal("expected span error")
+	}
+
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	end := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
+	if !ExceedsMaxStatsSpan(start, end) {
+		t.Fatal("expected span to exceed the maximum")
+	}
+
+	if ExceedsMaxStatsSpan(time.Time{}, end) {
+		t.Fatal("zero start is not a span error")
 	}
 }
 

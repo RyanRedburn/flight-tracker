@@ -12,12 +12,11 @@ const (
 	CodeFlightNumberNotFound  = "flight_number_not_found"
 	CodeFlightNumberAmbiguous = "flight_number_ambiguous"
 	CodeRouteNotFound         = "route_not_found"
-	CodeNoDataInWindow        = "no_data_in_window"
 	CodeUnavailable           = "unavailable"
 )
 
 // Result is the structured output every tool returns.
-// Summary is one recommendation line and its caveat.
+// Summary is one recommendation line.
 // Confidence uses the decision vocabulary when the tool is backed by flight history.
 type Result[T any] struct {
 	Summary    string   `json:"summary,omitempty"`
@@ -29,14 +28,11 @@ type Result[T any] struct {
 // Failure is a tool error an assistant can act on.
 // Matches are close airports when a code or name is unknown.
 // FlightRoutes lists recent routes for a marketing flight number when the AI must pick one.
-// AvailableStart and AvailableEnd are the dates that have data when the requested window does not.
 type Failure struct {
-	Code           string                    `json:"code"`
-	Message        string                    `json:"message"`
-	Matches        []model.Airport           `json:"matches,omitempty"`
-	FlightRoutes   []model.FlightNumberRoute `json:"flight_routes,omitempty"`
-	AvailableStart string                    `json:"available_start,omitempty"`
-	AvailableEnd   string                    `json:"available_end,omitempty"`
+	Code         string                    `json:"code"`
+	Message      string                    `json:"message"`
+	Matches      []model.Airport           `json:"matches,omitempty"`
+	FlightRoutes []model.FlightNumberRoute `json:"flight_routes,omitempty"`
 }
 
 func successResult[T any](summary, confidence string, data *T) (*mcpsdk.CallToolResult, Result[T], error) {
