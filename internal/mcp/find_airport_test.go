@@ -46,6 +46,18 @@ const (
 	jsonKeyFlightNumber = "flight_number"
 	jsonKeyDepTimes     = "dep_times"
 	jsonKeyDayOfWeek    = "day_of_week"
+	jsonKeyStartDate    = "start_date"
+	jsonKeyEndDate      = "end_date"
+
+	sdkValidatingArguments = `validating "arguments"`
+
+	testQueryOrd     = "ord"
+	testPaddedOrd    = " ord "
+	testPaddedLax    = " lax "
+	testPaddedUA     = " ua "
+	testCodeZZZ      = "ZZZ"
+	testDateJun30    = "2025-06-30"
+	testLeakedSecret = "password"
 )
 
 func testLogger() *slog.Logger {
@@ -92,11 +104,11 @@ func TestFindAirport(t *testing.T) {
 	}{
 		{
 			name:       "exact code",
-			query:      " ord ",
+			query:      testPaddedOrd,
 			airports:   []model.Airport{ord},
 			wantCall:   true,
 			wantLimit:  store.AirportSearchDefaultLimit,
-			wantQuery:  "ord",
+			wantQuery:  testQueryOrd,
 			wantConf:   model.ConfidenceHigh,
 			wantSubstr: []string{testCodeORD, testCityChicago},
 		},
@@ -166,13 +178,13 @@ func TestFindAirport(t *testing.T) {
 			query:      testCodeORD,
 			limit:      store.AirportSearchMaxLimit + 1,
 			wantError:  true,
-			wantSubstr: []string{"validating \"arguments\""},
+			wantSubstr: []string{sdkValidatingArguments},
 		},
 		{
 			name:       "query too long",
 			query:      strings.Repeat("a", store.AirportSearchMaxQueryLen+1),
 			wantError:  true,
-			wantSubstr: []string{"validating \"arguments\""},
+			wantSubstr: []string{sdkValidatingArguments},
 		},
 		{
 			name:      "store failure",
@@ -186,7 +198,7 @@ func TestFindAirport(t *testing.T) {
 			wantSubstr: []string{
 				"Airport search is unavailable",
 			},
-			absent: "password",
+			absent: testLeakedSecret,
 		},
 	}
 
@@ -351,6 +363,8 @@ func TestToolsAreReadOnlyFindAirport(t *testing.T) {
 		toolFindAirport:      true,
 		toolCheckItinerary:   true,
 		toolRouteReliability: true,
+		toolBestTravelWindow: true,
+		toolCompareCarriers:  true,
 	}
 
 	if len(names) != len(want) {
@@ -370,6 +384,8 @@ func TestCheckItineraryAndRouteReliabilityAnnotations(t *testing.T) {
 	wantTitle := map[string]string{
 		toolCheckItinerary:   "Check itinerary",
 		toolRouteReliability: "Route reliability",
+		toolBestTravelWindow: "Best travel window",
+		toolCompareCarriers:  "Compare carriers",
 	}
 	seen := 0
 
