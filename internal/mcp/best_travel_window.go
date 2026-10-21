@@ -26,21 +26,19 @@ type bestTravelWindowInput struct {
 }
 
 type travelMonth struct {
-	Month        int     `json:"month"`
-	OnTimeRate   float64 `json:"on_time_rate"`
-	Reliability  string  `json:"reliability"`
-	Confidence   string  `json:"confidence"`
-	SampleSize   int     `json:"sample_size"`
-	SampleReason string  `json:"sample_reason"`
+	model.TravelWindowMonthBucket
+
+	SampleSize   int    `json:"sample_size"`
+	SampleReason string `json:"sample_reason"`
 }
 
 type bestTravelWindowData struct {
-	Origin  string        `json:"origin"`
-	Dest    string        `json:"dest"`
-	Carrier string        `json:"carrier,omitempty"`
-	Start   string        `json:"start"`
-	End     string        `json:"end"`
-	Months  []travelMonth `json:"months"`
+	Filters     model.Filters `json:"filters"`
+	Start       string        `json:"start"`
+	End         string        `json:"end"`
+	ByMonth     []travelMonth `json:"by_month"`
+	BestMonths  []travelMonth `json:"best_months"`
+	WorstMonths []travelMonth `json:"worst_months"`
 }
 
 func bestTravelWindowInputSchema() *jsonschema.Schema {
@@ -101,52 +99,48 @@ func bestTravelWindow(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	data := newBestTravelWindowData(origin, dest, carrier, windows)
-	summary, confidence := travelWindowSummary(data)
+	data := newBestTravelWindowData(windows)
+	summary, confidence := travelWindowSummary(carrier, origin, dest, data)
 
 	return successResult(summary, confidence, data)
 }
 
-func newBestTravelWindowData(origin, dest, carrier string, windows *model.RouteTravelWindows) *bestTravelWindowData {
-	months := make([]travelMonth, 0, len(windows.ByMonth))
-	for _, bucket := range windows.ByMonth {
+func newBestTravelWindowData(windows *model.RouteTravelWindows) *bestTravelWindowData {
+	return &bestTravelWindowData{
+		Filters:     windows.Filters,
+		Start:       windows.Analysis.Start,
+		End:         windows.Analysis.End,
+		ByMonth:     travelMonths(windows.ByMonth),
+		BestMonths:  travelMonths(windows.BestMonths),
+		WorstMonths: travelMonths(windows.WorstMonths),
+	}
+}
+
+func travelMonths(buckets []model.TravelWindowMonthBucket) []travelMonth {
+	months := make([]travelMonth, 0, len(buckets))
+	for _, bucket := range buckets {
 		months = append(months, travelMonthFrom(bucket))
 	}
 
-	return &bestTravelWindowData{
-		Origin:  origin,
-		Dest:    dest,
-		Carrier: carrier,
-		Start:   windows.Analysis.Start,
-		End:     windows.Analysis.End,
-		Months:  months,
-	}
+	return months
 }
 
 func travelMonthFrom(bucket model.TravelWindowMonthBucket) travelMonth {
-	confidence := bucket.Confidence
-	if confidence == "" {
-		confidence = model.ConfidenceUnknown
-	}
-
 	return travelMonth{
-		Month:        bucket.Month,
-		OnTimeRate:   bucket.OnTimeRate,
-		Reliability:  bucket.Reliability,
-		Confidence:   confidence,
-		SampleSize:   bucket.Flights,
-		SampleReason: sampleReasonForConfidence(confidence),
+		TravelWindowMonthBucket: bucket,
+		SampleSize:              bucket.Flights,
+		SampleReason:            sampleReason(bucket.Flights, bucket.Confidence),
 	}
 }
 
-func travelWindowSummary(data *bestTravelWindowData) (string, string) {
-	route := routeLabel(data.Carrier, data.Origin, data.Dest)
-	if len(data.Months) == 0 {
+func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowData) (string, string) {
+	route := routeLabel(carrier, origin, dest)
+	if len(data.ByMonth) == 0 {
 		return emptyWindowSummary("month-of-year history", route, data.Start, data.End), model.ConfidenceUnknown
 	}
 
-	items := make([]scoredItem, len(data.Months))
-	for i, month := range data.Months {
+	items := make([]scoredItem, len(data.ByMonth))
+	for i, month := range data.ByMonth {
 		items[i] = scoredItem{
 			label:      monthLabel(month.Month),
 			percent:    onTimePercent(month.OnTimeRate),
@@ -155,5 +149,5 @@ func travelWindowSummary(data *bestTravelWindowData) (string, string) {
 		}
 	}
 
-	return comparisonSummary(nounMonth, route, items)
+	return comparisonSummary(nounMonth, route, items, true)
 }

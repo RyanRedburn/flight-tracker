@@ -321,6 +321,19 @@ func containsFloat(values []float64, want float64) bool {
 // classifyRouteStatsOnTime reports 1 when the flight is on time: not cancelled,
 // then not diverted, then arr_del15 < 1. Cancelled takes priority over diverted,
 // and diverted takes priority over delayed.
+func classifyRouteStatsOnTime(cancelled, diverted, arrDel15 float64) int {
+	switch {
+	case cancelled >= 1:
+		return 0
+	case diverted >= 1:
+		return 0
+	case arrDel15 >= 1:
+		return 0
+	default:
+		return 1
+	}
+}
+
 func TestRouteCarrierWindow(t *testing.T) {
 	start, end, ok := RouteCarrierWindow("2026-04-01")
 	if !ok || end != "2026-04-01" {
@@ -347,18 +360,5 @@ func TestRouteCarrierWindow(t *testing.T) {
 
 	if _, _, ok := RouteCarrierWindow("not-a-date"); ok {
 		t.Fatal("expected invalid date")
-	}
-}
-
-func classifyRouteStatsOnTime(cancelled, diverted, arrDel15 float64) int {
-	switch {
-	case cancelled >= 1:
-		return 0
-	case diverted >= 1:
-		return 0
-	case arrDel15 >= 1:
-		return 0
-	default:
-		return 1
 	}
 }

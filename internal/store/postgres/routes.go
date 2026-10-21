@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -65,6 +64,22 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 	return stats, nil
 }
 
+// RouteLatestFlightDate is the newest flight_date on the route. No row means the route is unknown.
+func (s *Store) RouteLatestFlightDate(ctx context.Context, origin, dest string) (string, error) {
+	var maxDate sql.NullString
+
+	err := s.db.QueryRowContext(ctx, store.QueryRouteMaxFlightDate, origin, dest).Scan(&maxDate)
+	if err != nil {
+		return "", err
+	}
+
+	if !maxDate.Valid || maxDate.String == "" {
+		return "", fmt.Errorf("route latest flight %s-%s: %w", origin, dest, store.ErrNotFound)
+	}
+
+	return maxDate.String, nil
+}
+
 func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
 	out := emptyRouteOutlook(filter)
 
@@ -83,12 +98,11 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, fmt.Errorf("route outlook %s-%s %s: %w", filter.Origin, filter.Dest, filter.Carrier, store.ErrNotFound)
 	}
 
-	endTime, err := time.Parse("2006-01-02", analysisEnd.String)
-	if err != nil {
-		return nil, fmt.Errorf("parse route outlook max flight date %q: %w", analysisEnd.String, err)
+	analysisStart, _, ok := store.RouteCarrierWindow(analysisEnd.String)
+	if !ok {
+		return nil, fmt.Errorf("parse route outlook max flight date %q", analysisEnd.String)
 	}
 
-	analysisStart := endTime.AddDate(0, 0, -store.OutlookLookbackDays).Format("2006-01-02")
 	out.Analysis.Start = analysisStart
 	out.Analysis.End = analysisEnd.String
 

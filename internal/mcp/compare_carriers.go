@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 
@@ -27,18 +28,15 @@ type compareCarriersInput struct {
 }
 
 type comparedCarrier struct {
-	Carrier      string  `json:"carrier"`
-	OnTimeRate   float64 `json:"on_time_rate"`
-	Confidence   string  `json:"confidence"`
-	SampleSize   int     `json:"sample_size"`
-	SampleReason string  `json:"sample_reason"`
+	model.CarrierOnTime
+
+	Confidence   string `json:"confidence"`
+	SampleSize   int    `json:"sample_size"`
+	SampleReason string `json:"sample_reason"`
 }
 
 type compareCarriersData struct {
-	Origin   string            `json:"origin"`
-	Dest     string            `json:"dest"`
-	Start    string            `json:"start"`
-	End      string            `json:"end"`
+	Stats    model.RouteStats  `json:"stats"`
 	Carriers []comparedCarrier `json:"carriers"`
 }
 
@@ -83,7 +81,35 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 		return failureResult[compareCarriersData](fail)
 	}
 
-	got, err := s.RouteCarriers(ctx, store.RouteCarriersFilter{
+	if start == "" {
+		latest, err := s.RouteLatestFlightDate(ctx, origin, dest)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				return failureResult[compareCarriersData](explainMissingRoute(ctx, s, logger, toolCompareCarriers, "", origin, dest, false))
+			}
+
+			logger.Error(toolCompareCarriers, "stage", "latest_flight", "error", err)
+
+			return failureResult[compareCarriersData](&Failure{
+				Code:    CodeUnavailable,
+				Message: msgCarriersUnavailable,
+			})
+		}
+
+		var ok bool
+
+		start, end, ok = store.RouteCarrierWindow(latest)
+		if !ok {
+			logger.Error(toolCompareCarriers, "stage", "window", "date", latest)
+
+			return failureResult[compareCarriersData](&Failure{
+				Code:    CodeUnavailable,
+				Message: msgCarriersUnavailable,
+			})
+		}
+	}
+
+	stats, err := s.RouteStats(ctx, store.RouteStatsFilter{
 		Origin:    origin,
 		Dest:      dest,
 		StartDate: start,
@@ -94,7 +120,7 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 			return failureResult[compareCarriersData](explainMissingRoute(ctx, s, logger, toolCompareCarriers, "", origin, dest, false))
 		}
 
-		logger.Error(toolCompareCarriers, "stage", "carriers", "error", err)
+		logger.Error(toolCompareCarriers, "stage", "stats", "error", err)
 
 		return failureResult[compareCarriersData](&Failure{
 			Code:    CodeUnavailable,
@@ -102,23 +128,20 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 		})
 	}
 
-	data := newCompareCarriersData(origin, dest, got)
-	summary, confidence := compareCarriersSummary(data)
+	data := newCompareCarriersData(stats)
+	summary, confidence := compareCarriersSummary(origin, dest, data)
 
 	return successResult(summary, confidence, data)
 }
 
-func newCompareCarriersData(origin, dest string, got *store.RouteCarriers) *compareCarriersData {
-	carriers := make([]comparedCarrier, 0, len(got.Carriers))
-	for _, row := range got.Carriers {
+func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
+	carriers := make([]comparedCarrier, 0, len(stats.CarrierOnTime))
+	for _, row := range stats.CarrierOnTime {
 		carriers = append(carriers, comparedCarrierFrom(row))
 	}
 
 	return &compareCarriersData{
-		Origin:   origin,
-		Dest:     dest,
-		Start:    got.Start,
-		End:      got.End,
+		Stats:    *stats,
 		Carriers: carriers,
 	}
 }
@@ -128,18 +151,17 @@ func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
 	confidence := model.SeasonalConfidence(row.Flights, store.CarrierStatsMinSampleSize)
 
 	return comparedCarrier{
-		Carrier:      row.Carrier,
-		OnTimeRate:   row.OnTimeRate,
-		Confidence:   confidence,
-		SampleSize:   row.Flights,
-		SampleReason: sampleReasonForConfidence(confidence),
+		CarrierOnTime: row,
+		Confidence:    confidence,
+		SampleSize:    row.Flights,
+		SampleReason:  sampleReason(row.Flights, confidence),
 	}
 }
 
-func compareCarriersSummary(data *compareCarriersData) (string, string) {
-	route := routeLabel("", data.Origin, data.Dest)
+func compareCarriersSummary(origin, dest string, data *compareCarriersData) (string, string) {
+	route := routeLabel("", origin, dest)
 	if len(data.Carriers) == 0 {
-		return emptyWindowSummary("flights", route, data.Start, data.End), model.ConfidenceUnknown
+		return emptyWindowSummary("flights", route, data.Stats.Analysis.Start, data.Stats.Analysis.End), model.ConfidenceUnknown
 	}
 
 	items := make([]scoredItem, len(data.Carriers))
@@ -152,5 +174,14 @@ func compareCarriersSummary(data *compareCarriersData) (string, string) {
 		}
 	}
 
-	return comparisonSummary(nounCarrier, route, items)
+	if len(items) == 1 && items[0].confidence == model.ConfidenceHigh {
+		return soleCarrierSummary(route, items[0])
+	}
+
+	return comparisonSummary(nounCarrier, route, items, true)
+}
+
+func soleCarrierSummary(route string, item scoredItem) (string, string) {
+	return fmt.Sprintf("%s is on time about %d%% of the time on %s (%s, %s).",
+		item.label, item.percent, route, phraseHighConfidence, flightsPhrase([]int{item.sampleSize})), model.ConfidenceHigh
 }

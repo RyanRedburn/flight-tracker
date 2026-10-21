@@ -46,22 +46,6 @@ type RouteOutlookFilter struct {
 	DepTimeWindowMinutes int
 }
 
-// RouteCarriersFilter is per-marketing-carrier on-time performance for one route.
-// Empty dates select the trailing outlook year ending at the route's latest flight.
-type RouteCarriersFilter struct {
-	Origin    string
-	Dest      string
-	StartDate string
-	EndDate   string
-}
-
-// RouteCarriers is that comparison. Carriers is sorted like route stats carrier_on_time.
-type RouteCarriers struct {
-	Start    string
-	End      string
-	Carriers []model.CarrierOnTime
-}
-
 // ParseOutlookDay resolves an outlook weekday. Exactly one of date or dayOfWeek must be set.
 func ParseOutlookDay(date string, dayOfWeek int) (int, error) {
 	date = strings.TrimSpace(date)

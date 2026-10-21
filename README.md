@@ -273,8 +273,6 @@ curl -X POST http://localhost:8080/mcp \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"find_airport","arguments":{"query":"Chicago"}}}'
 
-# best_travel_window compares months of the year; departure times stay in route_reliability. compare_carriers ranks carriers on one route over the given dates, or the trailing year ending at that route's latest flight.
-
 # Create an API key (admin; name is required; the plaintext secret is returned once)
 curl -X POST http://localhost:8080/api/internal/keys \
   -H "Authorization: Bearer $API_KEY" \

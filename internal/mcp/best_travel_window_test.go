@@ -167,7 +167,10 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				RouteTravelWindowsFn: func(_ context.Context, filter store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) {
 					gotFilter = filter
 
-					return testWindows(tt.months), nil
+					windows := testWindows(tt.months)
+					windows.Filters = model.Filters{Origin: filter.Origin, Dest: filter.Dest, Carrier: filter.Carrier}
+
+					return windows, nil
 				},
 			}
 
@@ -184,7 +187,9 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				t.Fatalf("IsError content=%s", toolText(t, res))
 			}
 
-			assertSamplesOnList(t, res, "months")
+			assertSamplesOnList(t, res, "by_month")
+			assertSamplesOnList(t, res, "best_months")
+			assertSamplesOnList(t, res, "worst_months")
 
 			out := decodeResult[bestTravelWindowData](t, res)
 			if out.Summary != tt.want {
@@ -195,27 +200,31 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				t.Fatalf("confidence = %q, want %q", out.Confidence, tt.wantConf)
 			}
 
-			if out.Data == nil || out.Data.Origin != testCodeORD || out.Data.Dest != testCodeLAX || out.Data.Start != testStatsStart || out.Data.End != testStatsEnd {
+			if out.Data == nil || out.Data.Filters.Origin != testCodeORD || out.Data.Filters.Dest != testCodeLAX || out.Data.Start != testStatsStart || out.Data.End != testStatsEnd {
 				t.Fatalf("data = %#v", out.Data)
 			}
 
-			if tt.carrier == "" && out.Data.Carrier != "" {
-				t.Fatalf("carrier = %q", out.Data.Carrier)
+			if tt.carrier == "" && out.Data.Filters.Carrier != "" {
+				t.Fatalf("carrier = %q", out.Data.Filters.Carrier)
 			}
 
-			if tt.carrier != "" && out.Data.Carrier != testCarrierUA {
-				t.Fatalf("carrier = %q", out.Data.Carrier)
+			if tt.carrier != "" && out.Data.Filters.Carrier != testCarrierUA {
+				t.Fatalf("carrier = %q", out.Data.Filters.Carrier)
 			}
 
-			if len(out.Data.Months) != tt.wantMonths {
-				t.Fatalf("months = %d", len(out.Data.Months))
+			if len(out.Data.ByMonth) != tt.wantMonths {
+				t.Fatalf("months = %d", len(out.Data.ByMonth))
 			}
 
-			if tt.wantMonths > 0 && out.Data.Months[0].Month != tt.firstMonth {
-				t.Fatalf("first month = %d", out.Data.Months[0].Month)
+			if tt.wantMonths > 0 && (out.Data.ByMonth[0].Month != tt.firstMonth || out.Data.ByMonth[0].Flights != tt.months[0].Flights) {
+				t.Fatalf("first month = %#v", out.Data.ByMonth[0])
 			}
 
-			if gotFilter.Origin != testCodeORD || gotFilter.Dest != testCodeLAX || gotFilter.Carrier != out.Data.Carrier {
+			if tt.wantMonths > 0 && (len(out.Data.BestMonths) != 1 || len(out.Data.WorstMonths) != 1) {
+				t.Fatalf("best = %d worst = %d", len(out.Data.BestMonths), len(out.Data.WorstMonths))
+			}
+
+			if gotFilter.Origin != testCodeORD || gotFilter.Dest != testCodeLAX || gotFilter.Carrier != out.Data.Filters.Carrier {
 				t.Fatalf("filter = %+v", gotFilter)
 			}
 
@@ -249,20 +258,20 @@ func TestBestTravelWindowSampleReasons(t *testing.T) {
 	}
 
 	out := decodeResult[bestTravelWindowData](t, res)
-	if len(out.Data.Months) != 3 {
-		t.Fatalf("months = %#v", out.Data.Months)
+	if len(out.Data.ByMonth) != 3 {
+		t.Fatalf("months = %#v", out.Data.ByMonth)
 	}
 
-	if out.Data.Months[0].SampleSize != 80 || out.Data.Months[0].SampleReason != model.SampleReasonSufficient || out.Data.Months[0].Confidence != model.ConfidenceHigh {
-		t.Fatalf("solid = %#v", out.Data.Months[0])
+	if out.Data.ByMonth[0].SampleSize != 80 || out.Data.ByMonth[0].SampleReason != model.SampleReasonSufficient || out.Data.ByMonth[0].Confidence != model.ConfidenceHigh {
+		t.Fatalf("solid = %#v", out.Data.ByMonth[0])
 	}
 
-	if out.Data.Months[1].SampleSize != 4 || out.Data.Months[1].SampleReason != model.SampleReasonInsufficientSample || out.Data.Months[1].Confidence != model.ConfidenceLow {
-		t.Fatalf("thin = %#v", out.Data.Months[1])
+	if out.Data.ByMonth[1].SampleSize != 4 || out.Data.ByMonth[1].SampleReason != model.SampleReasonInsufficientSample || out.Data.ByMonth[1].Confidence != model.ConfidenceLow {
+		t.Fatalf("thin = %#v", out.Data.ByMonth[1])
 	}
 
-	if out.Data.Months[2].SampleSize != 2 || out.Data.Months[2].SampleReason != model.SampleReasonEmptySample || out.Data.Months[2].Confidence != model.ConfidenceUnknown {
-		t.Fatalf("unknown = %#v", out.Data.Months[2])
+	if out.Data.ByMonth[2].Flights != 2 || out.Data.ByMonth[2].SampleSize != 2 || out.Data.ByMonth[2].SampleReason != model.SampleReasonInsufficientSample || out.Data.ByMonth[2].Confidence != "" {
+		t.Fatalf("unknown = %#v", out.Data.ByMonth[2])
 	}
 }
 
@@ -283,7 +292,7 @@ func TestBestTravelWindowErrors(t *testing.T) {
 			windows:  func(store.RouteTravelWindowsFilter) (*model.RouteTravelWindows, error) { return nil, store.ErrNotFound },
 			search:   func(query string) ([]model.Airport, error) { return exactAirportSearch(context.Background(), query, 1) },
 			wantCode: CodeRouteNotFound,
-			wantText: "No history for ORD–LAX. Check the airports.",
+			wantText: testRouteNotFound,
 		},
 		{
 			name:     "missing carrier route",
@@ -502,9 +511,19 @@ func monthBucket(month int, rate float64, flights int, confidence, reliability s
 }
 
 func testWindows(months []model.TravelWindowMonthBucket) *model.RouteTravelWindows {
+	best := []model.TravelWindowMonthBucket{}
+	worst := []model.TravelWindowMonthBucket{}
+
+	if len(months) > 0 {
+		best = []model.TravelWindowMonthBucket{months[0]}
+		worst = []model.TravelWindowMonthBucket{months[len(months)-1]}
+	}
+
 	return &model.RouteTravelWindows{
-		Analysis: model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 424242},
-		ByMonth:  months,
+		Analysis:    model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 424242},
+		ByMonth:     months,
+		BestMonths:  best,
+		WorstMonths: worst,
 		ByDayOfWeek: []model.TravelWindowDayBucket{{
 			DayOfWeek:   1,
 			OnTimeRate:  0.13,

@@ -58,6 +58,8 @@ const (
 	testCodeZZZ      = "ZZZ"
 	testDateJun30    = "2025-06-30"
 	testLeakedSecret = "password"
+
+	testRouteNotFound = "No history for ORD–LAX. Check the airports."
 )
 
 func testLogger() *slog.Logger {

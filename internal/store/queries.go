@@ -323,26 +323,11 @@ const (
 			AND iata_code_marketing_airline = $3
 		LIMIT 1`
 
-	// Carrier stats cannot filter by route. This scan can, and
-	// idx_flight_performance_origin_dest_date (origin, dest, flight_date)
-	// covers both the latest-flight lookup and the grouped date range.
 	QueryRouteMaxFlightDate = `
 		SELECT MAX(flight_date)::text
 		FROM flight_performance
 		WHERE origin = $1
 			AND dest = $2`
-
-	QueryRouteCarriers = `
-		SELECT
-			COALESCE(iata_code_marketing_airline, ''),
-			COUNT(*)::int,
-			COUNT(*) FILTER (WHERE ` + sqlIsOnTime + `)::int
-		FROM flight_performance
-		WHERE origin = $1
-			AND dest = $2
-			AND flight_date >= $3
-			AND flight_date <= $4
-		GROUP BY 1`
 
 	QueryRouteStats = `
 		WITH matched AS (

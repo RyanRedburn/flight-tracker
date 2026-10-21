@@ -13,25 +13,25 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-const (
-	defaultCarrierStart = "2025-04-02"
-	defaultCarrierEnd   = "2026-04-01"
-)
+const latestCarrierDate = "2026-04-01"
 
 func TestCompareCarriersSummaries(t *testing.T) {
 	minFlights := store.CarrierStatsMinSampleSize
 
+	windowStart, windowEnd, ok := store.RouteCarrierWindow(latestCarrierDate)
+	if !ok || windowEnd != latestCarrierDate {
+		t.Fatalf("window = %s %s ok=%v", windowStart, windowEnd, ok)
+	}
+
 	tests := []struct {
-		name         string
-		args         map[string]any
-		carriers     []model.CarrierOnTime
-		want         string
-		wantConf     string
-		wantFirst    string
-		wantStart    string
-		wantEnd      string
-		wantFilterLo string
-		wantFilterHi string
+		name      string
+		args      map[string]any
+		carriers  []model.CarrierOnTime
+		want      string
+		wantConf  string
+		wantFirst string
+		wantStart string
+		wantEnd   string
 	}{
 		{
 			name: "later carrier beats the first",
@@ -42,8 +42,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "UA is more reliable than AA on ORD–LAX (85% vs 60% on time, high confidence, 120 and 80 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: "AA",
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "exact tie names both carriers",
@@ -54,8 +54,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "UA and AA are about the same on ORD–LAX (80% on time, high confidence, 100 and 90 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "near tie names both carriers",
@@ -66,8 +66,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "UA and AA are about the same on ORD–LAX (82% and 80% on time, high confidence, 100 and 90 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "steady slide names every carrier",
@@ -79,8 +79,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "UA is most reliable on ORD–LAX (85% on time, high confidence, 120 flights), then AA (83%, high confidence, 110 flights) and DL (81%, high confidence, 100 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "two lead and one trails",
@@ -92,8 +92,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "UA and AA are about the same and more reliable than DL on ORD–LAX (85% and 84% vs 70% on time, high confidence, 120, 110 and 90 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "one solid carrier and every thin carrier",
@@ -105,8 +105,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, high confidence, %d flights). AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights),
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "every thin carrier is named",
@@ -118,8 +118,19 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      fmt.Sprintf("No carrier on ORD–LAX has enough data to compare. UA (low confidence, %d flights), AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights-1),
 			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "only carrier on the route",
+			carriers: []model.CarrierOnTime{
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: minFlights},
+			},
+			want:      fmt.Sprintf("UA is on time about 85%% of the time on ORD–LAX (high confidence, %d flights).", minFlights),
+			wantConf:  model.ConfidenceHigh,
+			wantFirst: testCarrierUA,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "one flight stays singular",
@@ -129,8 +140,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "No carrier on ORD–LAX has enough data to compare. UA (low confidence, 1 flight) has thin data.",
 			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
 			name: "blank carrier code is still named",
@@ -138,45 +149,53 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "", OnTimeRate: 0.80, Flights: minFlights},
 				{Carrier: "AA", OnTimeRate: 0.70, Flights: 4},
 			},
-			want:      fmt.Sprintf("unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, high confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
+			want:      fmt.Sprintf("Unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, high confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: "",
-			wantStart: defaultCarrierStart,
-			wantEnd:   defaultCarrierEnd,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
 		},
 		{
-			name:         "known route with no flights in range",
-			args:         map[string]any{jsonKeyStartDate: testStatsStart, jsonKeyEndDate: testDateJun30},
-			carriers:     nil,
-			want:         "No flights for ORD–LAX between " + testStatsStart + " and " + testDateJun30 + ", so the confidence is unknown.",
-			wantConf:     model.ConfidenceUnknown,
-			wantStart:    testStatsStart,
-			wantEnd:      testDateJun30,
-			wantFilterLo: testStatsStart,
-			wantFilterHi: testDateJun30,
+			name:      "known route with no flights in range",
+			args:      map[string]any{jsonKeyStartDate: testStatsStart, jsonKeyEndDate: testDateJun30},
+			carriers:  nil,
+			want:      "No flights for ORD–LAX between " + testStatsStart + " and " + testDateJun30 + ", so the confidence is unknown.",
+			wantConf:  model.ConfidenceUnknown,
+			wantStart: testStatsStart,
+			wantEnd:   testDateJun30,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotFilter store.RouteCarriersFilter
+			var gotFilter store.RouteStatsFilter
 
 			stub := &storetest.Stub{
-				RouteCarriersFn: func(_ context.Context, filter store.RouteCarriersFilter) (*store.RouteCarriers, error) {
+				RouteStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
 					gotFilter = filter
 
-					start, end := tt.wantStart, tt.wantEnd
-					if filter.StartDate != "" {
-						start, end = filter.StartDate, filter.EndDate
-					}
-
-					return &store.RouteCarriers{Start: start, End: end, Carriers: tt.carriers}, nil
+					return &model.RouteStats{
+						Filters: model.Filters{
+							Origin:    filter.Origin,
+							Dest:      filter.Dest,
+							StartDate: filter.StartDate,
+							EndDate:   filter.EndDate,
+						},
+						Analysis:      model.Analysis{Start: filter.StartDate, End: filter.EndDate},
+						CarrierOnTime: tt.carriers,
+					}, nil
 				},
 			}
 
 			args := map[string]any{jsonKeyOrigin: testQueryOrd, jsonKeyDest: "lax"}
 			for key, value := range tt.args {
 				args[key] = value
+			}
+
+			if _, dated := args[jsonKeyStartDate]; !dated {
+				stub.RouteLatestFlightDateFn = func(context.Context, string, string) (string, error) {
+					return latestCarrierDate, nil
+				}
 			}
 
 			res := callTool(t, stub, toolCompareCarriers, args)
@@ -195,12 +214,12 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				t.Fatalf("confidence = %q, want %q", out.Confidence, tt.wantConf)
 			}
 
-			if out.Data == nil || out.Data.Origin != testCodeORD || out.Data.Dest != testCodeLAX || out.Data.Start != tt.wantStart || out.Data.End != tt.wantEnd {
+			if out.Data == nil || out.Data.Stats.Filters.Origin != testCodeORD || out.Data.Stats.Filters.Dest != testCodeLAX || out.Data.Stats.Analysis.Start != tt.wantStart || out.Data.Stats.Analysis.End != tt.wantEnd {
 				t.Fatalf("data = %#v", out.Data)
 			}
 
-			if len(out.Data.Carriers) != len(tt.carriers) {
-				t.Fatalf("carriers = %d", len(out.Data.Carriers))
+			if len(out.Data.Carriers) != len(tt.carriers) || len(out.Data.Stats.CarrierOnTime) != len(tt.carriers) {
+				t.Fatalf("carriers = %d stats = %d", len(out.Data.Carriers), len(out.Data.Stats.CarrierOnTime))
 			}
 
 			if len(tt.carriers) > 0 && out.Data.Carriers[0].Carrier != tt.wantFirst {
@@ -208,12 +227,12 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			}
 
 			if len(tt.carriers) > 0 {
-				if out.Data.Carriers[0].SampleSize != tt.carriers[0].Flights || out.Data.Carriers[0].OnTimeRate != tt.carriers[0].OnTimeRate {
+				if out.Data.Carriers[0].SampleSize != tt.carriers[0].Flights || out.Data.Carriers[0].Flights != tt.carriers[0].Flights || out.Data.Carriers[0].OnTimeRate != tt.carriers[0].OnTimeRate {
 					t.Fatalf("first carrier = %#v", out.Data.Carriers[0])
 				}
 			}
 
-			if gotFilter.Origin != testCodeORD || gotFilter.Dest != testCodeLAX || gotFilter.StartDate != tt.wantFilterLo || gotFilter.EndDate != tt.wantFilterHi {
+			if gotFilter.Origin != testCodeORD || gotFilter.Dest != testCodeLAX || gotFilter.StartDate != tt.wantStart || gotFilter.EndDate != tt.wantEnd {
 				t.Fatalf("filter = %+v", gotFilter)
 			}
 		})
@@ -223,11 +242,13 @@ func TestCompareCarriersSummaries(t *testing.T) {
 func TestCompareCarriersSampleReasons(t *testing.T) {
 	minFlights := store.CarrierStatsMinSampleSize
 	stub := &storetest.Stub{
-		RouteCarriersFn: func(context.Context, store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-			return &store.RouteCarriers{
-				Start: defaultCarrierStart,
-				End:   defaultCarrierEnd,
-				Carriers: []model.CarrierOnTime{
+		RouteLatestFlightDateFn: func(context.Context, string, string) (string, error) {
+			return latestCarrierDate, nil
+		},
+		RouteStatsFn: func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				Analysis: model.Analysis{Start: filter.StartDate, End: filter.EndDate},
+				CarrierOnTime: []model.CarrierOnTime{
 					{Carrier: testCarrierUA, OnTimeRate: 0.80, Flights: minFlights},
 					{Carrier: "AA", OnTimeRate: 0.90, Flights: minFlights - 1},
 				},
@@ -267,7 +288,8 @@ func TestCompareCarriersErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     map[string]any
-		carriers func(store.RouteCarriersFilter) (*store.RouteCarriers, error)
+		latest   func(origin, dest string) (string, error)
+		stats    func(store.RouteStatsFilter) (*model.RouteStats, error)
 		search   func(string) ([]model.Airport, error)
 		wantCode string
 		wantText string
@@ -277,16 +299,26 @@ func TestCompareCarriersErrors(t *testing.T) {
 		{
 			name:     "missing route",
 			args:     map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX},
-			carriers: func(store.RouteCarriersFilter) (*store.RouteCarriers, error) { return nil, store.ErrNotFound },
+			latest:   func(string, string) (string, error) { return "", store.ErrNotFound },
 			search:   func(query string) ([]model.Airport, error) { return exactAirportSearch(context.Background(), query, 1) },
 			wantCode: CodeRouteNotFound,
-			wantText: "No history for ORD–LAX. Check the airports.",
+			wantText: testRouteNotFound,
+		},
+		{
+			name: "missing route for explicit dates",
+			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX, jsonKeyStartDate: testStatsStart, jsonKeyEndDate: testDateJun30},
+			stats: func(store.RouteStatsFilter) (*model.RouteStats, error) {
+				return nil, store.ErrNotFound
+			},
+			search:   func(query string) ([]model.Airport, error) { return exactAirportSearch(context.Background(), query, 1) },
+			wantCode: CodeRouteNotFound,
+			wantText: testRouteNotFound,
 		},
 		{
 			name: "unknown origin",
 			args: map[string]any{jsonKeyOrigin: testCodeORX, jsonKeyDest: testCodeLAX},
-			carriers: func(store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-				return nil, store.ErrNotFound
+			latest: func(string, string) (string, error) {
+				return "", store.ErrNotFound
 			},
 			search: func(query string) ([]model.Airport, error) {
 				if query == testCodeORX {
@@ -301,8 +333,8 @@ func TestCompareCarriersErrors(t *testing.T) {
 		{
 			name: "unknown code with no matches",
 			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeZZZ},
-			carriers: func(store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-				return nil, store.ErrNotFound
+			latest: func(string, string) (string, error) {
+				return "", store.ErrNotFound
 			},
 			search: func(query string) ([]model.Airport, error) {
 				if query == testCodeZZZ {
@@ -317,8 +349,8 @@ func TestCompareCarriersErrors(t *testing.T) {
 		{
 			name: "airport lookup unavailable",
 			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX},
-			carriers: func(store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-				return nil, store.ErrNotFound
+			latest: func(string, string) (string, error) {
+				return "", store.ErrNotFound
 			},
 			search: func(string) ([]model.Airport, error) {
 				return nil, errors.New("pq: password authentication failed")
@@ -330,8 +362,8 @@ func TestCompareCarriersErrors(t *testing.T) {
 		{
 			name: "store unavailable",
 			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX},
-			carriers: func(store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-				return nil, errors.New("pq: password authentication failed")
+			latest: func(string, string) (string, error) {
+				return "", errors.New("pq: password authentication failed")
 			},
 			wantCode: CodeUnavailable,
 			wantText: msgCarriersUnavailable,
@@ -378,9 +410,15 @@ func TestCompareCarriersErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stub := &storetest.Stub{}
-			if tt.carriers != nil {
-				stub.RouteCarriersFn = func(_ context.Context, filter store.RouteCarriersFilter) (*store.RouteCarriers, error) {
-					return tt.carriers(filter)
+			if tt.latest != nil {
+				stub.RouteLatestFlightDateFn = func(_ context.Context, origin, dest string) (string, error) {
+					return tt.latest(origin, dest)
+				}
+			}
+
+			if tt.stats != nil {
+				stub.RouteStatsFn = func(_ context.Context, filter store.RouteStatsFilter) (*model.RouteStats, error) {
+					return tt.stats(filter)
 				}
 			}
 
