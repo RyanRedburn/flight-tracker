@@ -4,7 +4,8 @@
 --
 -- route_weather_category_buckets is the read model for GET /api/v1/routes/weather-stats.
 -- Grain is per side (origin or dest), not an origin-category × dest-category matrix.
--- carrier '' is a missing marketing carrier. flight_number -1 is a missing flight number.
+-- carrier '' is a missing marketing carrier. flight_number '' is a missing flight number.
+-- '' is one primary-key value, so flights with no marketing number share one GROUP BY bucket.
 -- UNMATCHED is a rollup bucket only (no classified observation in the ±30 minute window).
 
 ALTER TABLE weather_observations
@@ -23,7 +24,7 @@ CREATE TABLE route_weather_category_buckets (
     carrier        TEXT NOT NULL,
     flight_date    DATE NOT NULL,
     day_of_week    INTEGER NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
-    flight_number  INTEGER NOT NULL,
+    flight_number  TEXT NOT NULL,
     side           TEXT NOT NULL CHECK (side IN ('origin', 'dest')),
     category       TEXT NOT NULL CHECK (category IN (
         'THUNDER', 'LIFR', 'IFR', 'MVFR', 'WINDY', 'PRECIP', 'VFR_FAIR', 'UNKNOWN', 'UNMATCHED'

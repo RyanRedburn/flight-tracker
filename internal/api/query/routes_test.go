@@ -1,6 +1,7 @@
 package query
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +34,47 @@ func TestParseRouteStats(t *testing.T) {
 
 	if len(filter.DaysOfWeek) != 3 {
 		t.Fatalf("days_of_week = %v, want 3 unique days", filter.DaysOfWeek)
+	}
+}
+
+func TestParseRouteStatsFlightNumber(t *testing.T) {
+	base := "/api/v1/routes/stats?origin=ORD&dest=LAX&start_date=2025-01-01&end_date=2025-01-31&carrier=UA&flight_number="
+
+	tests := []struct {
+		name    string
+		raw     string
+		want    string
+		wantErr bool
+	}{
+		{name: "leading zeros", raw: "0123", want: "123"},
+		{name: "already canonical", raw: "42", want: "42"},
+		{name: "empty", raw: "", want: ""},
+		{name: "too long", raw: "12345", wantErr: true},
+		{name: "non digits", raw: "12A", wantErr: true},
+		{name: "all zeros", raw: "0000", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, base+tt.raw, nil)
+
+			filter, err := ParseRouteStats(req)
+			if tt.wantErr {
+				if !errors.Is(err, store.ErrInvalidFlightNumber) {
+					t.Fatalf("ParseRouteStats() error = %v, want %v", err, store.ErrInvalidFlightNumber)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ParseRouteStats() error = %v", err)
+			}
+
+			if filter.FlightNumber != tt.want {
+				t.Errorf("flight_number = %q, want %q", filter.FlightNumber, tt.want)
+			}
+		})
 	}
 }
 

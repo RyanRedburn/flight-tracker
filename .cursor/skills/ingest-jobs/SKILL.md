@@ -23,13 +23,13 @@ HTTP handlers must not download. Workers must always replace the target month or
 
 | Package | Job type(s) | Replace |
 | --- | --- | --- |
-| `internal/ingest/bts` | `import_flight_performance` | `ReplaceFlightPerformanceByMonth`, then both rollups below |
-| `internal/ingest/iem` | `import_weather_observations`, `import_weather_stations` | month observations; full station catalog + mapping; weather-stats rollup after either |
+| `internal/ingest/bts` | `import_flight_performance` | `ReplaceFlightPerformanceByMonth` |
+| `internal/ingest/iem` | `import_weather_observations`, `import_weather_stations` | month observations; full station catalog + mapping |
 | `internal/ingest/ourairports` | `import_countries`, `import_regions`, `import_airports` | full table |
 | `internal/ingest/mct` | `import_airport_mct` | `ReplaceAirportMCT` (full table) |
 | `internal/operator` | `rebuild_route_travel_windows`, `rebuild_route_weather_stats` | `RebuildRouteTravelWindows` / `RebuildRouteWeatherStats`; no download |
 
-Rebuild handlers only call the store. Flight-performance ingest rebuilds both rollups after a successful month. Weather-observation and weather-station ingests rebuild weather stats only. The rebuild job types are the admin queue when you do not want another import.
+Rebuild handlers only call the store. Ingest does not queue them. Rollups refresh only when an admin posts `POST /api/internal/rebuild/travel-windows` or `POST /api/internal/rebuild/weather-stats`. After a backfill, call both once.
 
 Shared helpers:
 

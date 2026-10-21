@@ -10,7 +10,6 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -58,9 +57,7 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 
 			return nil
 		},
-		CreateRebuildRouteWeatherStatsJobFn: func(context.Context) (*model.Job, error) {
-			return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
-		},
+		CreateRebuildRouteWeatherStatsJobFn: rejectRebuild(t),
 	}
 
 	path := iemFixtureCSVPath(t)
@@ -90,81 +87,13 @@ func TestWeatherIngestHandlerProcess(t *testing.T) {
 	}
 }
 
-func TestWeatherIngestHandlerEnqueuesWeatherStats(t *testing.T) {
-	ctx := context.Background()
-
-	tests := []struct {
-		name    string
-		create  func(context.Context) (*model.Job, error)
-		wantErr bool
-	}{
-		{
-			name: "queued",
-			create: func(context.Context) (*model.Job, error) {
-				return queuedRebuild(model.JobTypeRebuildRouteWeatherStats), nil
-			},
-		},
-		{
-			name: "pending",
-			create: func(context.Context) (*model.Job, error) {
-				return nil, store.ErrActiveIngestConflict
-			},
-		},
-		{
-			name: "error",
-			create: func(context.Context) (*model.Job, error) {
-				return nil, errEnqueueFailed
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			calls := 0
-			st := &storetest.Stub{
-				GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
-					return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
-				},
-				ReplaceWeatherObservationsByMonthFn: func(context.Context, int, int, []string, [][]string) error {
-					return nil
-				},
-				CreateRebuildRouteWeatherStatsJobFn: func(ctx context.Context) (*model.Job, error) {
-					calls++
-
-					return tt.create(ctx)
-				},
-			}
-
-			path := iemFixtureCSVPath(t)
-			svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {
-				return path, func() {}, nil
-			})
-
-			h := NewWeatherIngestHandler(st, svc)
-			_, err := h.Process(ctx, &model.Job{ID: testJobID})
-
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected enqueue error")
-				}
-			} else if err != nil {
-				t.Fatalf("Process() error = %v", err)
-			}
-
-			if calls != 1 {
-				t.Fatalf("enqueue calls = %d, want 1", calls)
-			}
-		})
-	}
-}
-
-func TestWeatherIngestHandlerSkipsRebuildOnImportError(t *testing.T) {
+func TestWeatherIngestHandlerImportError(t *testing.T) {
 	ctx := context.Background()
 	st := &storetest.Stub{
 		GetWeatherIngestJobFn: func(_ context.Context, jobID string) (*model.WeatherIngestJob, error) {
 			return &model.WeatherIngestJob{JobID: jobID, Year: 2024, Month: 1, Stations: []string{testStationORD}}, nil
 		},
+		CreateRebuildRouteWeatherStatsJobFn: rejectRebuild(t),
 	}
 
 	svc := iem.NewService(st, nil).WithCSVOpener(func(context.Context, int, int, []string) (string, func(), error) {

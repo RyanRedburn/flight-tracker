@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -53,6 +54,15 @@ func ParseRouteStats(r *http.Request) (store.RouteStatsFilter, error) {
 
 	if err := Validate(q); err != nil {
 		return store.RouteStatsFilter{}, err
+	}
+
+	if strings.TrimSpace(q.FlightNumber) != "" {
+		flightNumber, err := store.NormalizeFlightNumber(q.FlightNumber)
+		if err != nil {
+			return store.RouteStatsFilter{}, err
+		}
+
+		q.FlightNumber = flightNumber
 	}
 
 	filter := store.RouteStatsFilter{

@@ -303,6 +303,22 @@ func TestCheckItineraryBadInput(t *testing.T) {
 
 			return leg
 		}(), valid}},
+		{name: "flight number too long", legs: []checkItineraryLegInput{
+			{Carrier: testCarrierUA, FlightNumber: "12345", Date: testDateOct6, DepTime: "700", ArrTime: "905"},
+			valid,
+		}},
+		{name: "flight number not digits", legs: []checkItineraryLegInput{
+			{Carrier: testCarrierUA, FlightNumber: "12A", Date: testDateOct6, DepTime: "700", ArrTime: "905"},
+			valid,
+		}},
+		{name: "flight number empty", legs: []checkItineraryLegInput{
+			{Carrier: testCarrierUA, FlightNumber: "", Date: testDateOct6, DepTime: "700", ArrTime: "905"},
+			valid,
+		}},
+		{name: "flight number all zeros", legs: []checkItineraryLegInput{
+			{Carrier: testCarrierUA, FlightNumber: "0000", Date: testDateOct6, DepTime: "700", ArrTime: "905"},
+			valid,
+		}},
 	}
 
 	for _, tt := range tests {
@@ -337,7 +353,7 @@ func TestCheckItineraryInputSchema(t *testing.T) {
 	assertCodeSchema(t, props["dest"], 3)
 
 	flightNumber := props[jsonKeyFlightNumber]
-	if flightNumber == nil || flightNumber.MaxLength == nil || *flightNumber.MaxLength != store.FlightNumberMaxLen {
+	if flightNumber == nil || flightNumber.MaxLength == nil || *flightNumber.MaxLength != store.FlightNumberRawMaxLen || flightNumber.Pattern != store.FlightNumberPattern {
 		t.Fatalf("flight_number schema = %#v", flightNumber)
 	}
 

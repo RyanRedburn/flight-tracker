@@ -26,7 +26,7 @@ type checkItineraryLegInput struct {
 	Origin               string `json:"origin,omitempty" jsonschema:"Origin IATA code"`
 	Dest                 string `json:"dest,omitempty" jsonschema:"Destination IATA code"`
 	Carrier              string `json:"carrier" jsonschema:"Marketing carrier code"`
-	FlightNumber         string `json:"flight_number,omitempty" jsonschema:"Marketing flight number when origin and destination are unknown"`
+	FlightNumber         string `json:"flight_number,omitempty" jsonschema:"Marketing flight number when origin and destination are unknown. 1 to 4 digits; leading zeros are ignored"`
 	Date                 string `json:"date" jsonschema:"Travel date (YYYY-MM-DD)"`
 	DepTime              string `json:"dep_time" jsonschema:"Scheduled departure (hhmm)"`
 	ArrTime              string `json:"arr_time" jsonschema:"Scheduled arrival (hhmm)"`
@@ -54,7 +54,8 @@ func checkItineraryInputSchema() *jsonschema.Schema {
 	legProps["origin"].MaxLength = jsonschema.Ptr(3)
 	legProps["dest"].MinLength = jsonschema.Ptr(3)
 	legProps["dest"].MaxLength = jsonschema.Ptr(3)
-	legProps["flight_number"].MaxLength = jsonschema.Ptr(store.FlightNumberMaxLen)
+	legProps["flight_number"].MaxLength = jsonschema.Ptr(store.FlightNumberRawMaxLen)
+	legProps["flight_number"].Pattern = store.FlightNumberPattern
 	legProps["dep_time_window_minutes"].Minimum = jsonschema.Ptr(1.0)
 	legProps["dep_time_window_minutes"].Maximum = jsonschema.Ptr(float64(store.MaxDepTimeWindowMinutes))
 
@@ -184,7 +185,7 @@ func prepareItineraryLeg(in checkItineraryLegInput) (model.ItineraryLeg, bool, *
 	}
 
 	if !supplied {
-		if _, ok := store.NormalizeFlightNumber(in.FlightNumber); !ok {
+		if _, err := store.NormalizeFlightNumber(in.FlightNumber); err != nil {
 			return model.ItineraryLeg{}, false, &Failure{
 				Code:    CodeInvalidInput,
 				Message: "Flight number is required and must be 1 to 4 digits.",

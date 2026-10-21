@@ -362,7 +362,7 @@ const docTemplateexternal = `{
                     },
                     {
                         "type": "string",
-                        "description": "Flight number (requires carrier)",
+                        "description": "Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)",
                         "name": "flight_number",
                         "in": "query"
                     },
@@ -576,7 +576,7 @@ const docTemplateexternal = `{
                     },
                     {
                         "type": "string",
-                        "description": "Flight number (requires carrier)",
+                        "description": "Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)",
                         "name": "flight_number",
                         "in": "query"
                     },

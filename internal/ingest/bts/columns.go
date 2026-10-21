@@ -9,6 +9,10 @@ const (
 	colYear       = "year"
 	colDayOfMonth = "day_of_month"
 	jsonKeyRows   = "rows_imported"
+
+	colFlightNumberMarketing = "flight_number_marketing_airline"
+	colFlightNumberOperating = "flight_number_operating_airline"
+	colFlightNumberCodeshare = "flight_num_originally_scheduled_code_share_airline"
 )
 
 // DBColumns is the canonical flight_performance column order (snake_case).
@@ -23,16 +27,16 @@ var DBColumns = []string{
 	"operated_or_branded_code_share_partners",
 	"dot_id_marketing_airline",
 	"iata_code_marketing_airline",
-	"flight_number_marketing_airline",
+	colFlightNumberMarketing,
 	"originally_scheduled_code_share_airline",
 	"dot_id_originally_scheduled_code_share_airline",
 	"iata_code_originally_scheduled_code_share_airline",
-	"flight_num_originally_scheduled_code_share_airline",
+	colFlightNumberCodeshare,
 	"operating_airline",
 	"dot_id_operating_airline",
 	"iata_code_operating_airline",
 	"tail_number",
-	"flight_number_operating_airline",
+	colFlightNumberOperating,
 	"origin_airport_id",
 	"origin_airport_seq_id",
 	"origin_city_market_id",

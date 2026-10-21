@@ -22,7 +22,7 @@ func TestBuildRouteWeatherStatsQueryOptionalFilters(t *testing.T) {
 		t.Fatal("expected carrier filter in query")
 	}
 
-	if !strings.Contains(query, "flight_number::text") {
+	if !strings.Contains(query, "flight_number = $") {
 		t.Fatal("expected flight number filter in query")
 	}
 
