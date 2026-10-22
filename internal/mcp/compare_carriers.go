@@ -98,7 +98,7 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 
 		var ok bool
 
-		start, end, ok = store.RouteCarrierWindow(latest)
+		start, end, ok = store.TrailingOutlookWindow(latest)
 		if !ok {
 			logger.Error(toolCompareCarriers, "stage", "window", "date", latest)
 
@@ -182,6 +182,6 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 }
 
 func soleCarrierSummary(route string, item scoredItem) (string, string) {
-	return fmt.Sprintf("%s is on time about %d%% of the time on %s (%s, %s).",
-		item.label, item.percent, route, phraseHighConfidence, flightsPhrase([]int{item.sampleSize})), model.ConfidenceHigh
+	return sentenceCase(fmt.Sprintf("%s is on time about %d%% of the time on %s (%s, %s).",
+		item.label, item.percent, route, phraseHighConfidence, flightsPhrase([]int{item.sampleSize}))), model.ConfidenceHigh
 }

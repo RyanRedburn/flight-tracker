@@ -334,8 +334,8 @@ func classifyRouteStatsOnTime(cancelled, diverted, arrDel15 float64) int {
 	}
 }
 
-func TestRouteCarrierWindow(t *testing.T) {
-	start, end, ok := RouteCarrierWindow("2026-04-01")
+func TestTrailingOutlookWindow(t *testing.T) {
+	start, end, ok := TrailingOutlookWindow("2026-04-01")
 	if !ok || end != "2026-04-01" {
 		t.Fatalf("window = %s %s ok=%v", start, end, ok)
 	}
@@ -358,7 +358,7 @@ func TestRouteCarrierWindow(t *testing.T) {
 		t.Fatal("default window exceeds max stats span")
 	}
 
-	if _, _, ok := RouteCarrierWindow("not-a-date"); ok {
+	if _, _, ok := TrailingOutlookWindow("not-a-date"); ok {
 		t.Fatal("expected invalid date")
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
@@ -36,7 +38,7 @@ func routeLabel(carrier, origin, dest string) string {
 
 func carrierLabel(code string) string {
 	if code == "" {
-		return "Unknown carrier"
+		return "an unknown carrier"
 	}
 
 	return code
@@ -47,14 +49,21 @@ func sampleReason(flights int, confidence string) string {
 		return model.SampleReasonEmptySample
 	}
 
-	switch confidence {
-	case model.ConfidenceHigh:
+	if confidence == model.ConfidenceHigh {
 		return model.SampleReasonSufficient
-	case model.ConfidenceLow:
-		return model.SampleReasonInsufficientSample
-	default:
-		return model.SampleReasonInsufficientSample
 	}
+
+	return model.SampleReasonInsufficientSample
+}
+
+// sentenceCase capitalizes a sentence that opens with a lowercase label such as "an unknown carrier".
+func sentenceCase(sentence string) string {
+	r, size := utf8.DecodeRuneInString(sentence)
+	if r == utf8.RuneError || !unicode.IsLower(r) {
+		return sentence
+	}
+
+	return string(unicode.ToUpper(r)) + sentence[size:]
 }
 
 func comparisonSummary(noun, route string, items []scoredItem, detail bool) (string, string) {
@@ -246,7 +255,7 @@ func gapSentence(thin, none []scoredItem) string {
 func appendNote(base string, notes ...string) string {
 	parts := make([]string, 0, 1+len(notes))
 	if base != "" {
-		parts = append(parts, base)
+		parts = append(parts, sentenceCase(base))
 	}
 
 	for _, note := range notes {
@@ -254,7 +263,7 @@ func appendNote(base string, notes ...string) string {
 			continue
 		}
 
-		parts = append(parts, note)
+		parts = append(parts, sentenceCase(note))
 	}
 
 	return strings.Join(parts, " ")

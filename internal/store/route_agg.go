@@ -191,9 +191,9 @@ func ISOWeekdayFromDate(date string) (int, bool) {
 	return ISOWeekday(t), true
 }
 
-// RouteCarrierWindow is the inclusive trailing outlook year ending at endDate.
-// The span matches route outlook and fits in MaxStatsSpanDays.
-func RouteCarrierWindow(endDate string) (start, end string, ok bool) {
+// TrailingOutlookWindow is the inclusive trailing outlook year ending at endDate.
+// Route outlook and compare_carriers share it; the span fits in MaxStatsSpanDays.
+func TrailingOutlookWindow(endDate string) (start, end string, ok bool) {
 	endTime, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		return "", "", false

@@ -18,7 +18,7 @@ const latestCarrierDate = "2026-04-01"
 func TestCompareCarriersSummaries(t *testing.T) {
 	minFlights := store.CarrierStatsMinSampleSize
 
-	windowStart, windowEnd, ok := store.RouteCarrierWindow(latestCarrierDate)
+	windowStart, windowEnd, ok := store.TrailingOutlookWindow(latestCarrierDate)
 	if !ok || windowEnd != latestCarrierDate {
 		t.Fatalf("window = %s %s ok=%v", windowStart, windowEnd, ok)
 	}
@@ -149,7 +149,42 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "", OnTimeRate: 0.80, Flights: minFlights},
 				{Carrier: "AA", OnTimeRate: 0.70, Flights: 4},
 			},
-			want:      fmt.Sprintf("Unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, high confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
+			want:      fmt.Sprintf("An unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, high confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
+			wantConf:  model.ConfidenceHigh,
+			wantFirst: "",
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "unknown carrier is lowercase mid-sentence",
+			carriers: []model.CarrierOnTime{
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 120},
+				{Carrier: "", OnTimeRate: 0.60, Flights: 80},
+			},
+			want:      "UA is more reliable than an unknown carrier on ORD–LAX (85% vs 60% on time, high confidence, 120 and 80 flights).",
+			wantConf:  model.ConfidenceHigh,
+			wantFirst: testCarrierUA,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "unknown carrier opens the thin-data sentence",
+			carriers: []model.CarrierOnTime{
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: minFlights},
+				{Carrier: "", OnTimeRate: 0.50, Flights: 4},
+			},
+			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, high confidence, %d flights). An unknown carrier (low confidence, 4 flights) has thin data.", minFlights),
+			wantConf:  model.ConfidenceHigh,
+			wantFirst: testCarrierUA,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "unknown carrier alone on the route",
+			carriers: []model.CarrierOnTime{
+				{Carrier: "", OnTimeRate: 0.85, Flights: minFlights},
+			},
+			want:      fmt.Sprintf("An unknown carrier is on time about 85%% of the time on ORD–LAX (high confidence, %d flights).", minFlights),
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: "",
 			wantStart: windowStart,
@@ -368,6 +403,30 @@ func TestCompareCarriersErrors(t *testing.T) {
 			wantCode: CodeUnavailable,
 			wantText: msgCarriersUnavailable,
 			absent:   testLeakedSecret,
+		},
+		{
+			name: "stats unavailable after latest date",
+			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX},
+			latest: func(string, string) (string, error) {
+				return latestCarrierDate, nil
+			},
+			stats: func(store.RouteStatsFilter) (*model.RouteStats, error) {
+				return nil, errors.New("pq: password authentication failed")
+			},
+			wantCode: CodeUnavailable,
+			wantText: msgCarriersUnavailable,
+			absent:   testLeakedSecret,
+		},
+		{
+			// RouteStats has no stub, so reaching it would panic.
+			name: "unparseable latest date",
+			args: map[string]any{jsonKeyOrigin: testCodeORD, jsonKeyDest: testCodeLAX},
+			latest: func(string, string) (string, error) {
+				return "not-a-date", nil
+			},
+			wantCode: CodeUnavailable,
+			wantText: msgCarriersUnavailable,
+			absent:   "not-a-date",
 		},
 		{
 			name:     "invalid calendar date",

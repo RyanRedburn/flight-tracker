@@ -98,7 +98,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, fmt.Errorf("route outlook %s-%s %s: %w", filter.Origin, filter.Dest, filter.Carrier, store.ErrNotFound)
 	}
 
-	analysisStart, _, ok := store.RouteCarrierWindow(analysisEnd.String)
+	analysisStart, _, ok := store.TrailingOutlookWindow(analysisEnd.String)
 	if !ok {
 		return nil, fmt.Errorf("parse route outlook max flight date %q", analysisEnd.String)
 	}
