@@ -23,9 +23,6 @@ const (
 	routeReliabilityMinDepTimes = 1
 	routeReliabilityMaxDepTimes = 5
 
-	// routeReliabilitySamePointGap is the on-time gap, in percentage points. A gap under this is about the same.
-	routeReliabilitySamePointGap = 3
-
 	routeNotFoundMessage = "No history for %s %s–%s. Check the airports and carrier."
 
 	msgOutlookSchedule = "Exactly one of date or day_of_week is required."
@@ -376,6 +373,7 @@ func departureItem(dep routeDepartureOutlook) scoredItem {
 		return item
 	}
 
+	item.rate = rate
 	item.percent = onTimePercent(rate)
 
 	return item

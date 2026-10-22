@@ -42,6 +42,17 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			wantConfidence: model.ConfidenceUnknown,
 		},
 		{
+			name:  "three times fully separated",
+			times: []string{"0700", "1200", "1800"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.90, 200, model.ConfidenceHigh),
+				"1200": reliabilityOutlook(0.70, 200, model.ConfidenceHigh),
+				"1800": reliabilityOutlook(0.50, 200, model.ConfidenceHigh),
+			},
+			want:           "0700 is most reliable on UA ORD–LAX (90% on time), then 1200 (70%) and 1800 (50%).",
+			wantConfidence: model.ConfidenceHigh,
+		},
+		{
 			name:  "two times clear winner",
 			times: []string{"0700", "1400"},
 			byTime: map[string]model.RouteOutlook{
@@ -58,7 +69,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 				"1400": reliabilityOutlook(0.80, 36, model.ConfidenceHigh),
 			},
-			want:           "0700 and 1400 are about the same on UA ORD–LAX (80% on time).",
+			want:           "0700 and 1400 are too close to call on UA ORD–LAX (80% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -68,7 +79,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.82, 40, model.ConfidenceHigh),
 				"1400": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 and 1400 are about the same on UA ORD–LAX (82% and 80% on time).",
+			want:           "0700 and 1400 are too close to call on UA ORD–LAX (82% and 80% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -109,7 +120,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400": reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800": reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 1400 (83%) and 1800 (81%).",
+			want:           "0700, 1400 and 1800 are too close to call on UA ORD–LAX (85%, 83% and 81% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -122,7 +133,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400":      reliabilityOutlook(0.79, 40, model.ConfidenceHigh),
 				"1800":      reliabilityOutlook(0.77, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 0900 (83%), 1100 (81%), 1400 (79%) and 1800 (77%).",
+			want:           "0700, 0900, 1100, 1400 and 1800 are too close to call on UA ORD–LAX (85%, 83%, 81%, 79% and 77% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -133,7 +144,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep0900: reliabilityOutlook(0.84, 40, model.ConfidenceHigh),
 				testDep1100: reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 and 0900 are about the same and more reliable than 1100 on UA ORD–LAX (85% and 84% vs 80% on time).",
+			want:           "0700, 0900 and 1100 are too close to call on UA ORD–LAX (85%, 84% and 80% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -144,7 +155,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
 				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 			},
-			want:           "0900 is most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 0700 (81%).",
+			want:           "0900, 1100 and 0700 are too close to call on UA ORD–LAX (85%, 83% and 81% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -156,11 +167,11 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 and 0900 are most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 1800 (81%).",
+			want:           "0700, 0900, 1100 and 1800 are too close to call on UA ORD–LAX (85%, 85%, 83% and 81% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
-			name:  "three tied within the gap stay about the same",
+			name:  "three tied within the gap stay too close to call",
 			times: []string{"0700", testDep0900, testDep1100, "1400"},
 			byTime: map[string]model.RouteOutlook{
 				"0700":      reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
@@ -168,7 +179,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep1100: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
 				"1400":      reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 			},
-			want:           "0700, 0900, 1100 and 1400 are about the same on UA ORD–LAX (85%, 85%, 85% and 83% on time).",
+			want:           "0700, 0900, 1100 and 1400 are too close to call on UA ORD–LAX (85%, 85%, 85% and 83% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -181,7 +192,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400":      reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "0700, 0900 and 1100 are most reliable on UA ORD–LAX (85% on time), then 1400 (83%) and 1800 (81%).",
+			want:           "0700, 0900, 1100, 1400 and 1800 are too close to call on UA ORD–LAX (85%, 85%, 85%, 83% and 81% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -193,7 +204,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800":      reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "0700 and 0900 are most reliable on UA ORD–LAX (85% on time), then 1100 (83%) and 1800 (81%).",
+			want:           "0700, 0900, 1100 and 1800 are too close to call on UA ORD–LAX (85%, 85%, 83% and 81% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -205,7 +216,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep1100: reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 				"1400":      reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
-			want:           "0700 is most reliable on UA ORD–LAX (85% on time), then 0900 (83%) and 1100 (81%). 1400 has thin data.",
+			want:           "0700, 0900 and 1100 are too close to call on UA ORD–LAX (85%, 83% and 81% on time). 1400 has thin data.",
 			wantConfidence: model.ConfidenceHigh,
 		},
 	}

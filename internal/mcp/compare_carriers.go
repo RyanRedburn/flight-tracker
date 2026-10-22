@@ -173,6 +173,7 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 		items[i] = scoredItem{
 			label:      carrierLabel(carrier.Carrier),
 			percent:    onTimePercent(carrier.OnTimeRate),
+			rate:       carrier.OnTimeRate,
 			sampleSize: carrier.SampleSize,
 			confidence: carrier.Confidence,
 		}

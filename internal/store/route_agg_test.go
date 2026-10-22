@@ -137,6 +137,48 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 	}
 }
 
+func TestCarrierComparison(t *testing.T) {
+	tests := []struct {
+		name  string
+		items []model.CarrierOnTime
+		want  string
+	}{
+		{name: "one comparable carrier", items: []model.CarrierOnTime{{Carrier: "UA", OnTimeRate: 0.8, Flights: CarrierStatsMinSampleSize}}, want: ""},
+		{
+			name: "thin carriers are not compared",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: CarrierStatsMinSampleSize},
+				{Carrier: "AA", OnTimeRate: 0.1, Flights: CarrierStatsMinSampleSize - 1},
+			},
+			want: "",
+		},
+		{
+			name: "ten point gap on uneven samples",
+			items: []model.CarrierOnTime{
+				{Carrier: "NK", OnTimeRate: 0.77, Flights: 99},
+				{Carrier: "F9", OnTimeRate: 0.67, Flights: 462},
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "wide gap",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: 200},
+				{Carrier: "AA", OnTimeRate: 0.5, Flights: 200},
+			},
+			want: model.ComparisonRanked,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CarrierComparison(tt.items); got != tt.want {
+				t.Fatalf("CarrierComparison() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSortCarrierOnTime(t *testing.T) {
 	items := []model.CarrierOnTime{
 		{Carrier: "UA", OnTimeRate: 0.5, Flights: 2},

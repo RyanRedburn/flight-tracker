@@ -218,6 +218,32 @@ func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierO
 	}
 }
 
+// CarrierComparison reports whether carriers with at least CarrierStatsMinSampleSize
+// differ at 95%. Fewer than two such carriers is not a comparison.
+func CarrierComparison(items []model.CarrierOnTime) string {
+	eligible := make([]model.CarrierOnTime, 0, len(items))
+
+	for _, item := range items {
+		if item.Flights >= CarrierStatsMinSampleSize {
+			eligible = append(eligible, item)
+		}
+	}
+
+	if len(eligible) < 2 {
+		return ""
+	}
+
+	for i := range eligible {
+		for j := i + 1; j < len(eligible); j++ {
+			if model.ProportionsDiffer(eligible[i].OnTimeRate, eligible[i].Flights, eligible[j].OnTimeRate, eligible[j].Flights) {
+				return model.ComparisonRanked
+			}
+		}
+	}
+
+	return model.ComparisonTooCloseToCall
+}
+
 func SortCarrierOnTime(items []model.CarrierOnTime) {
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].OnTimeRate != items[j].OnTimeRate {

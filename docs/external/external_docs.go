@@ -308,7 +308,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters, and carrier_comparison is too_close_to_call when those carriers do not differ at 95%. The carrier list is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -432,7 +432,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum. Month lists are omitted when the highest and lowest eligible months are inside the margin of error.",
                 "produces": [
                     "application/json"
                 ],
@@ -1303,6 +1303,14 @@ const docTemplateexternal = `{
                 "cancelled": {
                     "type": "integer"
                 },
+                "carrier_comparison": {
+                    "description": "CarrierComparison is ranked when a carrier pair differs at 95%, and too_close_to_call when none do.\nOmitted when fewer than two carriers are compared.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
+                },
                 "carrier_on_time": {
                     "description": "Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.",
                     "type": "array",
@@ -1404,6 +1412,14 @@ const docTemplateexternal = `{
                 },
                 "filters": {
                     "$ref": "#/definitions/model.Filters"
+                },
+                "month_comparison": {
+                    "description": "MonthComparison is too_close_to_call when the highest-rate and lowest-rate eligible months\nare inside the margin of error. Those best and worst lists are empty in that case.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
                 },
                 "worst_days": {
                     "type": "array",

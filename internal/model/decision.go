@@ -1,5 +1,7 @@
 package model
 
+import "math"
+
 const (
 	// Connection status compares a same-airport layover with the inbound outlook thresholds.
 	// Travel-window buckets do not use these values.
@@ -13,6 +15,14 @@ const (
 	ConfidenceHigh    = "high"
 	ConfidenceLow     = "low"
 	ConfidenceUnknown = "unknown"
+
+	// ComparisonRanked means at least one pair differs at 95%.
+	// ComparisonTooCloseToCall means every compared pair is inside the margin of error.
+	ComparisonRanked         = "ranked"
+	ComparisonTooCloseToCall = "too_close_to_call"
+
+	// proportionZCritical is the two-sided 95% critical value for a pooled two-proportion z-test.
+	proportionZCritical = 1.96
 
 	// Seasonal reliability is typical-year on-time performance for a travel-window bucket.
 	// It is not a connection status.
@@ -127,6 +137,44 @@ func ConnectionStatus(layover int, minutes *ConnectionMinutes) string {
 	}
 
 	return ConnectionTight
+}
+
+// ProportionsDiffer reports whether two rates differ at 95% under a pooled two-proportion z-test.
+// A gap at or inside the margin of error does not. A non-positive sample does not differ.
+func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int) bool {
+	if flights1 <= 0 || flights2 <= 0 {
+		return false
+	}
+
+	p1 := clampUnit(rate1)
+	p2 := clampUnit(rate2)
+	n1 := float64(flights1)
+	n2 := float64(flights2)
+	pooled := (p1*n1 + p2*n2) / (n1 + n2)
+	variance := pooled * (1 - pooled) * (1/n1 + 1/n2)
+
+	if variance <= 0 {
+		return false
+	}
+
+	z := (p1 - p2) / math.Sqrt(variance)
+	if z < 0 {
+		z = -z
+	}
+
+	return z > proportionZCritical
+}
+
+func clampUnit(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+
+	if v > 1 {
+		return 1
+	}
+
+	return v
 }
 
 // MinConfidence returns the weakest value. Unknown is weaker than low, and low is weaker than high.

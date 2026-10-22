@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters, and carrier_comparison is too_close_to_call when those carriers do not differ at 95%. The carrier list is omitted entirely when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum. Month lists are omitted when the highest and lowest eligible months are inside the margin of error.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

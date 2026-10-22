@@ -56,6 +56,9 @@ type RouteStats struct {
 	DiversionAirports               []AirportCount        `json:"diversion_airports"`
 	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
+	// CarrierComparison is ranked when a carrier pair differs at 95%, and too_close_to_call when none do.
+	// Omitted when fewer than two carriers are compared.
+	CarrierComparison string `json:"carrier_comparison,omitempty" enums:"ranked,too_close_to_call"`
 }
 
 type RouteOutlook struct {
@@ -128,10 +131,13 @@ type RouteTravelWindows struct {
 	ByHour      []TravelWindowHourBucket  `json:"by_hour"`
 	BestMonths  []TravelWindowMonthBucket `json:"best_months"`
 	WorstMonths []TravelWindowMonthBucket `json:"worst_months"`
-	BestDays    []TravelWindowDayBucket   `json:"best_days"`
-	WorstDays   []TravelWindowDayBucket   `json:"worst_days"`
-	BestHours   []TravelWindowHourBucket  `json:"best_hours"`
-	WorstHours  []TravelWindowHourBucket  `json:"worst_hours"`
+	// MonthComparison is too_close_to_call when the highest-rate and lowest-rate eligible months
+	// are inside the margin of error. Those best and worst lists are empty in that case.
+	MonthComparison string                   `json:"month_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	BestDays        []TravelWindowDayBucket  `json:"best_days"`
+	WorstDays       []TravelWindowDayBucket  `json:"worst_days"`
+	BestHours       []TravelWindowHourBucket `json:"best_hours"`
+	WorstHours      []TravelWindowHourBucket `json:"worst_hours"`
 }
 
 // RoundForResponse rounds rates and probabilities to two decimal places and

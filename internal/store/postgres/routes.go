@@ -57,6 +57,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		}
 
 		stats.CarrierOnTime = rows
+		stats.CarrierComparison = store.CarrierComparison(rows)
 	}
 
 	stats.RoundForResponse()

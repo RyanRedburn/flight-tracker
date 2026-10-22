@@ -151,6 +151,7 @@ func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowDat
 		items[i] = scoredItem{
 			label:      monthLabel(month.Month),
 			percent:    onTimePercent(month.OnTimeRate),
+			rate:       month.OnTimeRate,
 			sampleSize: month.SampleSize,
 			confidence: month.Confidence,
 		}
@@ -166,61 +167,90 @@ func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowDat
 
 // bestWorstMonths compares only the high-confidence months. Thin months are named after it.
 func bestWorstMonths(route string, ranked []scoredItem) string {
-	bestPct, worstPct := ranked[0].percent, ranked[0].percent
+	if len(ranked) == 1 {
+		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). High confidence, %s.",
+			ranked[0].label, route, ranked[0].percent, flightsPhrase([]int{ranked[0].sampleSize}))
+	}
+
 	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
 
 	for _, item := range ranked[1:] {
-		bestPct = max(bestPct, item.percent)
-		worstPct = min(worstPct, item.percent)
 		minFlights = min(minFlights, item.sampleSize)
 		maxFlights = max(maxFlights, item.sampleSize)
 	}
 
-	if len(ranked) == 1 {
-		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). High confidence, %s.",
-			ranked[0].label, route, bestPct, flightsPhrase([]int{minFlights}))
-	}
-
-	lead := spreadMonths(route, ranked, bestPct, worstPct)
-	if bestPct-worstPct < routeReliabilitySamePointGap {
-		lead = sameMonths(route, ranked, bestPct, worstPct)
-	}
-
-	return lead + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+	return monthComparison(route, ranked) + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
 }
 
-// sameMonths is for a spread under the shared same-point gap, so no month is called best or worst.
-func sameMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
+// monthComparison names a best and worst month only when those rates differ at 95%.
+func monthComparison(route string, ranked []scoredItem) string {
+	sorted := sortByRate(ranked)
+	if !anyItemDiffers(sorted) {
+		return sameMonths(route, sorted)
+	}
+
+	leaders, rest := splitLeaders(sorted)
+	if len(rest) > 0 && leadersSeparated(leaders, rest) && !anyItemDiffers(rest) {
+		return spreadMonths(route, leaders, rest)
+	}
+
+	if len(rest) > 0 && leadersSeparated(leaders, rest) {
+		return monthLeadersAhead(route, leaders, rest)
+	}
+
+	better, worse, ok := strongestPair(sorted)
+	if !ok {
+		return sameMonths(route, sorted)
+	}
+
+	return fmt.Sprintf("%s is the most reliable month for %s (%d%% on time), and %s is the least reliable (%d%%).",
+		better.label, route, better.percent, worse.label, worse.percent)
+}
+
+func monthLeadersAhead(route string, leaders, rest []scoredItem) string {
+	if len(leaders) == 1 {
+		return fmt.Sprintf("%s is more reliable than %s for %s (%d%% vs %s on time).",
+			leaders[0].label, joinLabels(rest), route, leaders[0].percent, joinItemPercents(rest))
+	}
+
+	rates := joinItemPercents(leaders)
+	if sameItemPercent(leaders) {
+		rates = strconv.Itoa(leaders[0].percent) + "%"
+	}
+
+	return fmt.Sprintf("%s are %s and more reliable than %s for %s (%s vs %s on time).",
+		joinLabels(leaders), phraseTooClose, joinLabels(rest), route, rates, joinItemPercents(rest))
+}
+
+// sameMonths is the whole set inside the margin of error, so no month is called best or worst.
+func sameMonths(route string, ranked []scoredItem) string {
 	rates := joinItemPercents(ranked)
-	if bestPct == worstPct {
-		rates = strconv.Itoa(bestPct) + "%"
+	if sameItemPercent(ranked) {
+		rates = strconv.Itoa(ranked[0].percent) + "%"
 	}
 
-	return fmt.Sprintf("%s are about the same for %s (%s on time).", joinLabels(ranked), route, rates)
+	return fmt.Sprintf("%s are %s for %s (%s on time).", joinLabels(ranked), phraseTooClose, route, rates)
 }
 
-// spreadMonths names every month tied for best and every month tied for worst.
-func spreadMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
-	best := make([]scoredItem, 0, len(ranked))
-	worst := make([]scoredItem, 0, len(ranked))
-
-	for _, item := range ranked {
-		if item.percent == bestPct {
-			best = append(best, item)
-		}
-
-		if item.percent == worstPct {
-			worst = append(worst, item)
-		}
-	}
-
+// spreadMonths names the months too close to the best and the months too close to the worst.
+func spreadMonths(route string, best, worst []scoredItem) string {
 	bestNoun := "month"
 	if len(best) > 1 {
 		bestNoun = "months"
 	}
 
-	return fmt.Sprintf("%s %s the most reliable %s for %s (%d%% on time), and %s %s the least reliable (%d%%).",
-		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestPct, joinLabels(worst), pluralVerb(len(worst)), worstPct)
+	bestRates := strconv.Itoa(best[0].percent) + "%"
+	if !sameItemPercent(best) {
+		bestRates = joinItemPercents(best)
+	}
+
+	worstRates := strconv.Itoa(worst[0].percent) + "%"
+	if !sameItemPercent(worst) {
+		worstRates = joinItemPercents(worst)
+	}
+
+	return fmt.Sprintf("%s %s the most reliable %s for %s (%s on time), and %s %s the least reliable (%s).",
+		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestRates, joinLabels(worst), pluralVerb(len(worst)), worstRates)
 }
 
 // monthCountSentence covers only the months with enough data, not the thin ones named after it.

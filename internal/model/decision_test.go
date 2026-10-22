@@ -31,6 +31,41 @@ func TestConnectionStatus(t *testing.T) {
 	}
 }
 
+func TestProportionsDiffer(t *testing.T) {
+	tests := []struct {
+		name     string
+		rate1    float64
+		flights1 int
+		rate2    float64
+		flights2 int
+		want     bool
+	}{
+		{name: "empty sample", rate1: 0.9, flights1: 0, rate2: 0.1, flights2: 40},
+		{name: "equal rates", rate1: 0.8, flights1: 200, rate2: 0.8, flights2: 180},
+		{name: "both perfect", rate1: 1, flights1: 50, rate2: 1, flights2: 40},
+		{name: "single flights", rate1: 1, flights1: 1, rate2: 0, flights2: 1},
+		{
+			name:  "ten point gap on uneven samples stays inside the margin",
+			rate1: 0.77, flights1: 99, rate2: 0.67, flights2: 462,
+		},
+		{name: "two point gap on small samples", rate1: 0.82, flights1: 40, rate2: 0.80, flights2: 40},
+		{name: "wide gap on small samples", rate1: 0.85, flights1: 40, rate2: 0.60, flights2: 40, want: true},
+		{name: "wide gap on large samples", rate1: 0.90, flights1: 200, rate2: 0.60, flights2: 200, want: true},
+		{name: "rates outside 0 and 1 are clamped", rate1: 1.4, flights1: 200, rate2: -0.2, flights2: 200, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ProportionsDiffer(tt.rate1, tt.flights1, tt.rate2, tt.flights2)
+			reverse := ProportionsDiffer(tt.rate2, tt.flights2, tt.rate1, tt.flights1)
+
+			if got != tt.want || reverse != tt.want {
+				t.Fatalf("ProportionsDiffer() = %v/%v, want %v", got, reverse, tt.want)
+			}
+		})
+	}
+}
+
 func TestMinConfidence(t *testing.T) {
 	if got := MinConfidence(); got != ConfidenceUnknown {
 		t.Fatalf("MinConfidence() = %q", got)
