@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 
@@ -26,10 +27,12 @@ type bestTravelWindowInput struct {
 }
 
 type travelMonth struct {
-	model.TravelWindowMonthBucket
-
-	SampleSize   int    `json:"sample_size"`
-	SampleReason string `json:"sample_reason"`
+	Month        int     `json:"month"`
+	OnTimeRate   float64 `json:"on_time_rate"`
+	Reliability  string  `json:"reliability"`
+	Confidence   string  `json:"confidence"`
+	SampleSize   int     `json:"sample_size"`
+	SampleReason string  `json:"sample_reason"`
 }
 
 type bestTravelWindowData struct {
@@ -127,9 +130,12 @@ func travelMonths(buckets []model.TravelWindowMonthBucket) []travelMonth {
 
 func travelMonthFrom(bucket model.TravelWindowMonthBucket) travelMonth {
 	return travelMonth{
-		TravelWindowMonthBucket: bucket,
-		SampleSize:              bucket.Flights,
-		SampleReason:            sampleReason(bucket.Flights, bucket.Confidence),
+		Month:        bucket.Month,
+		OnTimeRate:   bucket.OnTimeRate,
+		Reliability:  bucket.Reliability,
+		Confidence:   bucket.Confidence,
+		SampleSize:   bucket.Flights,
+		SampleReason: sampleReason(bucket.Flights, bucket.Confidence),
 	}
 }
 
@@ -149,5 +155,78 @@ func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowDat
 		}
 	}
 
-	return comparisonSummary(nounMonth, route, items, true)
+	ranked, thin, none := splitByConfidence(items)
+	if len(ranked) == 0 {
+		return appendNote(noneEnough(nounMonth, route), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+	}
+
+	return appendNote(bestWorstMonths(route, ranked), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+}
+
+func bestWorstMonths(route string, ranked []scoredItem) string {
+	bestPct, worstPct := ranked[0].percent, ranked[0].percent
+	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
+
+	for _, item := range ranked[1:] {
+		if item.percent > bestPct {
+			bestPct = item.percent
+		}
+
+		if item.percent < worstPct {
+			worstPct = item.percent
+		}
+
+		if item.sampleSize < minFlights {
+			minFlights = item.sampleSize
+		}
+
+		if item.sampleSize > maxFlights {
+			maxFlights = item.sampleSize
+		}
+	}
+
+	best := make([]scoredItem, 0, len(ranked))
+	worst := make([]scoredItem, 0, len(ranked))
+
+	for _, item := range ranked {
+		if item.percent == bestPct {
+			best = append(best, item)
+		}
+
+		if item.percent == worstPct {
+			worst = append(worst, item)
+		}
+	}
+
+	var lead string
+
+	switch {
+	case len(ranked) == 1:
+		lead = fmt.Sprintf("%s is the most reliable month for %s (%d%% on time).", best[0].label, route, bestPct)
+	case bestPct == worstPct:
+		lead = fmt.Sprintf("%s are about the same for %s (%d%% on time).", joinLabels(ranked), route, bestPct)
+	default:
+		bestNoun := "month"
+		if len(best) > 1 {
+			bestNoun = "months"
+		}
+
+		lead = fmt.Sprintf("%s %s the most reliable %s for %s (%d%% on time), and %s %s the least reliable (%d%%).",
+			joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestPct, joinLabels(worst), pluralVerb(len(worst)), worstPct)
+	}
+
+	return lead + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+}
+
+func monthCountSentence(months, minFlights, maxFlights int) string {
+	if minFlights == maxFlights {
+		phrase := flightsPhrase([]int{minFlights})
+		if months == 1 {
+			return "High confidence, " + phrase + "."
+		}
+
+		return "High confidence, " + phrase + " per month."
+	}
+
+	return fmt.Sprintf("High confidence, %d to %d flights per month.", minFlights, maxFlights)
 }

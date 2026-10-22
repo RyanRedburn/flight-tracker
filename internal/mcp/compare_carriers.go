@@ -28,11 +28,11 @@ type compareCarriersInput struct {
 }
 
 type comparedCarrier struct {
-	model.CarrierOnTime
-
-	Confidence   string `json:"confidence"`
-	SampleSize   int    `json:"sample_size"`
-	SampleReason string `json:"sample_reason"`
+	Carrier      string  `json:"carrier"`
+	OnTimeRate   float64 `json:"on_time_rate"`
+	Confidence   string  `json:"confidence"`
+	SampleSize   int     `json:"sample_size"`
+	SampleReason string  `json:"sample_reason"`
 }
 
 type compareCarriersData struct {
@@ -140,8 +140,11 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 		carriers = append(carriers, comparedCarrierFrom(row))
 	}
 
+	trimmed := *stats
+	trimmed.CarrierOnTime = nil
+
 	return &compareCarriersData{
-		Stats:    *stats,
+		Stats:    trimmed,
 		Carriers: carriers,
 	}
 }
@@ -151,10 +154,11 @@ func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
 	confidence := model.SeasonalConfidence(row.Flights, store.CarrierStatsMinSampleSize)
 
 	return comparedCarrier{
-		CarrierOnTime: row,
-		Confidence:    confidence,
-		SampleSize:    row.Flights,
-		SampleReason:  sampleReason(row.Flights, confidence),
+		Carrier:      row.Carrier,
+		OnTimeRate:   row.OnTimeRate,
+		Confidence:   confidence,
+		SampleSize:   row.Flights,
+		SampleReason: sampleReason(row.Flights, confidence),
 	}
 }
 

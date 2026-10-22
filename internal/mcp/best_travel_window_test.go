@@ -30,7 +30,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(1, 0.70, 100, model.ConfidenceHigh, model.ReliabilityTypical),
 				monthBucket(7, 0.90, 110, model.ConfidenceHigh, model.ReliabilityReliable),
 			},
-			want:       "July is more reliable than January on ORD–LAX (90% vs 70% on time, high confidence, 110 and 100 flights).",
+			want:       "July is the most reliable month for ORD–LAX (90% on time), and January is the least reliable (70%). High confidence, 100 to 110 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 2,
 			firstMonth: 1,
@@ -41,7 +41,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(1, 0.80, 100, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(2, 0.80, 90, model.ConfidenceHigh, model.ReliabilityReliable),
 			},
-			want:       "January and February are about the same on ORD–LAX (80% on time, high confidence, 100 and 90 flights).",
+			want:       "January and February are about the same for ORD–LAX (80% on time). High confidence, 90 to 100 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 2,
 			firstMonth: 1,
@@ -52,7 +52,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(1, 0.82, 100, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(2, 0.80, 90, model.ConfidenceHigh, model.ReliabilityReliable),
 			},
-			want:       "January and February are about the same on ORD–LAX (82% and 80% on time, high confidence, 100 and 90 flights).",
+			want:       "January is the most reliable month for ORD–LAX (82% on time), and February is the least reliable (80%). High confidence, 90 to 100 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 2,
 			firstMonth: 1,
@@ -64,7 +64,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(2, 0.83, 110, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(3, 0.81, 100, model.ConfidenceHigh, model.ReliabilityReliable),
 			},
-			want:       "January is most reliable on ORD–LAX (85% on time, high confidence, 120 flights), then February (83%, high confidence, 110 flights) and March (81%, high confidence, 100 flights).",
+			want:       "January is the most reliable month for ORD–LAX (85% on time), and March is the least reliable (81%). High confidence, 100 to 120 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 3,
 			firstMonth: 1,
@@ -76,7 +76,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(2, 0.84, 110, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(7, 0.70, 90, model.ConfidenceHigh, model.ReliabilityTypical),
 			},
-			want:       "January and February are about the same and more reliable than July on ORD–LAX (85% and 84% vs 70% on time, high confidence, 120, 110 and 90 flights).",
+			want:       "January is the most reliable month for ORD–LAX (85% on time), and July is the least reliable (70%). High confidence, 90 to 120 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 3,
 			firstMonth: 1,
@@ -88,7 +88,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(2, 0.85, 90, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(7, 0.70, 80, model.ConfidenceHigh, model.ReliabilityTypical),
 			},
-			want:       "January and February are about the same and more reliable than July on ORD–LAX (85% vs 70% on time, high confidence, 100, 90 and 80 flights).",
+			want:       "January and February are the most reliable months for ORD–LAX (85% on time), and July is the least reliable (70%). High confidence, 80 to 100 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 3,
 			firstMonth: 1,
@@ -100,7 +100,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(3, 0.95, 12, model.ConfidenceLow, model.ReliabilityUnknown),
 				monthBucket(7, 0.40, 8, model.ConfidenceLow, model.ReliabilityUnknown),
 			},
-			want:       "January is the only month with enough data on ORD–LAX (85% on time, high confidence, 80 flights). March (low confidence, 12 flights) and July (low confidence, 8 flights) have thin data.",
+			want:       "January is the most reliable month for ORD–LAX (85% on time). High confidence, 80 flights. March (low confidence, 12 flights) and July (low confidence, 8 flights) have thin data.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 3,
 			firstMonth: 1,
@@ -139,6 +139,67 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 			firstMonth: 1,
 		},
 		{
+			name: "tied best and worst leave the middle month out",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(5, 0.86, 500, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(6, 0.80, 650, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(8, 0.72, 440, model.ConfidenceHigh, model.ReliabilityTypical),
+				monthBucket(9, 0.86, 435, model.ConfidenceHigh, model.ReliabilityReliable),
+			},
+			want:       "May and September are the most reliable months for ORD–LAX (86% on time), and August is the least reliable (72%). High confidence, 435 to 650 flights per month.",
+			wantConf:   model.ConfidenceHigh,
+			wantMonths: 4,
+			firstMonth: 5,
+		},
+		{
+			name:    "carrier route names tied best months",
+			carrier: "ua",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(5, 0.86, 650, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(6, 0.80, 500, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(8, 0.72, 600, model.ConfidenceHigh, model.ReliabilityTypical),
+				monthBucket(9, 0.86, 435, model.ConfidenceHigh, model.ReliabilityReliable),
+			},
+			want:       "May and September are the most reliable months for UA ORD–LAX (86% on time), and August is the least reliable (72%). High confidence, 435 to 650 flights per month.",
+			wantConf:   model.ConfidenceHigh,
+			wantMonths: 4,
+			firstMonth: 5,
+		},
+		{
+			name: "tied worst months are both named",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(1, 0.90, 200, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(2, 0.80, 150, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(3, 0.70, 100, model.ConfidenceHigh, model.ReliabilityTypical),
+				monthBucket(4, 0.70, 180, model.ConfidenceHigh, model.ReliabilityTypical),
+			},
+			want:       "January is the most reliable month for ORD–LAX (90% on time), and March and April are the least reliable (70%). High confidence, 100 to 200 flights per month.",
+			wantConf:   model.ConfidenceHigh,
+			wantMonths: 4,
+			firstMonth: 1,
+		},
+		{
+			name: "one solid month",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(5, 0.86, 435, model.ConfidenceHigh, model.ReliabilityReliable),
+			},
+			want:       "May is the most reliable month for ORD–LAX (86% on time). High confidence, 435 flights.",
+			wantConf:   model.ConfidenceHigh,
+			wantMonths: 1,
+			firstMonth: 5,
+		},
+		{
+			name: "every solid month has the same flight count",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(1, 0.80, 100, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(2, 0.80, 100, model.ConfidenceHigh, model.ReliabilityReliable),
+			},
+			want:       "January and February are about the same for ORD–LAX (80% on time). High confidence, 100 flights per month.",
+			wantConf:   model.ConfidenceHigh,
+			wantMonths: 2,
+			firstMonth: 1,
+		},
+		{
 			name:       "route exists but no months",
 			months:     nil,
 			want:       "No month-of-year history for ORD–LAX between 2025-01-01 and 2026-01-01, so the confidence is unknown.",
@@ -152,7 +213,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				monthBucket(1, 0.85, 80, model.ConfidenceHigh, model.ReliabilityReliable),
 				monthBucket(7, 0.60, 70, model.ConfidenceHigh, model.ReliabilityUnreliable),
 			},
-			want:       "January is more reliable than July on UA ORD–LAX (85% vs 60% on time, high confidence, 80 and 70 flights).",
+			want:       "January is the most reliable month for UA ORD–LAX (85% on time), and July is the least reliable (60%). High confidence, 70 to 80 flights per month.",
 			wantConf:   model.ConfidenceHigh,
 			wantMonths: 2,
 			firstMonth: 1,
@@ -216,7 +277,7 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 				t.Fatalf("months = %d", len(out.Data.ByMonth))
 			}
 
-			if tt.wantMonths > 0 && (out.Data.ByMonth[0].Month != tt.firstMonth || out.Data.ByMonth[0].Flights != tt.months[0].Flights) {
+			if tt.wantMonths > 0 && (out.Data.ByMonth[0].Month != tt.firstMonth || out.Data.ByMonth[0].SampleSize != tt.months[0].Flights || out.Data.ByMonth[0].OnTimeRate != tt.months[0].OnTimeRate || out.Data.ByMonth[0].Reliability != tt.months[0].Reliability || out.Data.ByMonth[0].Confidence != tt.months[0].Confidence) {
 				t.Fatalf("first month = %#v", out.Data.ByMonth[0])
 			}
 
@@ -270,7 +331,7 @@ func TestBestTravelWindowSampleReasons(t *testing.T) {
 		t.Fatalf("thin = %#v", out.Data.ByMonth[1])
 	}
 
-	if out.Data.ByMonth[2].Flights != 2 || out.Data.ByMonth[2].SampleSize != 2 || out.Data.ByMonth[2].SampleReason != model.SampleReasonInsufficientSample || out.Data.ByMonth[2].Confidence != "" {
+	if out.Data.ByMonth[2].SampleSize != 2 || out.Data.ByMonth[2].SampleReason != model.SampleReasonInsufficientSample || out.Data.ByMonth[2].Confidence != "" {
 		t.Fatalf("unknown = %#v", out.Data.ByMonth[2])
 	}
 }
@@ -609,6 +670,10 @@ func assertSamplesOnList(t *testing.T, res *mcpsdk.CallToolResult, listKey strin
 
 		if _, ok := row["sample_reason"]; !ok {
 			t.Fatalf("item %d missing sample_reason: %#v", i, row)
+		}
+
+		if _, ok := row["flights"]; ok {
+			t.Fatalf("item %d still has flights: %#v", i, row)
 		}
 	}
 }

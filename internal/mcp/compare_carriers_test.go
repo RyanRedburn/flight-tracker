@@ -216,7 +216,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 							StartDate: filter.StartDate,
 							EndDate:   filter.EndDate,
 						},
-						Analysis:      model.Analysis{Start: filter.StartDate, End: filter.EndDate},
+						Analysis:      model.Analysis{Start: filter.StartDate, End: filter.EndDate, SampleSize: 999},
+						Flights:       999,
 						CarrierOnTime: tt.carriers,
 					}, nil
 				},
@@ -253,8 +254,16 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				t.Fatalf("data = %#v", out.Data)
 			}
 
-			if len(out.Data.Carriers) != len(tt.carriers) || len(out.Data.Stats.CarrierOnTime) != len(tt.carriers) {
-				t.Fatalf("carriers = %d stats = %d", len(out.Data.Carriers), len(out.Data.Stats.CarrierOnTime))
+			if len(out.Data.Carriers) != len(tt.carriers) || len(out.Data.Stats.CarrierOnTime) != 0 {
+				t.Fatalf("carriers = %d stats carriers = %d", len(out.Data.Carriers), len(out.Data.Stats.CarrierOnTime))
+			}
+
+			if out.Data.Stats.Flights != 999 || out.Data.Stats.Analysis.SampleSize != 999 {
+				t.Fatalf("stats totals = flights %d sample %d", out.Data.Stats.Flights, out.Data.Stats.Analysis.SampleSize)
+			}
+
+			if strings.Contains(toolText(t, res), `"carrier_on_time"`) {
+				t.Fatal("carrier_on_time included in compare_carriers")
 			}
 
 			if len(tt.carriers) > 0 && out.Data.Carriers[0].Carrier != tt.wantFirst {
@@ -262,7 +271,7 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			}
 
 			if len(tt.carriers) > 0 {
-				if out.Data.Carriers[0].SampleSize != tt.carriers[0].Flights || out.Data.Carriers[0].Flights != tt.carriers[0].Flights || out.Data.Carriers[0].OnTimeRate != tt.carriers[0].OnTimeRate {
+				if out.Data.Carriers[0].SampleSize != tt.carriers[0].Flights || out.Data.Carriers[0].OnTimeRate != tt.carriers[0].OnTimeRate {
 					t.Fatalf("first carrier = %#v", out.Data.Carriers[0])
 				}
 			}

@@ -190,10 +190,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 
 	leaders := sorted[:tied]
 
-	verb := "is"
-	if tied > 1 {
-		verb = "are"
-	}
+	verb := pluralVerb(tied)
 
 	lead := strconv.Itoa(sorted[0].percent) + "%"
 	if detail {
@@ -275,6 +272,14 @@ func haveVerb(n int) string {
 	}
 
 	return "have"
+}
+
+func pluralVerb(n int) string {
+	if n == 1 {
+		return "is"
+	}
+
+	return "are"
 }
 
 func leaderRates(leaders []scoredItem) string {
