@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"math"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -66,11 +65,6 @@ type routeDepartureOutlook struct {
 type routeReliabilityData struct {
 	Stats      model.RouteStats        `json:"stats"`
 	Departures []routeDepartureOutlook `json:"departures"`
-}
-
-type rankedDeparture struct {
-	time    string
-	percent int
 }
 
 func routeReliabilityInputSchema() *jsonschema.Schema {
@@ -354,159 +348,37 @@ func oneDepartureSummary(route string, dep routeDepartureOutlook) string {
 }
 
 func manyDepartureSummary(route string, departures []routeDepartureOutlook) string {
-	var (
-		ranked []rankedDeparture
-		thin   []string
-		none   []string
-	)
-
-	for _, dep := range departures {
-		timeLabel := dep.Filters.DepTime
-
-		switch outlookConfidence(dep.Analysis) {
-		case model.ConfidenceHigh:
-			rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
-			if !ok {
-				none = append(none, timeLabel)
-				continue
-			}
-
-			ranked = append(ranked, rankedDeparture{time: timeLabel, percent: onTimePercent(rate)})
-		case model.ConfidenceLow:
-			thin = append(thin, timeLabel)
-		default:
-			none = append(none, timeLabel)
-		}
+	items := make([]scoredItem, len(departures))
+	for i, dep := range departures {
+		items[i] = departureItem(dep)
 	}
 
-	switch len(ranked) {
-	case 0:
-		return appendDataNote("No listed time on "+route+" has enough data to compare.", thin, none)
-	case 1:
-		return appendDataNote(fmt.Sprintf("%s is the only listed time with enough data on %s (%d%% on time).", ranked[0].time, route, ranked[0].percent), thin, none)
-	default:
-		return appendDataNote(rankedSummary(route, ranked), thin, none)
-	}
+	summary, _ := comparisonSummary(nounListedTime, route, items, false)
+
+	return summary
 }
 
-func rankedSummary(route string, ranked []rankedDeparture) string {
-	sorted := append([]rankedDeparture(nil), ranked...)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].percent > sorted[j].percent })
-
-	split := 1
-	for split < len(sorted) && sorted[0].percent-sorted[split].percent < routeReliabilitySamePointGap {
-		split++
+func departureItem(dep routeDepartureOutlook) scoredItem {
+	item := scoredItem{
+		label:      dep.Filters.DepTime,
+		sampleSize: dep.Analysis.SampleSize,
+		confidence: outlookConfidence(dep.Analysis),
 	}
 
-	leaders, trailers := sorted[:split], sorted[split:]
-
-	if len(trailers) == 0 {
-		return aboutTheSame(route, leaders)
+	if item.confidence != model.ConfidenceHigh {
+		return item
 	}
 
-	// A trailer within the gap of the lowest leader is not clearly worse, so list every time in order instead.
-	if leaders[len(leaders)-1].percent-trailers[0].percent < routeReliabilitySamePointGap {
-		return orderedSummary(route, sorted)
+	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
+	if !ok {
+		item.confidence = ""
+
+		return item
 	}
 
-	if len(leaders) == 1 {
-		return fmt.Sprintf("%s is more reliable than %s on %s (%d%% vs %s on time).",
-			leaders[0].time, joinRankedTimes(trailers), route, leaders[0].percent, joinPercents(trailers))
-	}
+	item.percent = onTimePercent(rate)
 
-	return fmt.Sprintf("%s are about the same and more reliable than %s on %s (%s vs %s on time).",
-		joinRankedTimes(leaders), joinRankedTimes(trailers), route, joinPercents(leaders), joinPercents(trailers))
-}
-
-// orderedSummary compares the displayed percents, so every time tied with the best leads.
-func orderedSummary(route string, sorted []rankedDeparture) string {
-	tied := 1
-	for tied < len(sorted) && sorted[tied].percent == sorted[0].percent {
-		tied++
-	}
-
-	rest := make([]string, 0, len(sorted)-tied)
-	for _, item := range sorted[tied:] {
-		rest = append(rest, fmt.Sprintf("%s (%d%%)", item.time, item.percent))
-	}
-
-	verb := "is"
-	if tied > 1 {
-		verb = "are"
-	}
-
-	return fmt.Sprintf("%s %s most reliable on %s (%d%% on time), then %s.",
-		joinRankedTimes(sorted[:tied]), verb, route, sorted[0].percent, joinAnd(rest))
-}
-
-func aboutTheSame(route string, leaders []rankedDeparture) string {
-	if samePercent(leaders) {
-		return fmt.Sprintf("%s are about the same on %s (%d%% on time).", joinRankedTimes(leaders), route, leaders[0].percent)
-	}
-
-	return fmt.Sprintf("%s are about the same on %s (%s on time).", joinRankedTimes(leaders), route, joinPercents(leaders))
-}
-
-func appendDataNote(base string, thin, none []string) string {
-	note := dataGapSentence(thin, none)
-	if note == "" {
-		return base
-	}
-
-	return base + " " + note
-}
-
-func dataGapSentence(thin, none []string) string {
-	parts := make([]string, 0, 2)
-	if len(thin) > 0 {
-		parts = append(parts, joinAnd(thin)+" "+haveVerb(len(thin))+" thin data")
-	}
-
-	if len(none) > 0 {
-		parts = append(parts, joinAnd(none)+" "+haveVerb(len(none))+" no data")
-	}
-
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return strings.Join(parts, " and ") + "."
-}
-
-func haveVerb(n int) string {
-	if n == 1 {
-		return "has"
-	}
-
-	return "have"
-}
-
-func samePercent(items []rankedDeparture) bool {
-	for _, item := range items[1:] {
-		if item.percent != items[0].percent {
-			return false
-		}
-	}
-
-	return true
-}
-
-func joinRankedTimes(items []rankedDeparture) string {
-	times := make([]string, len(items))
-	for i, item := range items {
-		times[i] = item.time
-	}
-
-	return joinAnd(times)
-}
-
-func joinPercents(items []rankedDeparture) string {
-	parts := make([]string, len(items))
-	for i, item := range items {
-		parts[i] = strconv.Itoa(item.percent) + "%"
-	}
-
-	return joinAnd(parts)
+	return item
 }
 
 func outlookOnTimeRate(rate *float64) (float64, bool) {

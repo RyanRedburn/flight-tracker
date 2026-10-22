@@ -29,17 +29,11 @@ func normalizeSuppliedRoute(origin, dest string) (string, string, bool, *Failure
 	}
 
 	if len(origin) != 3 {
-		return "", "", false, &Failure{
-			Code:    CodeInvalidInput,
-			Message: "origin must be a 3-letter IATA airport code.",
-		}
+		return "", "", false, invalidIATA("origin")
 	}
 
 	if len(dest) != 3 {
-		return "", "", false, &Failure{
-			Code:    CodeInvalidInput,
-			Message: "dest must be a 3-letter IATA airport code.",
-		}
+		return "", "", false, invalidIATA("dest")
 	}
 
 	return origin, dest, true, nil
@@ -73,7 +67,21 @@ func explainMissingRoute(ctx context.Context, s store.Store, logger *slog.Logger
 	return routeNotFoundFailure(carrier, origin, dest)
 }
 
+func invalidIATA(field string) *Failure {
+	return &Failure{
+		Code:    CodeInvalidInput,
+		Message: field + " must be a 3-letter IATA airport code.",
+	}
+}
+
 func routeNotFoundFailure(carrier, origin, dest string) *Failure {
+	if carrier == "" {
+		return &Failure{
+			Code:    CodeRouteNotFound,
+			Message: fmt.Sprintf("No history for %s–%s. Check the airports.", origin, dest),
+		}
+	}
+
 	return &Failure{
 		Code:    CodeRouteNotFound,
 		Message: fmt.Sprintf(routeNotFoundMessage, carrier, origin, dest),

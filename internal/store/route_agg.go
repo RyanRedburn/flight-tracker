@@ -191,6 +191,17 @@ func ISOWeekdayFromDate(date string) (int, bool) {
 	return ISOWeekday(t), true
 }
 
+// TrailingOutlookWindow is the inclusive trailing outlook year ending at endDate.
+// Route outlook and compare_carriers share it; the span fits in MaxStatsSpanDays.
+func TrailingOutlookWindow(endDate string) (start, end string, ok bool) {
+	endTime, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		return "", "", false
+	}
+
+	return endTime.AddDate(0, 0, -OutlookLookbackDays).Format("2006-01-02"), endDate, true
+}
+
 func ResolveDepTimeWindowMinutes(minutes *int) int {
 	if minutes == nil {
 		return DefaultDepTimeWindowMinutes

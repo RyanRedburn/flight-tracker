@@ -323,6 +323,12 @@ const (
 			AND iata_code_marketing_airline = $3
 		LIMIT 1`
 
+	QueryRouteMaxFlightDate = `
+		SELECT MAX(flight_date)::text
+		FROM flight_performance
+		WHERE origin = $1
+			AND dest = $2`
+
 	QueryRouteStats = `
 		WITH matched AS (
 			SELECT
