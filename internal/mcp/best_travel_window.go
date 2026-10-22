@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"strconv"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -157,34 +158,49 @@ func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowDat
 
 	ranked, thin, none := splitByConfidence(items)
 	if len(ranked) == 0 {
-		return appendNote(noneEnough(nounMonth, route), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+		return appendNote("No month for "+route+" has enough data to compare.", thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
 	}
 
 	return appendNote(bestWorstMonths(route, ranked), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
 }
 
+// bestWorstMonths compares only the high-confidence months. Thin months are named after it.
 func bestWorstMonths(route string, ranked []scoredItem) string {
 	bestPct, worstPct := ranked[0].percent, ranked[0].percent
 	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
 
 	for _, item := range ranked[1:] {
-		if item.percent > bestPct {
-			bestPct = item.percent
-		}
-
-		if item.percent < worstPct {
-			worstPct = item.percent
-		}
-
-		if item.sampleSize < minFlights {
-			minFlights = item.sampleSize
-		}
-
-		if item.sampleSize > maxFlights {
-			maxFlights = item.sampleSize
-		}
+		bestPct = max(bestPct, item.percent)
+		worstPct = min(worstPct, item.percent)
+		minFlights = min(minFlights, item.sampleSize)
+		maxFlights = max(maxFlights, item.sampleSize)
 	}
 
+	if len(ranked) == 1 {
+		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). High confidence, %s.",
+			ranked[0].label, route, bestPct, flightsPhrase([]int{minFlights}))
+	}
+
+	lead := spreadMonths(route, ranked, bestPct, worstPct)
+	if bestPct-worstPct < routeReliabilitySamePointGap {
+		lead = sameMonths(route, ranked, bestPct, worstPct)
+	}
+
+	return lead + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+}
+
+// sameMonths is for a spread under the shared same-point gap, so no month is called best or worst.
+func sameMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
+	rates := joinItemPercents(ranked)
+	if bestPct == worstPct {
+		rates = strconv.Itoa(bestPct) + "%"
+	}
+
+	return fmt.Sprintf("%s are about the same for %s (%s on time).", joinLabels(ranked), route, rates)
+}
+
+// spreadMonths names every month tied for best and every month tied for worst.
+func spreadMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
 	best := make([]scoredItem, 0, len(ranked))
 	worst := make([]scoredItem, 0, len(ranked))
 
@@ -198,35 +214,21 @@ func bestWorstMonths(route string, ranked []scoredItem) string {
 		}
 	}
 
-	var lead string
-
-	switch {
-	case len(ranked) == 1:
-		lead = fmt.Sprintf("%s is the most reliable month for %s (%d%% on time).", best[0].label, route, bestPct)
-	case bestPct == worstPct:
-		lead = fmt.Sprintf("%s are about the same for %s (%d%% on time).", joinLabels(ranked), route, bestPct)
-	default:
-		bestNoun := "month"
-		if len(best) > 1 {
-			bestNoun = "months"
-		}
-
-		lead = fmt.Sprintf("%s %s the most reliable %s for %s (%d%% on time), and %s %s the least reliable (%d%%).",
-			joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestPct, joinLabels(worst), pluralVerb(len(worst)), worstPct)
+	bestNoun := "month"
+	if len(best) > 1 {
+		bestNoun = "months"
 	}
 
-	return lead + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+	return fmt.Sprintf("%s %s the most reliable %s for %s (%d%% on time), and %s %s the least reliable (%d%%).",
+		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestPct, joinLabels(worst), pluralVerb(len(worst)), worstPct)
 }
 
+// monthCountSentence covers only the months with enough data, not the thin ones named after it.
 func monthCountSentence(months, minFlights, maxFlights int) string {
-	if minFlights == maxFlights {
-		phrase := flightsPhrase([]int{minFlights})
-		if months == 1 {
-			return "High confidence, " + phrase + "."
-		}
-
-		return "High confidence, " + phrase + " per month."
+	flights := strconv.Itoa(minFlights)
+	if minFlights != maxFlights {
+		flights += " to " + strconv.Itoa(maxFlights)
 	}
 
-	return fmt.Sprintf("High confidence, %d to %d flights per month.", minFlights, maxFlights)
+	return fmt.Sprintf("High confidence. The %d months with enough data have %s flights each.", months, flights)
 }
