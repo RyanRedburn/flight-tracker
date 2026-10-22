@@ -57,6 +57,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		}
 
 		stats.CarrierOnTime = rows
+		stats.CarrierComparison = store.CarrierComparison(rows)
 	}
 
 	stats.RoundForResponse()
@@ -98,82 +99,14 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, fmt.Errorf("route outlook %s-%s %s: %w", filter.Origin, filter.Dest, filter.Carrier, store.ErrNotFound)
 	}
 
-	analysisStart, _, ok := store.TrailingOutlookWindow(analysisEnd.String)
-	if !ok {
-		return nil, fmt.Errorf("parse route outlook max flight date %q", analysisEnd.String)
-	}
-
-	out.Analysis.Start = analysisStart
-	out.Analysis.End = analysisEnd.String
-
 	var p90Arr sql.NullFloat64
 
-	if targetMin, ok := store.HHMMToMinutes(filter.DepTime); ok {
-		var (
-			onTime           int
-			delayed          int
-			cancelled        int
-			diverted         int
-			avgArr           sql.NullFloat64
-			medianArr        sql.NullFloat64
-			avgArrDelayed    sql.NullFloat64
-			medianArrDelayed sql.NullFloat64
-			avgDep           sql.NullFloat64
-			medianDep        sql.NullFloat64
-			avgDepDelayed    sql.NullFloat64
-			medianDepDelayed sql.NullFloat64
-		)
-
-		err = s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
-			filter.Origin,
-			filter.Dest,
-			filter.Carrier,
-			analysisStart,
-			analysisEnd.String,
-			filter.DayOfWeek,
-			targetMin,
-			filter.DepTimeWindowMinutes,
-		).Scan(
-			&out.Analysis.SampleSize,
-			&onTime,
-			&delayed,
-			&cancelled,
-			&diverted,
-			&avgArr,
-			&medianArr,
-			&avgArrDelayed,
-			&medianArrDelayed,
-			&avgDep,
-			&medianDep,
-			&avgDepDelayed,
-			&medianDepDelayed,
-			&p90Arr,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if out.Analysis.SampleSize > 0 {
-			onTimeRate := ratio(onTime, out.Analysis.SampleSize)
-			delayRate := ratio(delayed, out.Analysis.SampleSize)
-			cancelRate := ratio(cancelled, out.Analysis.SampleSize)
-			divertRate := ratio(diverted, out.Analysis.SampleSize)
-			out.OnTimeProbability = &onTimeRate
-			out.DelayProbability = &delayRate
-			out.CancellationProbability = &cancelRate
-			out.DiversionProbability = &divertRate
-			out.LikelyArrivalDelayMinutes = nullFloatPtr(avgArr)
-			out.MedianArrivalDelayMinutes = nullFloatPtr(medianArr)
-			out.LikelyArrivalDelayWhenDelayed = nullFloatPtr(avgArrDelayed)
-			out.MedianArrivalDelayWhenDelayed = nullFloatPtr(medianArrDelayed)
-			out.LikelyDepartureDelayMinutes = nullFloatPtr(avgDep)
-			out.MedianDepartureDelayMinutes = nullFloatPtr(medianDep)
-			out.LikelyDepartureDelayWhenDelayed = nullFloatPtr(avgDepDelayed)
-			out.MedianDepartureDelayWhenDelayed = nullFloatPtr(medianDepDelayed)
-		}
+	err = store.ApplyOutlookLookback(out, filter.DepTimeWindowSet, func(lookbackDays int) error {
+		return s.fillOutlookSlot(ctx, out, filter, analysisEnd.String, lookbackDays, &p90Arr)
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	out.ApplyOutlookSample(store.MinOutlookSampleSize)
 
 	if out.Analysis.SampleReason == model.SampleReasonSufficient {
 		if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
@@ -188,6 +121,91 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 	out.RoundForResponse()
 
 	return out, nil
+}
+
+func (s *Store) fillOutlookSlot(ctx context.Context, out *model.RouteOutlook, filter store.RouteOutlookFilter, end string, lookbackDays int, p90Arr *sql.NullFloat64) error {
+	analysisStart, _, ok := store.TrailingOutlookWindowDays(end, lookbackDays)
+	if !ok {
+		return fmt.Errorf("parse route outlook max flight date %q", end)
+	}
+
+	out.Analysis.Start = analysisStart
+	out.Analysis.End = end
+
+	targetMin, ok := store.HHMMToMinutes(filter.DepTime)
+	if !ok {
+		return nil
+	}
+
+	var (
+		onTime           int
+		delayed          int
+		cancelled        int
+		diverted         int
+		avgArr           sql.NullFloat64
+		medianArr        sql.NullFloat64
+		avgArrDelayed    sql.NullFloat64
+		medianArrDelayed sql.NullFloat64
+		avgDep           sql.NullFloat64
+		medianDep        sql.NullFloat64
+		avgDepDelayed    sql.NullFloat64
+		medianDepDelayed sql.NullFloat64
+		p90              sql.NullFloat64
+	)
+
+	err := s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
+		filter.Origin,
+		filter.Dest,
+		filter.Carrier,
+		analysisStart,
+		end,
+		filter.DayOfWeek,
+		targetMin,
+		filter.DepTimeWindowMinutes,
+	).Scan(
+		&out.Analysis.SampleSize,
+		&onTime,
+		&delayed,
+		&cancelled,
+		&diverted,
+		&avgArr,
+		&medianArr,
+		&avgArrDelayed,
+		&medianArrDelayed,
+		&avgDep,
+		&medianDep,
+		&avgDepDelayed,
+		&medianDepDelayed,
+		&p90,
+	)
+	if err != nil {
+		return err
+	}
+
+	*p90Arr = p90
+
+	if out.Analysis.SampleSize <= 0 {
+		return nil
+	}
+
+	onTimeRate := ratio(onTime, out.Analysis.SampleSize)
+	delayRate := ratio(delayed, out.Analysis.SampleSize)
+	cancelRate := ratio(cancelled, out.Analysis.SampleSize)
+	divertRate := ratio(diverted, out.Analysis.SampleSize)
+	out.OnTimeProbability = &onTimeRate
+	out.DelayProbability = &delayRate
+	out.CancellationProbability = &cancelRate
+	out.DiversionProbability = &divertRate
+	out.LikelyArrivalDelayMinutes = nullFloatPtr(avgArr)
+	out.MedianArrivalDelayMinutes = nullFloatPtr(medianArr)
+	out.LikelyArrivalDelayWhenDelayed = nullFloatPtr(avgArrDelayed)
+	out.MedianArrivalDelayWhenDelayed = nullFloatPtr(medianArrDelayed)
+	out.LikelyDepartureDelayMinutes = nullFloatPtr(avgDep)
+	out.MedianDepartureDelayMinutes = nullFloatPtr(medianDep)
+	out.LikelyDepartureDelayWhenDelayed = nullFloatPtr(avgDepDelayed)
+	out.MedianDepartureDelayWhenDelayed = nullFloatPtr(medianDepDelayed)
+
+	return nil
 }
 
 // attachOutlookWeather reads the category rollup for this route and carrier

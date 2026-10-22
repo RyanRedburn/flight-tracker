@@ -115,36 +115,35 @@ func AssembleRouteTravelWindows(
 	out.ByMonth = months
 	out.ByDayOfWeek = days
 	out.ByHour = hours
-	out.BestMonths = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, monthMin, true)
-	out.WorstMonths = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, monthMin, false)
+	out.BestMonths, out.WorstMonths, out.MonthComparison = rankTravelMonths(months, monthMin)
 	out.BestDays = pickTravelWindowBuckets(days, dayBucketKey, dayBucketRate, dayBucketFlights, dayMin, true)
 	out.WorstDays = pickTravelWindowBuckets(days, dayBucketKey, dayBucketRate, dayBucketFlights, dayMin, false)
 	out.BestHours = pickTravelWindowBuckets(hours, hourBucketKey, hourBucketRate, hourBucketFlights, hourMin, true)
 	out.WorstHours = pickTravelWindowBuckets(hours, hourBucketKey, hourBucketRate, hourBucketFlights, hourMin, false)
 
 	out.RoundForResponse()
-	labelSeasonalBuckets(out, monthMin, dayMin, hourMin)
+	labelSeasonalBuckets(out, dayMin, hourMin)
 
 	return out
 }
 
 // labelSeasonalBuckets sets confidence and reliability from the rounded on-time rate.
-// Best and worst copies are labeled with the same grain minimum as the full series.
-// reliability unknown with confidence low is a thin bucket, the seasonal form of
-// outlook insufficient_sample, not a second flag. reliability unreliable is only
-// a high-confidence on-time rate below the typical band. Buckets with no flights
-// are omitted earlier, so they are not published as a zero rate.
-func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourMin int) {
+// Best and worst copies use the same rule as the full series.
+// Month confidence uses the history bands, so a month can clear the eligibility floor and still be low.
+// Day and hour confidence stays high or low from the eligibility floor.
+// reliability unknown with confidence low is a thin bucket. A medium or high rate below the typical band is unreliable.
+// Buckets with no flights are omitted earlier, so they are not published as a zero rate.
+func labelSeasonalBuckets(out *model.RouteTravelWindows, dayMin, hourMin int) {
 	for i := range out.ByMonth {
-		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = model.SeasonalDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate, monthMin)
+		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = monthDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate)
 	}
 
 	for i := range out.BestMonths {
-		out.BestMonths[i].Confidence, out.BestMonths[i].Reliability = model.SeasonalDecision(out.BestMonths[i].Flights, out.BestMonths[i].OnTimeRate, monthMin)
+		out.BestMonths[i].Confidence, out.BestMonths[i].Reliability = monthDecision(out.BestMonths[i].Flights, out.BestMonths[i].OnTimeRate)
 	}
 
 	for i := range out.WorstMonths {
-		out.WorstMonths[i].Confidence, out.WorstMonths[i].Reliability = model.SeasonalDecision(out.WorstMonths[i].Flights, out.WorstMonths[i].OnTimeRate, monthMin)
+		out.WorstMonths[i].Confidence, out.WorstMonths[i].Reliability = monthDecision(out.WorstMonths[i].Flights, out.WorstMonths[i].OnTimeRate)
 	}
 
 	for i := range out.ByDayOfWeek {
@@ -172,6 +171,13 @@ func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourM
 	}
 }
 
+func monthDecision(flights int, onTimeRate float64) (confidence, reliability string) {
+	confidence = model.CountConfidence(flights, model.HistoryLowSampleBelow, model.HistoryHighSampleAt)
+	reliability = model.SeasonalReliability(onTimeRate, confidence)
+
+	return confidence, reliability
+}
+
 func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd string, windowFlights int) *model.RouteTravelWindows {
 	return &model.RouteTravelWindows{
 		Filters: model.Filters{
@@ -194,6 +200,99 @@ func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd strin
 		BestHours:   []model.TravelWindowHourBucket{},
 		WorstHours:  []model.TravelWindowHourBucket{},
 	}
+}
+
+// rankTravelMonths keeps the top and bottom months only when every month at the
+// highest rate differs at 95% from every month at the lowest rate. Otherwise the
+// lists are empty and the comparison is too close to call. One eligible month is
+// still returned on both lists and is not a comparison.
+func rankTravelMonths(months []model.TravelWindowMonthBucket, minSample int) (best, worst []model.TravelWindowMonthBucket, comparison string) {
+	eligible := make([]model.TravelWindowMonthBucket, 0, len(months))
+
+	for _, month := range months {
+		if month.Flights >= minSample {
+			eligible = append(eligible, month)
+		}
+	}
+
+	best = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, true)
+	worst = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, false)
+
+	if len(eligible) < 2 {
+		return best, worst, ""
+	}
+
+	highest, lowest := extremeMonths(eligible)
+	if !monthExtremesDiffer(highest, lowest) {
+		return []model.TravelWindowMonthBucket{}, []model.TravelWindowMonthBucket{}, model.ComparisonTooCloseToCall
+	}
+
+	return monthsDifferingFromAll(best, lowest), monthsDifferingFromAll(worst, highest), model.ComparisonRanked
+}
+
+func extremeMonths(eligible []model.TravelWindowMonthBucket) (highest, lowest []model.TravelWindowMonthBucket) {
+	maxRate := eligible[0].OnTimeRate
+	minRate := eligible[0].OnTimeRate
+
+	for _, month := range eligible[1:] {
+		if month.OnTimeRate > maxRate {
+			maxRate = month.OnTimeRate
+		}
+
+		if month.OnTimeRate < minRate {
+			minRate = month.OnTimeRate
+		}
+	}
+
+	for _, month := range eligible {
+		if month.OnTimeRate == maxRate {
+			highest = append(highest, month)
+		}
+
+		if month.OnTimeRate == minRate {
+			lowest = append(lowest, month)
+		}
+	}
+
+	return highest, lowest
+}
+
+func monthExtremesDiffer(highest, lowest []model.TravelWindowMonthBucket) bool {
+	for _, high := range highest {
+		for _, low := range lowest {
+			if !model.ProportionsDiffer(high.OnTimeRate, high.Flights, low.OnTimeRate, low.Flights) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func monthsDifferingFromAll(months, anchors []model.TravelWindowMonthBucket) []model.TravelWindowMonthBucket {
+	kept := make([]model.TravelWindowMonthBucket, 0, len(months))
+
+	for _, month := range months {
+		if monthDiffersFromAll(month, anchors) {
+			kept = append(kept, month)
+		}
+	}
+
+	if len(kept) == 0 {
+		return []model.TravelWindowMonthBucket{}
+	}
+
+	return kept
+}
+
+func monthDiffersFromAll(month model.TravelWindowMonthBucket, anchors []model.TravelWindowMonthBucket) bool {
+	for _, anchor := range anchors {
+		if !model.ProportionsDiffer(month.OnTimeRate, month.Flights, anchor.OnTimeRate, anchor.Flights) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func pickTravelWindowBuckets[T any](

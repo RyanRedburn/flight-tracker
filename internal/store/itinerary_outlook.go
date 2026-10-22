@@ -82,5 +82,6 @@ func ItineraryLegRouteOutlookFilter(leg model.ItineraryLeg) RouteOutlookFilter {
 		DayOfWeek:            day,
 		DepTime:              FormatHHMM(leg.DepTime),
 		DepTimeWindowMinutes: ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
+		DepTimeWindowSet:     leg.DepTimeWindowMinutes != nil,
 	}
 }

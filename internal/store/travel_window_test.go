@@ -93,19 +93,19 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 		t.Fatalf("by_month len = %d, want 4 (flights >= 1)", len(got.ByMonth))
 	}
 
-	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 || got.ByMonth[0].Confidence != model.ConfidenceHigh || got.ByMonth[0].Reliability != model.ReliabilityReliable {
+	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 || got.ByMonth[0].Confidence != model.ConfidenceMedium || got.ByMonth[0].Reliability != model.ReliabilityReliable {
 		t.Errorf("first month = %+v", got.ByMonth[0])
 	}
 
-	if got.ByMonth[1].Confidence != model.ConfidenceHigh || got.ByMonth[1].Reliability != model.ReliabilityUnreliable {
-		t.Errorf("month 2 = %+v, want high/unreliable", got.ByMonth[1])
+	if got.ByMonth[1].Confidence != model.ConfidenceLow || got.ByMonth[1].Reliability != model.ReliabilityUnknown {
+		t.Errorf("month 2 = %+v, want low/unknown", got.ByMonth[1])
 	}
 
 	if got.ByMonth[3].Confidence != model.ConfidenceLow || got.ByMonth[3].Reliability != model.ReliabilityUnknown {
 		t.Errorf("month 4 = %+v, want low/unknown", got.ByMonth[3])
 	}
 
-	if got.BestMonths[0].Confidence != model.ConfidenceHigh || got.BestMonths[0].Reliability != model.ReliabilityReliable {
+	if got.BestMonths[0].Confidence != model.ConfidenceMedium || got.BestMonths[0].Reliability != model.ReliabilityReliable {
 		t.Errorf("best month decision = %+v", got.BestMonths[0])
 	}
 
@@ -122,20 +122,25 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 	}
 
 	// window 200 → 1% = 2; month floor 50. Month 4 (49 flights) is in the series but not best/worst.
-	if len(got.BestMonths) != 3 {
-		t.Fatalf("best_months len = %d, want 3", len(got.BestMonths))
+	// Month 2 is the lowest rate, so it is not also listed as a best month.
+	if got.MonthComparison != model.ComparisonRanked {
+		t.Fatalf("month_comparison = %q, want ranked", got.MonthComparison)
 	}
 
-	if got.BestMonths[0].Month != 1 || got.BestMonths[1].Month != 3 || got.BestMonths[2].Month != 2 {
+	if len(got.BestMonths) != 2 {
+		t.Fatalf("best_months len = %d, want 2", len(got.BestMonths))
+	}
+
+	if got.BestMonths[0].Month != 1 || got.BestMonths[1].Month != 3 {
 		t.Errorf("best_months = %+v", got.BestMonths)
 	}
 
-	if len(got.WorstMonths) != 3 {
-		t.Fatalf("worst_months len = %d, want 3", len(got.WorstMonths))
+	if len(got.WorstMonths) != 2 {
+		t.Fatalf("worst_months len = %d, want 2", len(got.WorstMonths))
 	}
 
-	if got.WorstMonths[0].Month != 2 {
-		t.Errorf("worst_months[0] = %+v, want month 2", got.WorstMonths[0])
+	if got.WorstMonths[0].Month != 2 || got.WorstMonths[1].Month != 3 {
+		t.Errorf("worst_months = %+v, want months 2 then 3", got.WorstMonths)
 	}
 
 	if len(got.BestDays) != 1 || got.BestDays[0].DayOfWeek != 1 {
@@ -153,6 +158,44 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 	again := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
 	if again.ByMonth[0] != got.ByMonth[0] || again.BestHours[0] != got.BestHours[0] {
 		t.Error("AssembleRouteTravelWindows is not idempotent for the same counts")
+	}
+}
+
+func TestMonthConfidenceBands(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 80, Flights: 99},
+		{Grain: TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 80, Flights: 100},
+		{Grain: TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 240, Flights: 299},
+		{Grain: TravelWindowGrainMonth, Bucket: 4, OnTimeCount: 240, Flights: 300},
+		{Grain: TravelWindowGrainDayOfWeek, Bucket: 1, OnTimeCount: 40, Flights: 50},
+		{Grain: TravelWindowGrainHour, Bucket: 8, OnTimeCount: 24, Flights: 30},
+		{Grain: TravelWindowGrainHour, Bucket: 9, OnTimeCount: 20, Flights: 29},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
+
+	if got.ByMonth[0].Confidence != model.ConfidenceLow || got.ByMonth[0].Reliability != model.ReliabilityUnknown {
+		t.Errorf("99 flights = %+v, want low/unknown", got.ByMonth[0])
+	}
+
+	if got.ByMonth[1].Confidence != model.ConfidenceMedium || got.ByMonth[1].Reliability != model.ReliabilityReliable {
+		t.Errorf("100 flights = %+v, want medium/reliable", got.ByMonth[1])
+	}
+
+	if got.ByMonth[2].Confidence != model.ConfidenceMedium || got.ByMonth[2].OnTimeRate != 0.8 || got.ByMonth[2].Reliability != model.ReliabilityReliable {
+		t.Errorf("299 flights = %+v, want medium/reliable", got.ByMonth[2])
+	}
+
+	if got.ByMonth[3].Confidence != model.ConfidenceHigh || got.ByMonth[3].Reliability != model.ReliabilityReliable {
+		t.Errorf("300 flights = %+v, want high/reliable", got.ByMonth[3])
+	}
+
+	if got.ByDayOfWeek[0].Confidence != model.ConfidenceHigh || got.ByDayOfWeek[0].Reliability != model.ReliabilityReliable {
+		t.Errorf("weekday = %+v, want high/reliable at the day floor", got.ByDayOfWeek[0])
+	}
+
+	if got.ByHour[0].Confidence != model.ConfidenceHigh || got.ByHour[1].Confidence != model.ConfidenceLow {
+		t.Errorf("hours = %+v, want high then low", got.ByHour)
 	}
 }
 
@@ -177,6 +220,36 @@ func TestAssembleRouteTravelWindowsEligibilityShare(t *testing.T) {
 
 	if len(got.WorstMonths) != 1 {
 		t.Errorf("worst_months = %+v, want 1", got.WorstMonths)
+	}
+
+	if got.MonthComparison != "" {
+		t.Errorf("month_comparison = %q, want empty with one eligible month", got.MonthComparison)
+	}
+}
+
+func TestAssembleRouteTravelWindowsMonthTooClose(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 80, Flights: 100},
+		{Grain: TravelWindowGrainMonth, Bucket: 6, OnTimeCount: 78, Flights: 100},
+		{Grain: TravelWindowGrainDayOfWeek, Bucket: 1, OnTimeCount: 90, Flights: 100},
+		{Grain: TravelWindowGrainDayOfWeek, Bucket: 2, OnTimeCount: 40, Flights: 100},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 400, counts)
+	if got.MonthComparison != model.ComparisonTooCloseToCall {
+		t.Fatalf("month_comparison = %q", got.MonthComparison)
+	}
+
+	if len(got.BestMonths) != 0 || len(got.WorstMonths) != 0 {
+		t.Fatalf("best/worst months = %v / %v, want empty", got.BestMonths, got.WorstMonths)
+	}
+
+	if len(got.ByMonth) != 2 {
+		t.Fatalf("by_month len = %d, want 2", len(got.ByMonth))
+	}
+
+	if len(got.BestDays) != 2 || got.BestDays[0].DayOfWeek != 1 {
+		t.Fatalf("best_days = %+v, want both weekdays still ranked", got.BestDays)
 	}
 }
 

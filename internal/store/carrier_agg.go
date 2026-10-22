@@ -9,7 +9,7 @@ import (
 
 const (
 	DefaultCarrierStatsSpanDays = 90
-	CarrierStatsMinSampleSize   = 30
+	CarrierStatsMinSampleSize   = model.HistoryLowSampleBelow
 	CarrierStatsTopN            = 5
 )
 

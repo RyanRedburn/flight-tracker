@@ -34,12 +34,24 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		wantEnd   string
 	}{
 		{
+			name: "ten point gap on uneven samples is too close",
+			carriers: []model.CarrierOnTime{
+				{Carrier: "NK", OnTimeRate: 0.77, Flights: 120},
+				{Carrier: "F9", OnTimeRate: 0.67, Flights: 180},
+			},
+			want:      "NK and F9 are too close to call on ORD–LAX (77% and 67% on time, medium confidence, 120 and 180 flights).",
+			wantConf:  model.ConfidenceMedium,
+			wantFirst: "NK",
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
 			name: "later carrier beats the first",
 			carriers: []model.CarrierOnTime{
-				{Carrier: "AA", OnTimeRate: 0.60, Flights: 80},
-				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 120},
+				{Carrier: "AA", OnTimeRate: 0.60, Flights: 300},
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 320},
 			},
-			want:      "UA is more reliable than AA on ORD–LAX (85% vs 60% on time, high confidence, 120 and 80 flights).",
+			want:      "UA is more reliable than AA on ORD–LAX (85% vs 60% on time, high confidence, 320 and 300 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: "AA",
 			wantStart: windowStart,
@@ -48,10 +60,10 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		{
 			name: "exact tie names both carriers",
 			carriers: []model.CarrierOnTime{
-				{Carrier: testCarrierUA, OnTimeRate: 0.80, Flights: 100},
-				{Carrier: "AA", OnTimeRate: 0.80, Flights: 90},
+				{Carrier: testCarrierUA, OnTimeRate: 0.80, Flights: 300},
+				{Carrier: "AA", OnTimeRate: 0.80, Flights: 310},
 			},
-			want:      "UA and AA are about the same on ORD–LAX (80% on time, high confidence, 100 and 90 flights).",
+			want:      "UA and AA are too close to call on ORD–LAX (80% on time, high confidence, 300 and 310 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -60,10 +72,10 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		{
 			name: "near tie names both carriers",
 			carriers: []model.CarrierOnTime{
-				{Carrier: testCarrierUA, OnTimeRate: 0.82, Flights: 100},
-				{Carrier: "AA", OnTimeRate: 0.80, Flights: 90},
+				{Carrier: testCarrierUA, OnTimeRate: 0.82, Flights: 310},
+				{Carrier: "AA", OnTimeRate: 0.80, Flights: 300},
 			},
-			want:      "UA and AA are about the same on ORD–LAX (82% and 80% on time, high confidence, 100 and 90 flights).",
+			want:      "UA and AA are too close to call on ORD–LAX (82% and 80% on time, high confidence, 310 and 300 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -72,11 +84,11 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		{
 			name: "steady slide names every carrier",
 			carriers: []model.CarrierOnTime{
-				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 120},
-				{Carrier: "AA", OnTimeRate: 0.83, Flights: 110},
-				{Carrier: "DL", OnTimeRate: 0.81, Flights: 100},
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 320},
+				{Carrier: "AA", OnTimeRate: 0.83, Flights: 310},
+				{Carrier: "DL", OnTimeRate: 0.81, Flights: 300},
 			},
-			want:      "UA is most reliable on ORD–LAX (85% on time, high confidence, 120 flights), then AA (83%, high confidence, 110 flights) and DL (81%, high confidence, 100 flights).",
+			want:      "UA, AA and DL are too close to call on ORD–LAX (85%, 83% and 81% on time, high confidence, 320, 310 and 300 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -85,11 +97,11 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		{
 			name: "two lead and one trails",
 			carriers: []model.CarrierOnTime{
-				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 120},
-				{Carrier: "AA", OnTimeRate: 0.84, Flights: 110},
-				{Carrier: "DL", OnTimeRate: 0.70, Flights: 90},
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 320},
+				{Carrier: "AA", OnTimeRate: 0.84, Flights: 310},
+				{Carrier: "DL", OnTimeRate: 0.70, Flights: 300},
 			},
-			want:      "UA and AA are about the same and more reliable than DL on ORD–LAX (85% and 84% vs 70% on time, high confidence, 120, 110 and 90 flights).",
+			want:      "UA and AA are too close to call and more reliable than DL on ORD–LAX (85% and 84% vs 70% on time, high confidence, 320, 310 and 300 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -102,8 +114,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "AA", OnTimeRate: 0.95, Flights: 8},
 				{Carrier: "DL", OnTimeRate: 0.40, Flights: 4},
 			},
-			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, high confidence, %d flights). AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights),
-			wantConf:  model.ConfidenceHigh,
+			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, medium confidence, %d flights). AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights),
+			wantConf:  model.ConfidenceMedium,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -126,8 +138,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			carriers: []model.CarrierOnTime{
 				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: minFlights},
 			},
-			want:      fmt.Sprintf("UA is on time about 85%% of the time on ORD–LAX (high confidence, %d flights).", minFlights),
-			wantConf:  model.ConfidenceHigh,
+			want:      fmt.Sprintf("UA is on time about 85%% of the time on ORD–LAX (medium confidence, %d flights).", minFlights),
+			wantConf:  model.ConfidenceMedium,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -149,8 +161,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "", OnTimeRate: 0.80, Flights: minFlights},
 				{Carrier: "AA", OnTimeRate: 0.70, Flights: 4},
 			},
-			want:      fmt.Sprintf("An unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, high confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
-			wantConf:  model.ConfidenceHigh,
+			want:      fmt.Sprintf("An unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, medium confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
+			wantConf:  model.ConfidenceMedium,
 			wantFirst: "",
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -158,10 +170,10 @@ func TestCompareCarriersSummaries(t *testing.T) {
 		{
 			name: "unknown carrier is lowercase mid-sentence",
 			carriers: []model.CarrierOnTime{
-				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 120},
-				{Carrier: "", OnTimeRate: 0.60, Flights: 80},
+				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: 320},
+				{Carrier: "", OnTimeRate: 0.60, Flights: 300},
 			},
-			want:      "UA is more reliable than an unknown carrier on ORD–LAX (85% vs 60% on time, high confidence, 120 and 80 flights).",
+			want:      "UA is more reliable than an unknown carrier on ORD–LAX (85% vs 60% on time, high confidence, 320 and 300 flights).",
 			wantConf:  model.ConfidenceHigh,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -173,8 +185,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: minFlights},
 				{Carrier: "", OnTimeRate: 0.50, Flights: 4},
 			},
-			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, high confidence, %d flights). An unknown carrier (low confidence, 4 flights) has thin data.", minFlights),
-			wantConf:  model.ConfidenceHigh,
+			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, medium confidence, %d flights). An unknown carrier (low confidence, 4 flights) has thin data.", minFlights),
+			wantConf:  model.ConfidenceMedium,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -184,8 +196,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			carriers: []model.CarrierOnTime{
 				{Carrier: "", OnTimeRate: 0.85, Flights: minFlights},
 			},
-			want:      fmt.Sprintf("An unknown carrier is on time about 85%% of the time on ORD–LAX (high confidence, %d flights).", minFlights),
-			wantConf:  model.ConfidenceHigh,
+			want:      fmt.Sprintf("An unknown carrier is on time about 85%% of the time on ORD–LAX (medium confidence, %d flights).", minFlights),
+			wantConf:  model.ConfidenceMedium,
 			wantFirst: "",
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -314,7 +326,7 @@ func TestCompareCarriersSampleReasons(t *testing.T) {
 	}
 
 	solid := out.Data.Carriers[0]
-	if solid.SampleSize != minFlights || solid.SampleReason != model.SampleReasonSufficient || solid.Confidence != model.ConfidenceHigh {
+	if solid.SampleSize != minFlights || solid.SampleReason != model.SampleReasonSufficient || solid.Confidence != model.ConfidenceMedium {
 		t.Fatalf("solid = %#v", solid)
 	}
 

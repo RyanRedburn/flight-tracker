@@ -158,7 +158,7 @@ func TestItineraryOutlookWeatherDoesNotChangeConnection(t *testing.T) {
 	}
 
 	origin := out.Legs[0].Outlook.Weather.Origin
-	if origin.Confidence != model.ConfidenceHigh || origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.25 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.55 || origin.AdverseFlights != 40 {
+	if origin.Confidence != model.ConfidenceMedium || origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.25 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.55 || origin.AdverseFlights != 40 {
 		t.Fatalf("leg weather origin = %+v", origin)
 	}
 
@@ -469,7 +469,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 						OnTimeProbability: &zero,
 					},
 				}
-				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+				out.ApplyOutlookSample()
 
 				return out, nil
 			case testDestLAX:
@@ -480,7 +480,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 						OnTimeProbability: floatPtr(0),
 					},
 				}
-				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+				out.ApplyOutlookSample()
 
 				return out, nil
 			default:

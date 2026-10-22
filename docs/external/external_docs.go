@@ -250,7 +250,7 @@ const docTemplateexternal = `{
                         "maximum": 120,
                         "minimum": 1,
                         "type": "integer",
-                        "description": "Minutes around dep_time to include (default 30, max 120)",
+                        "description": "Minutes around dep_time to include (default 60, max 120)",
                         "name": "dep_time_window_minutes",
                         "in": "query"
                     }
@@ -308,7 +308,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters, and carrier_comparison is too_close_to_call when those carriers do not differ at 95%. The carrier list is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -432,7 +432,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum. Month lists are omitted when the highest and lowest eligible months are inside the margin of error.",
                 "produces": [
                     "application/json"
                 ],
@@ -667,6 +667,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -674,8 +675,12 @@ const docTemplateexternal = `{
                 "end": {
                     "type": "string"
                 },
+                "lookback_days": {
+                    "description": "730 when a thin default departure window was widened from 365 days.",
+                    "type": "integer"
+                },
                 "sample_reason": {
-                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient is high confidence; insufficient_sample is low.",
+                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient covers medium and high. insufficient_sample is low.",
                     "type": "string",
                     "enum": [
                         "sufficient",
@@ -1003,6 +1008,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1164,6 +1170,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1265,10 +1272,11 @@ const docTemplateexternal = `{
                     "type": "number"
                 },
                 "confidence": {
-                    "description": "Confidence is unknown when fair or adverse flights are absent, and low when the thinner group is below the outlook minimum. A thin sample keeps its rates.",
+                    "description": "Confidence follows the thinner of the fair and adverse counts, and is unknown when either count is zero.",
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1302,6 +1310,14 @@ const docTemplateexternal = `{
                 },
                 "cancelled": {
                     "type": "integer"
+                },
+                "carrier_comparison": {
+                    "description": "CarrierComparison is ranked when a carrier pair differs at 95%, and too_close_to_call when none do.\nOmitted when fewer than two carriers are compared.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
                 },
                 "carrier_on_time": {
                     "description": "Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.",
@@ -1405,6 +1421,14 @@ const docTemplateexternal = `{
                 "filters": {
                     "$ref": "#/definitions/model.Filters"
                 },
+                "month_comparison": {
+                    "description": "MonthComparison is too_close_to_call when the highest-rate and lowest-rate eligible months\nare inside the margin of error. Those best and worst lists are empty in that case.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
+                },
                 "worst_days": {
                     "type": "array",
                     "items": {
@@ -1452,6 +1476,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1483,6 +1508,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1514,6 +1540,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]

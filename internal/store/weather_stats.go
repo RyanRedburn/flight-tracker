@@ -208,7 +208,7 @@ func weatherSideConfidence(fairFlights, adverseFlights int) string {
 		sample = adverseFlights
 	}
 
-	return model.SeasonalConfidence(sample, MinOutlookSampleSize)
+	return model.CountConfidence(sample, model.OutlookLowSampleBelow, model.OutlookHighSampleAt)
 }
 
 func sampleRatePtr(onTime, flights int) *float64 {
