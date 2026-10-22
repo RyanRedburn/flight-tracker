@@ -57,7 +57,7 @@ type ItineraryOutlookSummary struct {
 	Origin      string `json:"origin"`
 	Destination string `json:"destination"`
 	// A missing outlook counts as unknown.
-	Confidence string `json:"confidence" enums:"high,low,unknown"`
+	Confidence string `json:"confidence" enums:"high,medium,low,unknown"`
 	// True when any connection is tight or unknown.
 	ConnectionRisk bool `json:"connection_risk"`
 }
@@ -78,7 +78,7 @@ type ItineraryConnection struct {
 	LooseMinutes       *int    `json:"loose_minutes"`
 	SlackMinutes       *int    `json:"slack_minutes"`
 	Status             string  `json:"status" enums:"loose,ok,tight,unknown"`
-	Confidence         string  `json:"confidence" enums:"high,low,unknown"`
+	Confidence         string  `json:"confidence" enums:"high,medium,low,unknown"`
 	// Reason is why status is unknown. overnight means a later date was still classified. empty_sample and insufficient_sample match the inbound sample_reason; missing_outlook does not.
 	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
 	// Overnight stays true for a later outbound date, including multi-day, when reason names another cause.

@@ -165,11 +165,11 @@ func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowDat
 	return appendNote(bestWorstMonths(route, ranked), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
 }
 
-// bestWorstMonths compares only the high-confidence months. Thin months are named after it.
+// bestWorstMonths compares months with enough data. Thin months are named after it.
 func bestWorstMonths(route string, ranked []scoredItem) string {
 	if len(ranked) == 1 {
-		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). High confidence, %s.",
-			ranked[0].label, route, ranked[0].percent, flightsPhrase([]int{ranked[0].sampleSize}))
+		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). %s, %s.",
+			ranked[0].label, route, ranked[0].percent, sentenceCase(confidencePhrase(ranked[0].confidence)), flightsPhrase([]int{ranked[0].sampleSize}))
 	}
 
 	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
@@ -179,7 +179,7 @@ func bestWorstMonths(route string, ranked []scoredItem) string {
 		maxFlights = max(maxFlights, item.sampleSize)
 	}
 
-	return monthComparison(route, ranked) + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+	return monthComparison(route, ranked) + " " + monthCountSentence(len(ranked), minFlights, maxFlights, itemConfidence(ranked))
 }
 
 // monthComparison names a best and worst month only when those rates differ at 95%.
@@ -254,11 +254,11 @@ func spreadMonths(route string, best, worst []scoredItem) string {
 }
 
 // monthCountSentence covers only the months with enough data, not the thin ones named after it.
-func monthCountSentence(months, minFlights, maxFlights int) string {
+func monthCountSentence(months, minFlights, maxFlights int, confidence string) string {
 	flights := strconv.Itoa(minFlights)
 	if minFlights != maxFlights {
 		flights += " to " + strconv.Itoa(maxFlights)
 	}
 
-	return fmt.Sprintf("High confidence. The %d months with enough data have %s flights each.", months, flights)
+	return fmt.Sprintf("%s. The %d months with enough data have %s flights each.", sentenceCase(confidencePhrase(confidence)), months, flights)
 }

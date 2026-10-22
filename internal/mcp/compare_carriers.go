@@ -150,8 +150,8 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 }
 
 func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
-	// Same 30-flight minimum used to rank a carrier's routes.
-	confidence := model.SeasonalConfidence(row.Flights, store.CarrierStatsMinSampleSize)
+	// Same history bands used to decide whether a carrier is ranked.
+	confidence := model.CountConfidence(row.Flights, model.HistoryLowSampleBelow, model.HistoryHighSampleAt)
 
 	return comparedCarrier{
 		Carrier:      row.Carrier,
@@ -179,7 +179,7 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 		}
 	}
 
-	if len(items) == 1 && items[0].confidence == model.ConfidenceHigh {
+	if len(items) == 1 && comparableConfidence(items[0].confidence) {
 		return soleCarrierSummary(route, items[0])
 	}
 
@@ -188,5 +188,5 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 
 func soleCarrierSummary(route string, item scoredItem) (string, string) {
 	return sentenceCase(fmt.Sprintf("%s is on time about %d%% of the time on %s (%s, %s).",
-		item.label, item.percent, route, phraseHighConfidence, flightsPhrase([]int{item.sampleSize}))), model.ConfidenceHigh
+		item.label, item.percent, route, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))), item.confidence
 }

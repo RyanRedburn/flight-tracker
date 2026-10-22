@@ -87,13 +87,13 @@ type OutlookResult struct {
 
 // TravelWindowMonthBucket is one month-of-year on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
-// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
-// Unreliable is a high-confidence on-time rate below 0.70. A month with no flights is omitted.
+// reliability is unknown unless confidence is medium or high, so a thin month is not unreliable.
+// Unreliable is a medium- or high-confidence on-time rate below 0.70. A month with no flights is omitted.
 type TravelWindowMonthBucket struct {
 	Month       int     `json:"month"`
 	OnTimeRate  float64 `json:"on_time_rate"`
 	Flights     int     `json:"flights"`
-	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Confidence  string  `json:"confidence" enums:"high,medium,low,unknown"`
 	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
@@ -105,7 +105,7 @@ type TravelWindowDayBucket struct {
 	DayOfWeek   int     `json:"day_of_week"`
 	OnTimeRate  float64 `json:"on_time_rate"`
 	Flights     int     `json:"flights"`
-	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Confidence  string  `json:"confidence" enums:"high,medium,low,unknown"`
 	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
@@ -117,7 +117,7 @@ type TravelWindowHourBucket struct {
 	Hour        int     `json:"hour"`
 	OnTimeRate  float64 `json:"on_time_rate"`
 	Flights     int     `json:"flights"`
-	Confidence  string  `json:"confidence" enums:"high,low,unknown"`
+	Confidence  string  `json:"confidence" enums:"high,medium,low,unknown"`
 	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 

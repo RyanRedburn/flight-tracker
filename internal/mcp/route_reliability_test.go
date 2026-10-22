@@ -33,6 +33,25 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
+			name:  "one medium time reports the rate",
+			times: []string{"0700"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 40, model.ConfidenceMedium),
+			},
+			want:           "0700 on UA ORD–LAX is on time about 85% of the time, from 40 flights.",
+			wantConfidence: model.ConfidenceMedium,
+		},
+		{
+			name:  "medium confidence times are compared",
+			times: []string{"0700", "1400"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 40, model.ConfidenceMedium),
+				"1400": reliabilityOutlook(0.60, 40, model.ConfidenceMedium),
+			},
+			want:           "0700 is more reliable than 1400 on UA ORD–LAX (85% vs 60% on time).",
+			wantConfidence: model.ConfidenceMedium,
+		},
+		{
 			name:  "one time with no data",
 			times: []string{"0700"},
 			byTime: map[string]model.RouteOutlook{
@@ -331,7 +350,7 @@ func reliabilityOutlook(rate float64, sample int, confidence string) model.Route
 	}
 
 	switch confidence {
-	case model.ConfidenceHigh:
+	case model.ConfidenceHigh, model.ConfidenceMedium:
 		outlook.Analysis.SampleReason = model.SampleReasonSufficient
 		outlook.OnTimeProbability = &rate
 	case model.ConfidenceLow:
@@ -407,7 +426,7 @@ func TestRouteReliabilityFlightNumberNoNearbyRoute(t *testing.T) {
 		jsonKeyCarrier:      testCarrierUA,
 		jsonKeyFlightNumber: "1234",
 		jsonKeyDayOfWeek:    2,
-		jsonKeyDepTimes:     []string{"0800"},
+		jsonKeyDepTimes:     []string{testDep0900},
 	})
 	if !res.IsError {
 		t.Fatal("expected error")
@@ -415,7 +434,7 @@ func TestRouteReliabilityFlightNumberNoNearbyRoute(t *testing.T) {
 
 	out := decodeResult[routeReliabilityData](t, res)
 
-	want := "No UA 1234 route leaves near 0800; recent routes are listed. Pick origin and destination."
+	want := "No UA 1234 route leaves near " + testDep0900 + "; recent routes are listed. Pick origin and destination."
 	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous || out.Error.Message != want {
 		t.Fatalf("error = %#v", out.Error)
 	}

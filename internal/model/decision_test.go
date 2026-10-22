@@ -77,6 +77,8 @@ func TestMinConfidence(t *testing.T) {
 		want   string
 	}{
 		{name: "high alone", values: []string{ConfidenceHigh}, want: ConfidenceHigh},
+		{name: "medium weakens high", values: []string{ConfidenceHigh, ConfidenceMedium}, want: ConfidenceMedium},
+		{name: "low weakens medium", values: []string{ConfidenceMedium, ConfidenceLow}, want: ConfidenceLow},
 		{name: "low weakens high", values: []string{ConfidenceHigh, ConfidenceLow}, want: ConfidenceLow},
 		{name: "unknown weakest", values: []string{ConfidenceLow, ConfidenceUnknown, ConfidenceHigh}, want: ConfidenceUnknown},
 		{name: "blank is weaker than high", values: []string{ConfidenceHigh, ""}, want: ""},
@@ -91,30 +93,38 @@ func TestMinConfidence(t *testing.T) {
 	}
 }
 
-func TestOutlookConfidence(t *testing.T) {
+func TestCountConfidence(t *testing.T) {
 	tests := []struct {
-		name         string
-		sampleSize   int
-		insufficient bool
-		want         string
+		name     string
+		count    int
+		lowBelow int
+		highAt   int
+		want     string
 	}{
-		{name: "empty sample", sampleSize: 0, want: ConfidenceUnknown},
-		{name: "empty wins over flag", sampleSize: 0, insufficient: true, want: ConfidenceUnknown},
-		{name: "thin sample", sampleSize: 4, insufficient: true, want: ConfidenceLow},
-		{name: "usable sample", sampleSize: 40, want: ConfidenceHigh},
+		{name: "empty outlook", lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceUnknown},
+		{name: "outlook 29", count: 29, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceLow},
+		{name: "outlook 30", count: 30, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceMedium},
+		{name: "outlook 49", count: 49, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceMedium},
+		{name: "outlook 50", count: 50, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceHigh},
+		{name: "history 99", count: 99, lowBelow: HistoryLowSampleBelow, highAt: HistoryHighSampleAt, want: ConfidenceLow},
+		{name: "history 100", count: 100, lowBelow: HistoryLowSampleBelow, highAt: HistoryHighSampleAt, want: ConfidenceMedium},
+		{name: "history 299", count: 299, lowBelow: HistoryLowSampleBelow, highAt: HistoryHighSampleAt, want: ConfidenceMedium},
+		{name: "history 300", count: 300, lowBelow: HistoryLowSampleBelow, highAt: HistoryHighSampleAt, want: ConfidenceHigh},
+		{name: "no low band", count: 1, highAt: 1, want: ConfidenceHigh},
+		{name: "no medium band", count: 10, lowBelow: 30, highAt: 30, want: ConfidenceLow},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := OutlookConfidence(tt.sampleSize, tt.insufficient); got != tt.want {
-				t.Errorf("OutlookConfidence() = %q, want %q", got, tt.want)
+			if got := CountConfidence(tt.count, tt.lowBelow, tt.highAt); got != tt.want {
+				t.Errorf("CountConfidence() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
 func TestApplyOutlookSample(t *testing.T) {
-	(*RouteOutlook)(nil).ApplyOutlookSample(10)
+	(*RouteOutlook)(nil).ApplyOutlookSample()
 
 	zero := 0.0
 	planted := ConnectionGuidanceFromRecommended(45, 60, 90, 120)
@@ -122,18 +132,16 @@ func TestApplyOutlookSample(t *testing.T) {
 	tests := []struct {
 		name               string
 		sampleSize         int
-		minSample          int
 		wantReason         string
 		wantConfidence     string
 		wantConnectionKept bool
 	}{
-		{name: "empty slot", minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
-		{name: "negative size", sampleSize: -3, minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
-		{name: "thin sample", sampleSize: 4, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
-		{name: "one below minimum", sampleSize: 9, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
-		{name: "meets minimum", sampleSize: 10, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
-		{name: "solid sample", sampleSize: 40, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
-		{name: "no minimum treats non-empty as sufficient", sampleSize: 1, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
+		{name: "empty slot", wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "negative size", sampleSize: -3, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "outlook 29", sampleSize: 29, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
+		{name: "outlook 30", sampleSize: 30, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceMedium, wantConnectionKept: true},
+		{name: "outlook 49", sampleSize: 49, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceMedium, wantConnectionKept: true},
+		{name: "outlook 50", sampleSize: 50, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
 	}
 
 	for _, tt := range tests {
@@ -146,7 +154,7 @@ func TestApplyOutlookSample(t *testing.T) {
 					Connection:                planted,
 				},
 			}
-			out.ApplyOutlookSample(tt.minSample)
+			out.ApplyOutlookSample()
 
 			if out.Analysis.SampleReason != tt.wantReason || out.Analysis.Confidence != tt.wantConfidence {
 				t.Fatalf("sample = reason %q confidence %q", out.Analysis.SampleReason, out.Analysis.Confidence)
@@ -194,6 +202,7 @@ func TestBlockingSampleReason(t *testing.T) {
 		{name: "derived low confidence", outlook: sampleOutlook(40, "", ConfidenceLow), want: SampleReasonInsufficientSample},
 		{name: "derived empty", outlook: sampleOutlook(0, "", ConfidenceUnknown), want: SampleReasonEmptySample},
 		{name: "derived sufficient from size", outlook: sampleOutlook(40, "", ConfidenceHigh), want: ""},
+		{name: "explicit medium is sufficient", outlook: sampleOutlook(40, "", ConfidenceMedium), want: ""},
 		{name: "explicit high with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceHigh), want: ""},
 	}
 
@@ -219,6 +228,21 @@ func TestDecisionConfidence(t *testing.T) {
 	derived := sampleOutlook(3, SampleReasonInsufficientSample, "")
 	if got := derived.DecisionConfidence(); got != ConfidenceLow {
 		t.Errorf("derived confidence = %q, want low", got)
+	}
+
+	medium := sampleOutlook(40, "", "")
+	if got := medium.DecisionConfidence(); got != ConfidenceMedium {
+		t.Errorf("derived confidence = %q, want medium", got)
+	}
+
+	high := sampleOutlook(50, "", "")
+	if got := high.DecisionConfidence(); got != ConfidenceHigh {
+		t.Errorf("derived confidence = %q, want high", got)
+	}
+
+	forcedLow := sampleOutlook(40, SampleReasonInsufficientSample, "")
+	if got := forcedLow.DecisionConfidence(); got != ConfidenceLow {
+		t.Errorf("insufficient reason = %q, want low", got)
 	}
 }
 
@@ -261,6 +285,28 @@ func TestSeasonalDecision(t *testing.T) {
 			confidence, reliability := SeasonalDecision(tt.flights, tt.rate, tt.minSample)
 			if confidence != tt.wantConfidence || reliability != tt.wantReliability {
 				t.Errorf("SeasonalDecision() = %q/%q, want %q/%q", confidence, reliability, tt.wantConfidence, tt.wantReliability)
+			}
+		})
+	}
+}
+
+func TestSeasonalReliabilityAtMedium(t *testing.T) {
+	tests := []struct {
+		name       string
+		rate       float64
+		confidence string
+		want       string
+	}{
+		{name: "reliable", rate: SeasonalReliableMinRate, confidence: ConfidenceMedium, want: ReliabilityReliable},
+		{name: "typical", rate: SeasonalTypicalMinRate, confidence: ConfidenceMedium, want: ReliabilityTypical},
+		{name: "unreliable", rate: SeasonalTypicalMinRate - 0.01, confidence: ConfidenceMedium, want: ReliabilityUnreliable},
+		{name: "low stays unknown", rate: 0.95, confidence: ConfidenceLow, want: ReliabilityUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SeasonalReliability(tt.rate, tt.confidence); got != tt.want {
+				t.Errorf("SeasonalReliability() = %q, want %q", got, tt.want)
 			}
 		})
 	}

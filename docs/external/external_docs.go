@@ -250,7 +250,7 @@ const docTemplateexternal = `{
                         "maximum": 120,
                         "minimum": 1,
                         "type": "integer",
-                        "description": "Minutes around dep_time to include (default 30, max 120)",
+                        "description": "Minutes around dep_time to include (default 60, max 120)",
                         "name": "dep_time_window_minutes",
                         "in": "query"
                     }
@@ -667,6 +667,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -674,8 +675,12 @@ const docTemplateexternal = `{
                 "end": {
                     "type": "string"
                 },
+                "lookback_days": {
+                    "description": "730 when a thin default departure window was widened from 365 days.",
+                    "type": "integer"
+                },
                 "sample_reason": {
-                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient is high confidence; insufficient_sample is low.",
+                    "description": "empty_sample means the slot has no flights: confidence is unknown and estimates are null.\nsufficient covers medium and high. insufficient_sample is low.",
                     "type": "string",
                     "enum": [
                         "sufficient",
@@ -1003,6 +1008,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1164,6 +1170,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1265,10 +1272,11 @@ const docTemplateexternal = `{
                     "type": "number"
                 },
                 "confidence": {
-                    "description": "Confidence is unknown when fair or adverse flights are absent, and low when the thinner group is below the outlook minimum. A thin sample keeps its rates.",
+                    "description": "Confidence follows the thinner of the fair and adverse counts, and is unknown when either count is zero.",
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1468,6 +1476,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1499,6 +1508,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]
@@ -1530,6 +1540,7 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "high",
+                        "medium",
                         "low",
                         "unknown"
                     ]

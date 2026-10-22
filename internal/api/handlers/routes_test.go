@@ -224,7 +224,7 @@ func TestRoutesOutlook(t *testing.T) {
 					OnTimeProbability: floatPtr(0),
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -299,7 +299,7 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 					OnTimeProbability: &zero,
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -354,7 +354,7 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -373,7 +373,7 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceHigh {
+	if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceMedium {
 		t.Fatalf("solid slot = %+v", out.Analysis)
 	}
 

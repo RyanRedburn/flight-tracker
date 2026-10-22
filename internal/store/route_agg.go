@@ -12,10 +12,11 @@ import (
 )
 
 const (
-	MinOutlookSampleSize        = 10
+	MinOutlookSampleSize        = model.OutlookLowSampleBelow
 	OutlookLookbackDays         = 365
+	OutlookFallbackLookbackDays = 730
 	MaxStatsSpanDays            = 366
-	DefaultDepTimeWindowMinutes = 30
+	DefaultDepTimeWindowMinutes = 60
 	MaxDepTimeWindowMinutes     = 120
 )
 
@@ -44,6 +45,9 @@ type RouteOutlookFilter struct {
 	DayOfWeek            int
 	DepTime              string
 	DepTimeWindowMinutes int
+	// DepTimeWindowSet is true when the caller passed a window.
+	// The default window may widen lookback. An explicit window does not.
+	DepTimeWindowSet bool
 }
 
 // ParseOutlookDay resolves an outlook weekday. Exactly one of date or dayOfWeek must be set.
@@ -194,12 +198,50 @@ func ISOWeekdayFromDate(date string) (int, bool) {
 // TrailingOutlookWindow is the inclusive trailing outlook year ending at endDate.
 // Route outlook and compare_carriers share it; the span fits in MaxStatsSpanDays.
 func TrailingOutlookWindow(endDate string) (start, end string, ok bool) {
+	return TrailingOutlookWindowDays(endDate, OutlookLookbackDays)
+}
+
+// TrailingOutlookWindowDays is the inclusive trailing window of days ending at endDate.
+func TrailingOutlookWindowDays(endDate string, days int) (start, end string, ok bool) {
 	endTime, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		return "", "", false
 	}
 
-	return endTime.AddDate(0, 0, -OutlookLookbackDays).Format("2006-01-02"), endDate, true
+	return endTime.AddDate(0, 0, -days).Format("2006-01-02"), endDate, true
+}
+
+// WidenOutlookLookback reports whether a thin default-window slot should be re-queried
+// at OutlookFallbackLookbackDays. A caller-set departure window is never widened.
+func WidenOutlookLookback(sampleSize int, windowSet bool) bool {
+	return !windowSet && sampleSize < MinOutlookSampleSize
+}
+
+// ApplyOutlookLookback runs the slot query at 365 days, and at 730 when the default window is still thin.
+// It records lookback_days and then applies the outlook sample rule.
+func ApplyOutlookLookback(out *model.RouteOutlook, windowSet bool, query func(lookbackDays int) error) error {
+	if out == nil {
+		return nil
+	}
+
+	if err := query(OutlookLookbackDays); err != nil {
+		return err
+	}
+
+	lookback := OutlookLookbackDays
+
+	if WidenOutlookLookback(out.Analysis.SampleSize, windowSet) {
+		if err := query(OutlookFallbackLookbackDays); err != nil {
+			return err
+		}
+
+		lookback = OutlookFallbackLookbackDays
+	}
+
+	out.Analysis.LookbackDays = lookback
+	out.ApplyOutlookSample()
+
+	return nil
 }
 
 func ResolveDepTimeWindowMinutes(minutes *int) int {

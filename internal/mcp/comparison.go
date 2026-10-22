@@ -13,6 +13,7 @@ import (
 
 const (
 	phraseHighConfidence    = "high confidence"
+	phraseMediumConfidence  = "medium confidence"
 	phraseLowConfidence     = "low confidence"
 	phraseUnknownConfidence = "unknown confidence"
 	phraseTooClose          = "too close to call"
@@ -51,11 +52,42 @@ func sampleReason(flights int, confidence string) string {
 		return model.SampleReasonEmptySample
 	}
 
-	if confidence == model.ConfidenceHigh {
+	if comparableConfidence(confidence) {
 		return model.SampleReasonSufficient
 	}
 
 	return model.SampleReasonInsufficientSample
+}
+
+func comparableConfidence(confidence string) bool {
+	switch confidence {
+	case model.ConfidenceHigh, model.ConfidenceMedium:
+		return true
+	default:
+		return false
+	}
+}
+
+func confidencePhrase(confidence string) string {
+	switch confidence {
+	case model.ConfidenceHigh:
+		return phraseHighConfidence
+	case model.ConfidenceMedium:
+		return phraseMediumConfidence
+	case model.ConfidenceLow:
+		return phraseLowConfidence
+	default:
+		return phraseUnknownConfidence
+	}
+}
+
+func itemConfidence(items []scoredItem) string {
+	values := make([]string, len(items))
+	for i, item := range items {
+		values[i] = item.confidence
+	}
+
+	return model.MinConfidence(values...)
 }
 
 // sentenceCase capitalizes a sentence that opens with a lowercase label such as "an unknown carrier".
@@ -89,7 +121,7 @@ func comparisonSummary(noun, route string, items []scoredItem, detail bool) (str
 
 func comparisonConfidence(ranked, thin, none []scoredItem) string {
 	if len(ranked) > 0 {
-		return model.ConfidenceHigh
+		return itemConfidence(ranked)
 	}
 
 	if len(none) > 0 {
@@ -106,7 +138,7 @@ func comparisonConfidence(ranked, thin, none []scoredItem) string {
 func splitByConfidence(items []scoredItem) (ranked, thin, none []scoredItem) {
 	for _, item := range items {
 		switch item.confidence {
-		case model.ConfidenceHigh:
+		case model.ConfidenceHigh, model.ConfidenceMedium:
 			ranked = append(ranked, item)
 		case model.ConfidenceLow:
 			thin = append(thin, item)
@@ -129,7 +161,7 @@ func onlyEnough(noun, route string, item scoredItem, detail bool) string {
 	}
 
 	return fmt.Sprintf("%s is the only %s with enough data on %s (%d%% on time, %s, %s).",
-		item.label, noun, route, item.percent, phraseHighConfidence, flightsPhrase([]int{item.sampleSize}))
+		item.label, noun, route, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))
 }
 
 func rankedComparison(route string, ranked []scoredItem, detail bool) string {
@@ -157,14 +189,16 @@ func tooCloseItems(route string, leaders []scoredItem, detail bool) string {
 	}
 
 	return fmt.Sprintf("%s are %s on %s (%s).",
-		joinLabels(leaders), phraseTooClose, route, onTimeDetail(rates, flightsPhrase(sampleSizes(leaders)), detail))
+		joinLabels(leaders), phraseTooClose, route, onTimeDetail(rates, flightsPhrase(sampleSizes(leaders)), confidencePhrase(itemConfidence(leaders)), detail))
 }
 
 func leaderSentence(route string, leaders, trailers []scoredItem, detail bool) string {
 	compared := append(append([]scoredItem{}, leaders...), trailers...)
+	confidence := confidencePhrase(itemConfidence(compared))
+
 	if len(leaders) == 1 {
 		return fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-			leaders[0].label, joinLabels(trailers), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", leaders[0].percent, joinItemPercents(trailers)), flightsPhrase(sampleSizes(compared)), detail))
+			leaders[0].label, joinLabels(trailers), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", leaders[0].percent, joinItemPercents(trailers)), flightsPhrase(sampleSizes(compared)), confidence, detail))
 	}
 
 	leaderRatesText := joinItemPercents(leaders)
@@ -173,7 +207,7 @@ func leaderSentence(route string, leaders, trailers []scoredItem, detail bool) s
 	}
 
 	return fmt.Sprintf("%s are %s and more reliable than %s on %s (%s).",
-		joinLabels(leaders), phraseTooClose, joinLabels(trailers), route, onTimeDetail(leaderRatesText+" vs "+joinItemPercents(trailers), flightsPhrase(sampleSizes(compared)), detail))
+		joinLabels(leaders), phraseTooClose, joinLabels(trailers), route, onTimeDetail(leaderRatesText+" vs "+joinItemPercents(trailers), flightsPhrase(sampleSizes(compared)), confidence, detail))
 }
 
 func mixedComparison(route string, sorted []scoredItem, detail bool) string {
@@ -197,11 +231,13 @@ func mixedComparison(route string, sorted []scoredItem, detail bool) string {
 		}
 
 		return fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-			better.label, worse.label, route, onTimeDetail(fmt.Sprintf("%d%% vs %d%%", better.percent, worse.percent), flightsPhrase(sampleSizes([]scoredItem{better, worse})), detail))
+			better.label, worse.label, route, onTimeDetail(fmt.Sprintf("%d%% vs %d%%", better.percent, worse.percent), flightsPhrase(sampleSizes([]scoredItem{better, worse})), confidencePhrase(itemConfidence([]scoredItem{better, worse})), detail))
 	}
 
+	compared := append([]scoredItem{best}, beaten...)
+
 	lead := fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-		best.label, joinLabels(beaten), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", best.percent, joinItemPercents(beaten)), flightsPhrase(sampleSizes(append([]scoredItem{best}, beaten...))), detail))
+		best.label, joinLabels(beaten), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", best.percent, joinItemPercents(beaten)), flightsPhrase(sampleSizes(compared)), confidencePhrase(itemConfidence(compared)), detail))
 	if len(tied) == 0 {
 		return lead
 	}
@@ -218,7 +254,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 	rest := make([]string, 0, len(sorted)-tied)
 	for _, item := range sorted[tied:] {
 		if detail {
-			rest = append(rest, fmt.Sprintf("%s (%d%%, %s, %s)", item.label, item.percent, phraseHighConfidence, flightsPhrase([]int{item.sampleSize})))
+			rest = append(rest, fmt.Sprintf("%s (%d%%, %s, %s)", item.label, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize})))
 			continue
 		}
 
@@ -231,7 +267,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 
 	lead := strconv.Itoa(sorted[0].percent) + "%"
 	if detail {
-		lead = onTimeDetail(lead, flightsPhrase(sampleSizes(leaders)), true)
+		lead = onTimeDetail(lead, flightsPhrase(sampleSizes(leaders)), confidencePhrase(itemConfidence(leaders)), true)
 	} else {
 		lead += " on time"
 	}
@@ -240,12 +276,12 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 		joinLabels(leaders), verb, route, lead, joinAnd(rest))
 }
 
-func onTimeDetail(rates, flights string, detail bool) string {
+func onTimeDetail(rates, flights, confidence string, detail bool) string {
 	if !detail {
 		return rates + " on time"
 	}
 
-	return rates + " on time, " + phraseHighConfidence + ", " + flights
+	return rates + " on time, " + confidence + ", " + flights
 }
 
 func thinSentence(items []scoredItem) string {

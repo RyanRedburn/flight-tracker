@@ -295,7 +295,7 @@ func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 			Connection:                ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 		},
 	}
-	empty.ApplyOutlookSample(10)
+	empty.ApplyOutlookSample()
 
 	body, err := json.Marshal(empty)
 	if err != nil {
@@ -315,8 +315,8 @@ func TestRouteOutlookSampleReasonJSON(t *testing.T) {
 
 	assertNullConnectionMinutes(t, jsonField(t, body, "connection"))
 
-	solid := RouteOutlook{OutlookResult: OutlookResult{Analysis: Analysis{SampleSize: 12}, OnTimeProbability: &zero}}
-	solid.ApplyOutlookSample(10)
+	solid := RouteOutlook{OutlookResult: OutlookResult{Analysis: Analysis{SampleSize: 30}, OnTimeProbability: &zero}}
+	solid.ApplyOutlookSample()
 
 	solidBody, err := json.Marshal(solid)
 	if err != nil {

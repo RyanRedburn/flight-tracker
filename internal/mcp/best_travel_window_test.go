@@ -36,6 +36,28 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 			firstMonth: 1,
 		},
 		{
+			name: "medium months are compared",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(1, 0.80, 120, model.ConfidenceMedium, model.ReliabilityReliable),
+				monthBucket(2, 0.80, 110, model.ConfidenceMedium, model.ReliabilityReliable),
+			},
+			want:       "January and February are too close to call for ORD–LAX (80% on time). Medium confidence. The 2 months with enough data have 110 to 120 flights each.",
+			wantConf:   model.ConfidenceMedium,
+			wantMonths: 2,
+			firstMonth: 1,
+		},
+		{
+			name: "result confidence is the weaker month",
+			months: []model.TravelWindowMonthBucket{
+				monthBucket(1, 0.90, 400, model.ConfidenceHigh, model.ReliabilityReliable),
+				monthBucket(7, 0.60, 120, model.ConfidenceMedium, model.ReliabilityUnreliable),
+			},
+			want:       "January is the most reliable month for ORD–LAX (90% on time), and July is the least reliable (60%). Medium confidence. The 2 months with enough data have 120 to 400 flights each.",
+			wantConf:   model.ConfidenceMedium,
+			wantMonths: 2,
+			firstMonth: 1,
+		},
+		{
 			name: "exact tie names both months",
 			months: []model.TravelWindowMonthBucket{
 				monthBucket(1, 0.80, 100, model.ConfidenceHigh, model.ReliabilityReliable),

@@ -13,6 +13,7 @@ const (
 	// Confidence is how much history supports a decision.
 	// Outlook, a classified itinerary connection, and travel-window buckets share these words.
 	ConfidenceHigh    = "high"
+	ConfidenceMedium  = "medium"
 	ConfidenceLow     = "low"
 	ConfidenceUnknown = "unknown"
 
@@ -26,7 +27,7 @@ const (
 
 	// Seasonal reliability is typical-year on-time performance for a travel-window bucket.
 	// It is not a connection status.
-	// Unreliable is a high-confidence verdict. A thin bucket stays reliability unknown.
+	// Unreliable is a medium- or high-confidence verdict. Low confidence stays reliability unknown.
 	ReliabilityReliable   = "reliable"
 	ReliabilityTypical    = "typical"
 	ReliabilityUnreliable = "unreliable"
@@ -61,8 +62,17 @@ const (
 	// required before a connection is loose instead of ok.
 	ConnectionLooseSlackMinutes = 30
 
-	// SeasonalReliableMinRate and SeasonalTypicalMinRate apply to a bucket's
-	// on-time rate only when that bucket's confidence is high.
+	// OutlookLowSampleBelow and OutlookHighSampleAt are the outlook and weather bands.
+	// Below 30 is low, 30–49 is medium, and 50 or more is high.
+	OutlookLowSampleBelow = 30
+	OutlookHighSampleAt   = 50
+
+	// HistoryLowSampleBelow and HistoryHighSampleAt are the carrier and month bands.
+	// Below 100 is low, 100–299 is medium, and 300 or more is high.
+	HistoryLowSampleBelow = 100
+	HistoryHighSampleAt   = 300
+
+	// SeasonalReliableMinRate and SeasonalTypicalMinRate apply when confidence is medium or high.
 	SeasonalReliableMinRate = 0.80
 	SeasonalTypicalMinRate  = 0.70
 )
@@ -177,7 +187,8 @@ func clampUnit(v float64) float64 {
 	return v
 }
 
-// MinConfidence returns the weakest value. Unknown is weaker than low, and low is weaker than high.
+// MinConfidence returns the weakest value.
+// Unknown is weaker than low, low is weaker than medium, and medium is weaker than high.
 // An empty list is unknown. Any other word counts as unknown.
 func MinConfidence(values ...string) string {
 	if len(values) == 0 {
@@ -197,6 +208,8 @@ func MinConfidence(values ...string) string {
 func confidenceRank(confidence string) int {
 	switch confidence {
 	case ConfidenceHigh:
+		return 3
+	case ConfidenceMedium:
 		return 2
 	case ConfidenceLow:
 		return 1
@@ -205,39 +218,38 @@ func confidenceRank(confidence string) int {
 	}
 }
 
-// OutlookConfidence maps an outlook sample onto high, low, or unknown.
-// insufficientSample is the existing thin-history flag (some rows, below the minimum).
-// An empty sample is unknown even when that flag is false.
-func OutlookConfidence(sampleSize int, insufficientSample bool) string {
-	if sampleSize <= 0 {
+// CountConfidence maps a sample onto high, medium, low, or unknown.
+// A non-positive count is unknown. Counts below lowBelow are low, and counts below highAt are medium.
+// lowBelow <= 0 skips the low band. highAt <= lowBelow skips the medium band.
+func CountConfidence(count, lowBelow, highAt int) string {
+	if count <= 0 {
 		return ConfidenceUnknown
 	}
 
-	if insufficientSample {
+	if lowBelow > 0 && count < lowBelow {
 		return ConfidenceLow
+	}
+
+	if highAt > lowBelow && count < highAt {
+		return ConfidenceMedium
 	}
 
 	return ConfidenceHigh
 }
 
 // ApplyOutlookSample sets sample_reason and confidence from the slot size.
-// sufficient: sample meets minSample and confidence is high.
-// insufficient_sample: some flights fall short of minSample and confidence is low.
-// Estimates stay, and connection thresholds are cleared.
-// empty_sample: no flights in this weekday and departure window.
-// Confidence is unknown, and probability, delay, and connection fields are cleared
-// so a zero is not a forecast.
-// minSample <= 0 treats every non-empty slot as sufficient.
-func (o *RouteOutlook) ApplyOutlookSample(minSample int) {
+// sufficient covers medium and high, and connection thresholds stay.
+// insufficient_sample is low confidence: estimates stay and connection thresholds are cleared.
+// empty_sample clears estimates so a zero is not a forecast.
+func (o *RouteOutlook) ApplyOutlookSample() {
 	if o == nil {
 		return
 	}
 
-	insufficient := o.Analysis.SampleSize > 0 && minSample > 0 && o.Analysis.SampleSize < minSample
-	o.Analysis.Confidence = OutlookConfidence(o.Analysis.SampleSize, insufficient)
+	o.Analysis.Confidence = CountConfidence(o.Analysis.SampleSize, OutlookLowSampleBelow, OutlookHighSampleAt)
 
 	switch o.Analysis.Confidence {
-	case ConfidenceHigh:
+	case ConfidenceHigh, ConfidenceMedium:
 		o.Analysis.SampleReason = SampleReasonSufficient
 	case ConfidenceLow:
 		o.Analysis.SampleReason = SampleReasonInsufficientSample
@@ -276,10 +288,18 @@ func (o *RouteOutlook) DecisionConfidence() string {
 	}
 
 	switch o.Analysis.Confidence {
-	case ConfidenceHigh, ConfidenceLow, ConfidenceUnknown:
+	case ConfidenceHigh, ConfidenceMedium, ConfidenceLow, ConfidenceUnknown:
 		return o.Analysis.Confidence
 	default:
-		return OutlookConfidence(o.Analysis.SampleSize, o.Analysis.SampleReason == SampleReasonInsufficientSample)
+		if o.Analysis.SampleSize <= 0 {
+			return ConfidenceUnknown
+		}
+
+		if o.Analysis.SampleReason == SampleReasonInsufficientSample {
+			return ConfidenceLow
+		}
+
+		return CountConfidence(o.Analysis.SampleSize, OutlookLowSampleBelow, OutlookHighSampleAt)
 	}
 }
 
@@ -321,21 +341,14 @@ func (o *RouteOutlook) resolvedSampleReason() string {
 }
 
 // SeasonalConfidence is high when flights meet minSample, low when some flights fall short, and unknown at zero.
+// It has no medium band. Month confidence uses CountConfidence with the history bands.
 func SeasonalConfidence(flights, minSample int) string {
-	if flights <= 0 {
-		return ConfidenceUnknown
-	}
-
-	if flights < minSample {
-		return ConfidenceLow
-	}
-
-	return ConfidenceHigh
+	return CountConfidence(flights, minSample, minSample)
 }
 
-// SeasonalReliability classifies a rounded on-time rate. It is unknown unless confidence is high.
+// SeasonalReliability classifies a rounded on-time rate. Medium and high confidence both count.
 func SeasonalReliability(onTimeRate float64, confidence string) string {
-	if confidence != ConfidenceHigh {
+	if confidence != ConfidenceHigh && confidence != ConfidenceMedium {
 		return ReliabilityUnknown
 	}
 

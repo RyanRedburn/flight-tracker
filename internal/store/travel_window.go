@@ -122,28 +122,28 @@ func AssembleRouteTravelWindows(
 	out.WorstHours = pickTravelWindowBuckets(hours, hourBucketKey, hourBucketRate, hourBucketFlights, hourMin, false)
 
 	out.RoundForResponse()
-	labelSeasonalBuckets(out, monthMin, dayMin, hourMin)
+	labelSeasonalBuckets(out, dayMin, hourMin)
 
 	return out
 }
 
 // labelSeasonalBuckets sets confidence and reliability from the rounded on-time rate.
-// Best and worst copies are labeled with the same grain minimum as the full series.
-// reliability unknown with confidence low is a thin bucket, the seasonal form of
-// outlook insufficient_sample, not a second flag. reliability unreliable is only
-// a high-confidence on-time rate below the typical band. Buckets with no flights
-// are omitted earlier, so they are not published as a zero rate.
-func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourMin int) {
+// Best and worst copies use the same rule as the full series.
+// Month confidence uses the history bands, so a month can clear the eligibility floor and still be low.
+// Day and hour confidence stays high or low from the eligibility floor.
+// reliability unknown with confidence low is a thin bucket. A medium or high rate below the typical band is unreliable.
+// Buckets with no flights are omitted earlier, so they are not published as a zero rate.
+func labelSeasonalBuckets(out *model.RouteTravelWindows, dayMin, hourMin int) {
 	for i := range out.ByMonth {
-		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = model.SeasonalDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate, monthMin)
+		out.ByMonth[i].Confidence, out.ByMonth[i].Reliability = monthDecision(out.ByMonth[i].Flights, out.ByMonth[i].OnTimeRate)
 	}
 
 	for i := range out.BestMonths {
-		out.BestMonths[i].Confidence, out.BestMonths[i].Reliability = model.SeasonalDecision(out.BestMonths[i].Flights, out.BestMonths[i].OnTimeRate, monthMin)
+		out.BestMonths[i].Confidence, out.BestMonths[i].Reliability = monthDecision(out.BestMonths[i].Flights, out.BestMonths[i].OnTimeRate)
 	}
 
 	for i := range out.WorstMonths {
-		out.WorstMonths[i].Confidence, out.WorstMonths[i].Reliability = model.SeasonalDecision(out.WorstMonths[i].Flights, out.WorstMonths[i].OnTimeRate, monthMin)
+		out.WorstMonths[i].Confidence, out.WorstMonths[i].Reliability = monthDecision(out.WorstMonths[i].Flights, out.WorstMonths[i].OnTimeRate)
 	}
 
 	for i := range out.ByDayOfWeek {
@@ -169,6 +169,13 @@ func labelSeasonalBuckets(out *model.RouteTravelWindows, monthMin, dayMin, hourM
 	for i := range out.WorstHours {
 		out.WorstHours[i].Confidence, out.WorstHours[i].Reliability = model.SeasonalDecision(out.WorstHours[i].Flights, out.WorstHours[i].OnTimeRate, hourMin)
 	}
+}
+
+func monthDecision(flights int, onTimeRate float64) (confidence, reliability string) {
+	confidence = model.CountConfidence(flights, model.HistoryLowSampleBelow, model.HistoryHighSampleAt)
+	reliability = model.SeasonalReliability(onTimeRate, confidence)
+
+	return confidence, reliability
 }
 
 func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd string, windowFlights int) *model.RouteTravelWindows {

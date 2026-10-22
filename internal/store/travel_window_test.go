@@ -93,19 +93,19 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 		t.Fatalf("by_month len = %d, want 4 (flights >= 1)", len(got.ByMonth))
 	}
 
-	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 || got.ByMonth[0].Confidence != model.ConfidenceHigh || got.ByMonth[0].Reliability != model.ReliabilityReliable {
+	if got.ByMonth[0].Month != 1 || got.ByMonth[0].OnTimeRate != 0.9 || got.ByMonth[0].Confidence != model.ConfidenceMedium || got.ByMonth[0].Reliability != model.ReliabilityReliable {
 		t.Errorf("first month = %+v", got.ByMonth[0])
 	}
 
-	if got.ByMonth[1].Confidence != model.ConfidenceHigh || got.ByMonth[1].Reliability != model.ReliabilityUnreliable {
-		t.Errorf("month 2 = %+v, want high/unreliable", got.ByMonth[1])
+	if got.ByMonth[1].Confidence != model.ConfidenceLow || got.ByMonth[1].Reliability != model.ReliabilityUnknown {
+		t.Errorf("month 2 = %+v, want low/unknown", got.ByMonth[1])
 	}
 
 	if got.ByMonth[3].Confidence != model.ConfidenceLow || got.ByMonth[3].Reliability != model.ReliabilityUnknown {
 		t.Errorf("month 4 = %+v, want low/unknown", got.ByMonth[3])
 	}
 
-	if got.BestMonths[0].Confidence != model.ConfidenceHigh || got.BestMonths[0].Reliability != model.ReliabilityReliable {
+	if got.BestMonths[0].Confidence != model.ConfidenceMedium || got.BestMonths[0].Reliability != model.ReliabilityReliable {
 		t.Errorf("best month decision = %+v", got.BestMonths[0])
 	}
 
@@ -158,6 +158,44 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 	again := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
 	if again.ByMonth[0] != got.ByMonth[0] || again.BestHours[0] != got.BestHours[0] {
 		t.Error("AssembleRouteTravelWindows is not idempotent for the same counts")
+	}
+}
+
+func TestMonthConfidenceBands(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 80, Flights: 99},
+		{Grain: TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 80, Flights: 100},
+		{Grain: TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 240, Flights: 299},
+		{Grain: TravelWindowGrainMonth, Bucket: 4, OnTimeCount: 240, Flights: 300},
+		{Grain: TravelWindowGrainDayOfWeek, Bucket: 1, OnTimeCount: 40, Flights: 50},
+		{Grain: TravelWindowGrainHour, Bucket: 8, OnTimeCount: 24, Flights: 30},
+		{Grain: TravelWindowGrainHour, Bucket: 9, OnTimeCount: 20, Flights: 29},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
+
+	if got.ByMonth[0].Confidence != model.ConfidenceLow || got.ByMonth[0].Reliability != model.ReliabilityUnknown {
+		t.Errorf("99 flights = %+v, want low/unknown", got.ByMonth[0])
+	}
+
+	if got.ByMonth[1].Confidence != model.ConfidenceMedium || got.ByMonth[1].Reliability != model.ReliabilityReliable {
+		t.Errorf("100 flights = %+v, want medium/reliable", got.ByMonth[1])
+	}
+
+	if got.ByMonth[2].Confidence != model.ConfidenceMedium || got.ByMonth[2].OnTimeRate != 0.8 || got.ByMonth[2].Reliability != model.ReliabilityReliable {
+		t.Errorf("299 flights = %+v, want medium/reliable", got.ByMonth[2])
+	}
+
+	if got.ByMonth[3].Confidence != model.ConfidenceHigh || got.ByMonth[3].Reliability != model.ReliabilityReliable {
+		t.Errorf("300 flights = %+v, want high/reliable", got.ByMonth[3])
+	}
+
+	if got.ByDayOfWeek[0].Confidence != model.ConfidenceHigh || got.ByDayOfWeek[0].Reliability != model.ReliabilityReliable {
+		t.Errorf("weekday = %+v, want high/reliable at the day floor", got.ByDayOfWeek[0])
+	}
+
+	if got.ByHour[0].Confidence != model.ConfidenceHigh || got.ByHour[1].Confidence != model.ConfidenceLow {
+		t.Errorf("hours = %+v, want high then low", got.ByHour)
 	}
 }
 

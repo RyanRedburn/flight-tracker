@@ -119,6 +119,10 @@ func TestParseRouteOutlook(t *testing.T) {
 	if filter.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes {
 		t.Errorf("window = %d, want %d", filter.DepTimeWindowMinutes, store.DefaultDepTimeWindowMinutes)
 	}
+
+	if filter.DepTimeWindowSet {
+		t.Error("default window should stay unset")
+	}
 }
 
 func TestParseRouteOutlookWindowAndErrors(t *testing.T) {
@@ -129,8 +133,8 @@ func TestParseRouteOutlookWindowAndErrors(t *testing.T) {
 		t.Fatalf("ParseRouteOutlook() error = %v", err)
 	}
 
-	if filter.DepTimeWindowMinutes != 45 {
-		t.Errorf("window = %d, want 45", filter.DepTimeWindowMinutes)
+	if filter.DepTimeWindowMinutes != 45 || !filter.DepTimeWindowSet {
+		t.Errorf("window = %+v, want 45 and caller-set", filter)
 	}
 
 	if filter.DayOfWeek != 2 {

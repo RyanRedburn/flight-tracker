@@ -72,7 +72,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 //	@Param			day_of_week					query		int		false	"Weekday (1=Mon … 7=Sun); exactly one of day_of_week or date"	minimum(1)	maximum(7)
 //	@Param			date						query		string	false	"Calendar date (YYYY-MM-DD); exactly one of day_of_week or date"	Format(date)
 //	@Param			dep_time					query		string	true	"Scheduled departure time (HHmm)"
-//	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 30, max 120)"	minimum(1)	maximum(120)
+//	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 60, max 120)"	minimum(1)	maximum(120)
 //	@Success		200							{object}	model.RouteOutlook
 //	@Failure		400							{object}	ErrorResponse
 //	@Failure		401							{object}	ErrorResponse
