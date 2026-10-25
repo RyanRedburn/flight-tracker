@@ -68,8 +68,10 @@ func TestGoldenOutlookItineraryConnection(t *testing.T) {
 	}
 }
 
-func TestGoldenThinSampleStaysUnknown(t *testing.T) {
-	outlook := goldenOutlook(4, model.SampleReasonInsufficientSample, model.ConfidenceLow, model.ConnectionGuidance{})
+func TestGoldenThinSampleKeepsConnection(t *testing.T) {
+	outlook := goldenOutlook(4, model.SampleReasonInsufficientSample, model.ConfidenceLow, model.ConnectionGuidanceFromRecommended(60, 75, 90, 120))
+	tagConnectionMCT(outlook.Connection, model.MCTSourceAirport)
+
 	countries := map[string]string{
 		testOriginBOS: "US",
 		testOriginORD: "US",
@@ -77,7 +79,7 @@ func TestGoldenThinSampleStaysUnknown(t *testing.T) {
 	}
 
 	gotOutlook := getOutlook(t, outlook)
-	if gotOutlook.Analysis.Confidence != model.ConfidenceLow || gotOutlook.Connection.DomesticToDomestic != nil {
+	if gotOutlook.Analysis.Confidence != model.ConfidenceLow || gotOutlook.Connection.DomesticToDomestic == nil || gotOutlook.Connection.DomesticToDomestic.RecommendedMinutes != 60 {
 		t.Fatalf("thin outlook = %+v", gotOutlook.Connection)
 	}
 
@@ -86,12 +88,12 @@ func TestGoldenThinSampleStaysUnknown(t *testing.T) {
 		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1330"},
 	}})
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != gotOutlook.Analysis.Confidence || conn.Reason != model.SampleReasonInsufficientSample || conn.MCTSource != nil {
-		t.Fatalf("connection = %+v, outlook confidence %q", conn, gotOutlook.Analysis.Confidence)
+	if conn.Status != model.ConnectionLoose || conn.Confidence != model.ConfidenceLow || conn.Reason != model.ConnectionReasonEvaluated {
+		t.Fatalf("connection = %+v", conn)
 	}
 
-	if conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
-		t.Fatalf("thin connection published thresholds: %+v", conn)
+	if conn.RecommendedMinutes == nil || *conn.RecommendedMinutes != 60 || conn.LooseMinutes == nil || *conn.LooseMinutes != 90 {
+		t.Fatalf("thin connection thresholds: %+v", conn)
 	}
 }
 

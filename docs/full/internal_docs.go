@@ -1395,7 +1395,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least 100 flights differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1519,7 +1519,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst days and hours are the top and bottom 3 buckets that meet the grain minimum. Months need 50 flights. Their lists are the highest-rate month plus months that do not differ from it at 95%, and the same around the lowest-rate month. Both month lists are omitted when that highest-rate month differs from nobody.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. Best is the highest-rate bucket plus buckets that do not differ from it at 95%, capped at 3, and only when that bucket differs from another. Worst is the lowest-rate bucket among those it beats, plus buckets tied with that one, capped at 3. Both lists are omitted when the highest-rate bucket differs from nobody.",
                 "produces": [
                     "application/json"
                 ],
@@ -2572,7 +2572,7 @@ const docTemplateinternal = `{
                     "type": "boolean"
                 },
                 "reason": {
-                    "description": "Reason is why status is unknown. overnight means a later date was still classified. empty_sample and insufficient_sample match the inbound sample_reason; missing_outlook does not.",
+                    "description": "Reason is why status is unknown, except overnight, which means a later date was still classified. empty_sample matches the inbound sample_reason when that slot has no flights. A low sample is still classified. missing_outlook does not.",
                     "type": "string",
                     "enum": [
                         "evaluated",
@@ -2768,7 +2768,7 @@ const docTemplateinternal = `{
                     "type": "number"
                 },
                 "connection": {
-                    "description": "Cleared for empty_sample and insufficient_sample.",
+                    "description": "Cleared when the slot has no flights. A low sample keeps these thresholds.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.ConnectionGuidance"
@@ -2989,11 +2989,27 @@ const docTemplateinternal = `{
                         "$ref": "#/definitions/model.TravelWindowMonthBucket"
                     }
                 },
+                "day_comparison": {
+                    "description": "DayComparison uses the same rule as month_comparison.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
+                },
                 "filters": {
                     "$ref": "#/definitions/model.Filters"
                 },
+                "hour_comparison": {
+                    "description": "HourComparison uses the same rule as month_comparison.",
+                    "type": "string",
+                    "enum": [
+                        "ranked",
+                        "too_close_to_call"
+                    ]
+                },
                 "month_comparison": {
-                    "description": "MonthComparison is ranked when the highest-rate eligible month differs at 95% from at least one other.\nIt is too_close_to_call when that month differs from nobody, and those best and worst lists are empty.",
+                    "description": "MonthComparison is ranked when the highest-rate month differs at 95% from another month.\nBest months are that month plus months tied with it, capped at 3. Worst months are the lowest-rate month among those it beats, plus months tied with that one, capped at 3. Too close to call leaves both lists empty.",
                     "type": "string",
                     "enum": [
                         "ranked",

@@ -143,12 +143,20 @@ func TestCarrierComparison(t *testing.T) {
 		items []model.CarrierOnTime
 		want  string
 	}{
-		{name: "one comparable carrier", items: []model.CarrierOnTime{{Carrier: "UA", OnTimeRate: 0.8, Flights: CarrierStatsMinSampleSize}}, want: ""},
+		{name: "one carrier", items: []model.CarrierOnTime{{Carrier: "UA", OnTimeRate: 0.8, Flights: 1}}, want: ""},
 		{
-			name: "thin carriers are not compared",
+			name: "a low-flight carrier is compared",
 			items: []model.CarrierOnTime{
-				{Carrier: "UA", OnTimeRate: 0.9, Flights: CarrierStatsMinSampleSize},
-				{Carrier: "AA", OnTimeRate: 0.1, Flights: CarrierStatsMinSampleSize - 1},
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: model.CarrierLowSampleBelow},
+				{Carrier: "AA", OnTimeRate: 0.1, Flights: 1},
+			},
+			want: model.ComparisonRanked,
+		},
+		{
+			name: "zero flights are not compared",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: 1},
+				{Carrier: "AA", OnTimeRate: 0.1, Flights: 0},
 			},
 			want: "",
 		},

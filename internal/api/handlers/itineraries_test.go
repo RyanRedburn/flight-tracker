@@ -478,6 +478,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 					OutlookResult: model.OutlookResult{
 						Analysis:          model.Analysis{SampleSize: 4},
 						OnTimeProbability: floatPtr(0),
+						Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 120, 180),
 					},
 				}
 				out.ApplyOutlookSample()
@@ -570,7 +571,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	thinConn := out.Connections[2]
-	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.SampleReasonInsufficientSample || thinConn.MCTSource != nil || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
+	if thinConn.Status != model.ConnectionOK || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.ConnectionReasonEvaluated || thinConn.RecommendedMinutes == nil || *thinConn.RecommendedMinutes != 45 {
 		t.Fatalf("thin connection = %+v", thinConn)
 	}
 }

@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least 100 flights differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst days and hours are the top and bottom 3 buckets that meet the grain minimum. Months need 50 flights. Their lists are the highest-rate month plus months that do not differ from it at 95%, and the same around the lowest-rate month. Both month lists are omitted when that highest-rate month differs from nobody.
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. Best is the highest-rate bucket plus buckets that do not differ from it at 95%, capped at 3, and only when that bucket differs from another. Worst is the lowest-rate bucket among those it beats, plus buckets tied with that one, capped at 3. Both lists are omitted when the highest-rate bucket differs from nobody.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

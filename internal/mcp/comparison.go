@@ -30,6 +30,7 @@ type scoredItem struct {
 	sampleSize int
 	confidence string
 	key        int
+	hasRate    bool
 }
 
 func routeLabel(carrier, origin, dest string) string {
@@ -102,7 +103,7 @@ func sentenceCase(sentence string) string {
 }
 
 func comparisonSummary(noun, route string, items []scoredItem, detail bool) (string, string) {
-	ranked, thin, none := splitByConfidence(items)
+	ranked, none := splitByData(items)
 	summary := noneEnough(noun, route)
 
 	switch len(ranked) {
@@ -114,54 +115,45 @@ func comparisonSummary(noun, route string, items []scoredItem, detail bool) (str
 	}
 
 	if detail {
-		return appendNote(summary, thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+		return appendNote(summary, noneSentence(none)), comparisonConfidence(ranked)
 	}
 
-	return appendNote(summary, gapSentence(thin, none)), comparisonConfidence(ranked, thin, none)
+	return appendNote(summary, gapSentence(none)), comparisonConfidence(ranked)
 }
 
-func comparisonConfidence(ranked, thin, none []scoredItem) string {
+func comparisonConfidence(ranked []scoredItem) string {
 	if len(ranked) > 0 {
 		return itemConfidence(ranked)
-	}
-
-	if len(none) > 0 {
-		return model.ConfidenceUnknown
-	}
-
-	if len(thin) > 0 {
-		return model.ConfidenceLow
 	}
 
 	return model.ConfidenceUnknown
 }
 
-func splitByConfidence(items []scoredItem) (ranked, thin, none []scoredItem) {
+func splitByData(items []scoredItem) (ranked, none []scoredItem) {
 	for _, item := range items {
-		switch item.confidence {
-		case model.ConfidenceHigh, model.ConfidenceMedium:
+		if item.sampleSize > 0 && item.hasRate {
 			ranked = append(ranked, item)
-		case model.ConfidenceLow:
-			thin = append(thin, item)
-		default:
-			none = append(none, item)
+
+			continue
 		}
+
+		none = append(none, item)
 	}
 
-	return ranked, thin, none
+	return ranked, none
 }
 
 func noneEnough(noun, route string) string {
-	return "No " + noun + " on " + route + " has enough data to compare."
+	return "No " + noun + " on " + route + " has data to compare."
 }
 
 func onlyEnough(noun, route string, item scoredItem, detail bool) string {
 	if !detail {
-		return fmt.Sprintf("%s is the only %s with enough data on %s (%d%% on time).",
+		return fmt.Sprintf("%s is the only %s on %s (%d%% on time).",
 			item.label, noun, route, item.percent)
 	}
 
-	return fmt.Sprintf("%s is the only %s with enough data on %s (%d%% on time, %s, %s).",
+	return fmt.Sprintf("%s is the only %s on %s (%d%% on time, %s, %s).",
 		item.label, noun, route, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))
 }
 
@@ -279,10 +271,6 @@ func onTimeDetail(rates, flights, confidence string, detail bool) string {
 	return rates + " on time, " + confidence + ", " + flights
 }
 
-func thinSentence(items []scoredItem) string {
-	return confidenceSentence(items, phraseLowConfidence, "thin data")
-}
-
 func noneSentence(items []scoredItem) string {
 	return confidenceSentence(items, phraseUnknownConfidence, "no reliable on-time rate")
 }
@@ -300,21 +288,12 @@ func confidenceSentence(items []scoredItem, confidence, tail string) string {
 	return joinAnd(parts) + " " + haveVerb(len(items)) + " " + tail + "."
 }
 
-func gapSentence(thin, none []scoredItem) string {
-	parts := make([]string, 0, 2)
-	if len(thin) > 0 {
-		parts = append(parts, joinLabels(thin)+" "+haveVerb(len(thin))+" thin data")
-	}
-
-	if len(none) > 0 {
-		parts = append(parts, joinLabels(none)+" "+haveVerb(len(none))+" no data")
-	}
-
-	if len(parts) == 0 {
+func gapSentence(none []scoredItem) string {
+	if len(none) == 0 {
 		return ""
 	}
 
-	return strings.Join(parts, " and ") + "."
+	return joinLabels(none) + " " + haveVerb(len(none)) + " no data."
 }
 
 func appendNote(base string, notes ...string) string {

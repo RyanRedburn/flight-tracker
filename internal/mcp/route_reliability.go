@@ -57,6 +57,7 @@ type routeDepartureOutlook struct {
 	LikelyDepartureDelayWhenDelayed *float64                  `json:"likely_departure_delay_when_delayed"`
 	MedianDepartureDelayWhenDelayed *float64                  `json:"median_departure_delay_when_delayed"`
 	Weather                         model.RouteOutlookWeather `json:"weather"`
+	onTimeCount                     *int
 }
 
 type routeReliabilityData struct {
@@ -243,6 +244,7 @@ func newRouteDepartureOutlook(out model.RouteOutlook, depTime string, window int
 		LikelyDepartureDelayWhenDelayed: out.LikelyDepartureDelayWhenDelayed,
 		MedianDepartureDelayWhenDelayed: out.MedianDepartureDelayWhenDelayed,
 		Weather:                         out.Weather,
+		onTimeCount:                     out.OnTimeCount,
 	}
 }
 
@@ -304,7 +306,7 @@ func departureConfidence(departures []routeDepartureOutlook) string {
 		confidence := outlookConfidence(dep.Analysis)
 		all[i] = confidence
 
-		if !comparableConfidence(confidence) {
+		if dep.Analysis.SampleSize <= 0 {
 			continue
 		}
 
@@ -329,19 +331,10 @@ func outlookConfidence(analysis model.Analysis) string {
 
 func oneDepartureSummary(route string, dep routeDepartureOutlook) string {
 	label := dep.Filters.DepTime + " on " + route
-	confidence := outlookConfidence(dep.Analysis)
+	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
 
-	if comparableConfidence(confidence) {
-		rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
-		if !ok {
-			return label + " has no reliable on-time rate."
-		}
-
+	if dep.Analysis.SampleSize > 0 && ok {
 		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Analysis.SampleSize)
-	}
-
-	if confidence == model.ConfidenceLow {
-		return fmt.Sprintf("%s has thin data (%d flights), so there is no reliable on-time rate.", label, dep.Analysis.SampleSize)
 	}
 
 	return label + " has no data for this day and time."
@@ -365,18 +358,13 @@ func departureItem(dep routeDepartureOutlook) scoredItem {
 		confidence: outlookConfidence(dep.Analysis),
 	}
 
-	if !comparableConfidence(item.confidence) {
-		return item
-	}
-
 	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
-	if !ok {
-		item.confidence = ""
-
+	if dep.Analysis.SampleSize <= 0 || !ok {
 		return item
 	}
 
-	item.rate = rate
+	item.hasRate = true
+	item.rate = model.ComparisonRate(rate, dep.onTimeCount, dep.Analysis.SampleSize)
 	item.percent = onTimePercent(rate)
 
 	return item

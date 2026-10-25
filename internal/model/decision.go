@@ -39,9 +39,9 @@ const (
 	SampleReasonEmptySample        = "empty_sample"
 
 	// ConnectionReason explains an itinerary status, including unknown.
-	// empty_sample and insufficient_sample are the inbound outlook sample_reason.
-	// missing_outlook is a null inbound outlook (route outlook 404 / leg error),
-	// which is not empty_sample.
+	// empty_sample is the inbound outlook sample_reason when that slot has no flights.
+	// A low sample is still classified. missing_outlook is a null inbound outlook
+	// (route outlook 404 / leg error), which is not empty_sample.
 	ConnectionReasonEvaluated        = "evaluated"
 	ConnectionReasonOvernight        = "overnight"
 	ConnectionReasonMultiAirport     = "multi_airport"
@@ -67,10 +67,10 @@ const (
 	OutlookLowSampleBelow = 30
 	OutlookHighSampleAt   = 50
 
-	// HistoryLowSampleBelow and HistoryHighSampleAt are the carrier and month bands.
+	// CarrierLowSampleBelow and CarrierHighSampleAt are the carrier bands.
 	// Below 100 is low, 100–299 is medium, and 300 or more is high.
-	HistoryLowSampleBelow = 100
-	HistoryHighSampleAt   = 300
+	CarrierLowSampleBelow = 100
+	CarrierHighSampleAt   = 300
 
 	// SeasonalReliableMinRate and SeasonalTypicalMinRate apply when confidence is medium or high.
 	SeasonalReliableMinRate = 0.80
@@ -247,8 +247,8 @@ func CountConfidence(count, lowBelow, highAt int) string {
 }
 
 // ApplyOutlookSample sets sample_reason and confidence from the slot size.
-// sufficient covers medium and high, and connection thresholds stay.
-// insufficient_sample is low confidence: estimates stay and connection thresholds are cleared.
+// sufficient covers medium and high. insufficient_sample is low confidence.
+// Estimates and connection thresholds stay for a low sample.
 // empty_sample clears estimates so a zero is not a forecast.
 func (o *RouteOutlook) ApplyOutlookSample() {
 	if o == nil {
@@ -262,7 +262,6 @@ func (o *RouteOutlook) ApplyOutlookSample() {
 		o.Analysis.SampleReason = SampleReasonSufficient
 	case ConfidenceLow:
 		o.Analysis.SampleReason = SampleReasonInsufficientSample
-		o.Connection = ConnectionGuidance{}
 	default:
 		if o.Analysis.SampleSize < 0 {
 			o.Analysis.SampleSize = 0
@@ -275,6 +274,7 @@ func (o *RouteOutlook) ApplyOutlookSample() {
 
 func (o *RouteOutlook) clearEstimates() {
 	o.OnTimeProbability = nil
+	o.OnTimeCount = nil
 	o.DelayProbability = nil
 	o.CancellationProbability = nil
 	o.DiversionProbability = nil
@@ -312,22 +312,19 @@ func (o *RouteOutlook) DecisionConfidence() string {
 	}
 }
 
-// BlockingSampleReason is empty_sample or insufficient_sample when that sample
-// withholds connection thresholds. A sufficient sample returns an empty string.
-// An explicit sample_reason wins. Otherwise a low-confidence non-empty sample
-// is insufficient_sample. An empty sample is empty_sample unless confidence is medium or high.
-// Nil returns an empty string. A missing inbound outlook is not a sample reason.
+// BlockingSampleReason is empty_sample when the slot has no flights.
+// A low sample does not block connection guidance. Nil returns an empty string.
+// A missing inbound outlook is not a sample reason.
 func (o *RouteOutlook) BlockingSampleReason() string {
 	if o == nil {
 		return ""
 	}
 
-	switch reason := o.resolvedSampleReason(); reason {
-	case SampleReasonEmptySample, SampleReasonInsufficientSample:
-		return reason
-	default:
-		return ""
+	if o.resolvedSampleReason() == SampleReasonEmptySample {
+		return SampleReasonEmptySample
 	}
+
+	return ""
 }
 
 // resolvedSampleReason is the outlook sample_reason, or the same words derived
@@ -349,12 +346,6 @@ func (o *RouteOutlook) resolvedSampleReason() string {
 	return SampleReasonSufficient
 }
 
-// SeasonalConfidence is high when flights meet minSample, low when some flights fall short, and unknown at zero.
-// It has no medium band. Month confidence uses CountConfidence with the history bands.
-func SeasonalConfidence(flights, minSample int) string {
-	return CountConfidence(flights, minSample, minSample)
-}
-
 // SeasonalReliability classifies a rounded on-time rate. Medium and high confidence both count.
 func SeasonalReliability(onTimeRate float64, confidence string) string {
 	if confidence != ConfidenceHigh && confidence != ConfidenceMedium {
@@ -373,8 +364,9 @@ func SeasonalReliability(onTimeRate float64, confidence string) string {
 }
 
 // SeasonalDecision is the confidence and reliability pair for one travel-window bucket.
-func SeasonalDecision(flights int, onTimeRate float64, minSample int) (confidence, reliability string) {
-	confidence = SeasonalConfidence(flights, minSample)
+// Confidence uses the outlook bands. The reliability word stays unknown at low confidence.
+func SeasonalDecision(flights int, onTimeRate float64) (confidence, reliability string) {
+	confidence = CountConfidence(flights, OutlookLowSampleBelow, OutlookHighSampleAt)
 	reliability = SeasonalReliability(onTimeRate, confidence)
 
 	return confidence, reliability

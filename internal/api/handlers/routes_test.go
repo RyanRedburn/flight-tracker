@@ -222,6 +222,7 @@ func TestRoutesOutlook(t *testing.T) {
 				OutlookResult: model.OutlookResult{
 					Analysis:          model.Analysis{SampleSize: 3, End: testAnalysisEnd},
 					OnTimeProbability: floatPtr(0),
+					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 				},
 			}
 			out.ApplyOutlookSample()
@@ -261,7 +262,9 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Errorf("analysis end = %q, want %q", out.Analysis.End, testAnalysisEnd)
 	}
 
-	assertNullConnectionMinutesJSON(t, body)
+	if out.Connection.DomesticToDomestic == nil || out.Connection.DomesticToDomestic.RecommendedMinutes != 45 {
+		t.Fatalf("connection = %+v", out.Connection.DomesticToDomestic)
+	}
 }
 
 func TestRoutesOutlookEmpty(t *testing.T) {

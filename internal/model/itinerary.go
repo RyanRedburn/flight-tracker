@@ -79,7 +79,7 @@ type ItineraryConnection struct {
 	SlackMinutes       *int    `json:"slack_minutes"`
 	Status             string  `json:"status" enums:"loose,ok,tight,unknown"`
 	Confidence         string  `json:"confidence" enums:"high,medium,low,unknown"`
-	// Reason is why status is unknown. overnight means a later date was still classified. empty_sample and insufficient_sample match the inbound sample_reason; missing_outlook does not.
+	// Reason is why status is unknown, except overnight, which means a later date was still classified. empty_sample matches the inbound sample_reason when that slot has no flights. A low sample is still classified. missing_outlook does not.
 	Reason string `json:"reason" enums:"evaluated,overnight,multi_airport,missing_country,missing_outlook,empty_sample,insufficient_sample,missing_threshold,negative_layover,invalid_schedule"`
 	// Overnight stays true for a later outbound date, including multi-day, when reason names another cause.
 	Overnight bool `json:"overnight"`

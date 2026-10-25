@@ -261,14 +261,13 @@ func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierO
 	}
 }
 
-// CarrierComparison is ranked when the highest-rate carrier with at least
-// CarrierStatsMinSampleSize flights differs at 95% from another. Fewer than two
-// such carriers is not a comparison.
+// CarrierComparison is ranked when the highest-rate carrier with at least one
+// flight differs at 95% from another. Fewer than two such carriers is not a comparison.
 func CarrierComparison(items []model.CarrierOnTime) string {
 	eligible := make([]model.CarrierOnTime, 0, len(items))
 
 	for _, item := range items {
-		if item.Flights >= CarrierStatsMinSampleSize {
+		if item.Flights >= 1 {
 			eligible = append(eligible, item)
 		}
 	}

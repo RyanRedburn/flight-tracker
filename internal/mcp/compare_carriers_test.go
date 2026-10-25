@@ -17,7 +17,7 @@ import (
 const latestCarrierDate = "2026-04-01"
 
 func TestCompareCarriersSummaries(t *testing.T) {
-	minFlights := store.CarrierStatsMinSampleSize
+	minFlights := model.CarrierLowSampleBelow
 
 	windowStart, windowEnd, ok := store.TrailingOutlookWindow(latestCarrierDate)
 	if !ok || windowEnd != latestCarrierDate {
@@ -140,8 +140,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "AA", OnTimeRate: 0.95, Flights: 8},
 				{Carrier: "DL", OnTimeRate: 0.40, Flights: 4},
 			},
-			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, medium confidence, %d flights). AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights),
-			wantConf:  model.ConfidenceMedium,
+			want:      "AA and UA are too close to call and more reliable than DL on ORD–LAX (95% and 85% vs 40% on time, low confidence, 8, 100 and 4 flights).",
+			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -153,7 +153,7 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "AA", OnTimeRate: 0.50, Flights: 8},
 				{Carrier: "DL", OnTimeRate: 0.20, Flights: 4},
 			},
-			want:      fmt.Sprintf("No carrier on ORD–LAX has enough data to compare. UA (low confidence, %d flights), AA (low confidence, 8 flights) and DL (low confidence, 4 flights) have thin data.", minFlights-1),
+			want:      fmt.Sprintf("UA is more reliable than AA and DL on ORD–LAX (90%% vs 50%% and 20%% on time, low confidence, %d, 8 and 4 flights).", minFlights-1),
 			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -175,7 +175,7 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			carriers: []model.CarrierOnTime{
 				{Carrier: testCarrierUA, OnTimeRate: 1, Flights: 1},
 			},
-			want:      "No carrier on ORD–LAX has enough data to compare. UA (low confidence, 1 flight) has thin data.",
+			want:      "UA is on time about 100% of the time on ORD–LAX (low confidence, 1 flight).",
 			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
@@ -187,8 +187,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: "", OnTimeRate: 0.80, Flights: minFlights},
 				{Carrier: "AA", OnTimeRate: 0.70, Flights: 4},
 			},
-			want:      fmt.Sprintf("An unknown carrier is the only carrier with enough data on ORD–LAX (80%% on time, medium confidence, %d flights). AA (low confidence, 4 flights) has thin data.", minFlights),
-			wantConf:  model.ConfidenceMedium,
+			want:      fmt.Sprintf("An unknown carrier and AA are too close to call on ORD–LAX (80%% and 70%% on time, low confidence, %d and 4 flights).", minFlights),
+			wantConf:  model.ConfidenceLow,
 			wantFirst: "",
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -211,8 +211,8 @@ func TestCompareCarriersSummaries(t *testing.T) {
 				{Carrier: testCarrierUA, OnTimeRate: 0.85, Flights: minFlights},
 				{Carrier: "", OnTimeRate: 0.50, Flights: 4},
 			},
-			want:      fmt.Sprintf("UA is the only carrier with enough data on ORD–LAX (85%% on time, medium confidence, %d flights). An unknown carrier (low confidence, 4 flights) has thin data.", minFlights),
-			wantConf:  model.ConfidenceMedium,
+			want:      fmt.Sprintf("UA and an unknown carrier are too close to call on ORD–LAX (85%% and 50%% on time, low confidence, %d and 4 flights).", minFlights),
+			wantConf:  model.ConfidenceLow,
 			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
@@ -322,7 +322,7 @@ func TestCompareCarriersSummaries(t *testing.T) {
 }
 
 func TestCompareCarriersSampleReasons(t *testing.T) {
-	minFlights := store.CarrierStatsMinSampleSize
+	minFlights := model.CarrierLowSampleBelow
 	stub := &storetest.Stub{
 		RouteLatestFlightDateFn: func(context.Context, string, string) (string, error) {
 			return latestCarrierDate, nil

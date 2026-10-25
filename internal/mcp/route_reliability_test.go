@@ -52,6 +52,15 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			wantConfidence: model.ConfidenceMedium,
 		},
 		{
+			name:  "one low time reports the rate",
+			times: []string{"0700"},
+			byTime: map[string]model.RouteOutlook{
+				"0700": reliabilityOutlook(0.85, 4, model.ConfidenceLow),
+			},
+			want:           "0700 on UA ORD–LAX is on time about 85% of the time, from 4 flights.",
+			wantConfidence: model.ConfidenceLow,
+		},
+		{
 			name:  "one time with no data",
 			times: []string{"0700"},
 			byTime: map[string]model.RouteOutlook{
@@ -108,7 +117,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
 			},
-			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has no data.",
+			want:           "0700 is the only listed time on UA ORD–LAX (85% on time). 1400 has no data.",
 			wantConfidence: model.ConfidenceMedium,
 		},
 		{
@@ -118,18 +127,18 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
 				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
 			},
-			want:           "No listed time on UA ORD–LAX has enough data to compare. 0700 and 1400 have no data.",
+			want:           "No listed time on UA ORD–LAX has data to compare. 0700 and 1400 have no data.",
 			wantConfidence: model.ConfidenceUnknown,
 		},
 		{
-			name:  "low confidence time not ranked",
+			name:  "low confidence time is ranked",
 			times: []string{"0700", "1400"},
 			byTime: map[string]model.RouteOutlook{
 				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 				"1400": reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
-			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has thin data.",
-			wantConfidence: model.ConfidenceMedium,
+			want:           "1400 and 0700 are too close to call on UA ORD–LAX (95% and 85% on time).",
+			wantConfidence: model.ConfidenceLow,
 		},
 		{
 			name:  "in-between time lists in order",
@@ -235,8 +244,8 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep1100: reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 				"1400":      reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
-			want:           "0700, 0900 and 1100 are too close to call on UA ORD–LAX (85%, 83% and 81% on time). 1400 has thin data.",
-			wantConfidence: model.ConfidenceHigh,
+			want:           "1400, 0700, 0900 and 1100 are too close to call on UA ORD–LAX (95%, 85%, 83% and 81% on time).",
+			wantConfidence: model.ConfidenceLow,
 		},
 	}
 

@@ -69,8 +69,10 @@ type RouteOutlook struct {
 }
 
 type OutlookResult struct {
-	Analysis                        Analysis `json:"analysis"`
-	OnTimeProbability               *float64 `json:"on_time_probability"`
+	Analysis          Analysis `json:"analysis"`
+	OnTimeProbability *float64 `json:"on_time_probability"`
+	// OnTimeCount is the raw on-time count. Comparisons use it instead of a rounded rate.
+	OnTimeCount                     *int     `json:"-"`
 	DelayProbability                *float64 `json:"delay_probability"`
 	CancellationProbability         *float64 `json:"cancellation_probability"`
 	DiversionProbability            *float64 `json:"diversion_probability"`
@@ -82,7 +84,7 @@ type OutlookResult struct {
 	MedianDepartureDelayMinutes     *float64 `json:"median_departure_delay_minutes"`
 	LikelyDepartureDelayWhenDelayed *float64 `json:"likely_departure_delay_when_delayed"`
 	MedianDepartureDelayWhenDelayed *float64 `json:"median_departure_delay_when_delayed"`
-	// Cleared for empty_sample and insufficient_sample.
+	// Cleared when the slot has no flights. A low sample keeps these thresholds.
 	Connection ConnectionGuidance  `json:"connection"`
 	Weather    RouteOutlookWeather `json:"weather"`
 }
@@ -103,26 +105,30 @@ type TravelWindowMonthBucket struct {
 
 // TravelWindowDayBucket is one weekday on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
-// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
-// Unreliable is a high-confidence on-time rate below 0.70. A weekday with no flights is omitted.
+// reliability is unknown unless confidence is medium or high, so a thin weekday is not unreliable.
+// Unreliable is a medium- or high-confidence on-time rate below 0.70. A weekday with no flights is omitted.
 type TravelWindowDayBucket struct {
-	DayOfWeek   int     `json:"day_of_week"`
-	OnTimeRate  float64 `json:"on_time_rate"`
-	Flights     int     `json:"flights"`
-	Confidence  string  `json:"confidence" enums:"high,medium,low,unknown"`
-	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
+	DayOfWeek  int     `json:"day_of_week"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+	// OnTimeCount is the raw on-time count. Comparisons use it instead of a rounded rate.
+	OnTimeCount *int   `json:"-"`
+	Confidence  string `json:"confidence" enums:"high,medium,low,unknown"`
+	Reliability string `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
 // TravelWindowHourBucket is one scheduled departure-hour on-time rate.
 // confidence and reliability are seasonal only; they are not connection statuses.
-// reliability is unknown unless confidence is high, so a thin bucket is not unreliable.
-// Unreliable is a high-confidence on-time rate below 0.70. An hour with no flights is omitted.
+// reliability is unknown unless confidence is medium or high, so a thin hour is not unreliable.
+// Unreliable is a medium- or high-confidence on-time rate below 0.70. An hour with no flights is omitted.
 type TravelWindowHourBucket struct {
-	Hour        int     `json:"hour"`
-	OnTimeRate  float64 `json:"on_time_rate"`
-	Flights     int     `json:"flights"`
-	Confidence  string  `json:"confidence" enums:"high,medium,low,unknown"`
-	Reliability string  `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
+	Hour       int     `json:"hour"`
+	OnTimeRate float64 `json:"on_time_rate"`
+	Flights    int     `json:"flights"`
+	// OnTimeCount is the raw on-time count. Comparisons use it instead of a rounded rate.
+	OnTimeCount *int   `json:"-"`
+	Confidence  string `json:"confidence" enums:"high,medium,low,unknown"`
+	Reliability string `json:"reliability" enums:"reliable,typical,unreliable,unknown"`
 }
 
 // RouteTravelWindows is typical-year on-time performance for a route (and
@@ -135,13 +141,17 @@ type RouteTravelWindows struct {
 	ByHour      []TravelWindowHourBucket  `json:"by_hour"`
 	BestMonths  []TravelWindowMonthBucket `json:"best_months"`
 	WorstMonths []TravelWindowMonthBucket `json:"worst_months"`
-	// MonthComparison is ranked when the highest-rate eligible month differs at 95% from at least one other.
-	// It is too_close_to_call when that month differs from nobody, and those best and worst lists are empty.
-	MonthComparison string                   `json:"month_comparison,omitempty" enums:"ranked,too_close_to_call"`
-	BestDays        []TravelWindowDayBucket  `json:"best_days"`
-	WorstDays       []TravelWindowDayBucket  `json:"worst_days"`
-	BestHours       []TravelWindowHourBucket `json:"best_hours"`
-	WorstHours      []TravelWindowHourBucket `json:"worst_hours"`
+	// MonthComparison is ranked when the highest-rate month differs at 95% from another month.
+	// Best months are that month plus months tied with it, capped at 3. Worst months are the lowest-rate month among those it beats, plus months tied with that one, capped at 3. Too close to call leaves both lists empty.
+	MonthComparison string                  `json:"month_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	BestDays        []TravelWindowDayBucket `json:"best_days"`
+	WorstDays       []TravelWindowDayBucket `json:"worst_days"`
+	// DayComparison uses the same rule as month_comparison.
+	DayComparison string                   `json:"day_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	BestHours     []TravelWindowHourBucket `json:"best_hours"`
+	WorstHours    []TravelWindowHourBucket `json:"worst_hours"`
+	// HourComparison uses the same rule as month_comparison.
+	HourComparison string `json:"hour_comparison,omitempty" enums:"ranked,too_close_to_call"`
 }
 
 // RoundForResponse rounds rates and probabilities to two decimal places and

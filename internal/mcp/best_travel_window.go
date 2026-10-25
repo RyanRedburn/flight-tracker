@@ -146,35 +146,38 @@ func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTrave
 		return emptyWindowSummary("month-of-year history", route, windows.Analysis.Start, windows.Analysis.End), model.ConfidenceUnknown
 	}
 
-	minSample := store.TravelWindowMinSample(store.TravelWindowMonthFloor, windows.Analysis.SampleSize)
-	eligible := make([]scoredItem, 0, len(windows.ByMonth))
+	months := scoredMonths(windows.ByMonth)
+	confidence := itemConfidence(months)
 
-	var thin, none []scoredItem
+	if windows.MonthComparison == "" {
+		only := months[0]
 
-	for _, month := range windows.ByMonth {
-		item := scoredMonth(month)
-		if month.Flights >= minSample {
-			eligible = append(eligible, item)
-
-			continue
-		}
-
-		if month.Confidence == model.ConfidenceLow {
-			thin = append(thin, item)
-
-			continue
-		}
-
-		if month.Confidence != model.ConfidenceHigh && month.Confidence != model.ConfidenceMedium {
-			none = append(none, item)
-		}
+		return fmt.Sprintf("%s is the only month for %s (%d%% on time). %s, %s.",
+			only.label, route, only.percent, sentenceCase(confidencePhrase(only.confidence)), flightsPhrase([]int{only.sampleSize})), confidence
 	}
 
-	if len(eligible) == 0 {
-		return appendNote("No month for "+route+" has enough data to compare.", thinSentence(thin), noneSentence(none)), comparisonConfidence(eligible, thin, none)
+	if windows.MonthComparison == model.ComparisonTooCloseToCall {
+		return sameMonths(route, sortMonths(months, true)) + " " + monthCountSentence(months), confidence
 	}
 
-	return appendNote(bestWorstMonths(route, eligible), thinSentence(thin), noneSentence(none)), comparisonConfidence(eligible, thin, none)
+	best := scoredMonths(windows.BestMonths)
+	worst := scoredMonths(windows.WorstMonths)
+	summary := spreadMonths(route, best, worst)
+
+	if also := monthsOutside(months, best, worst); also != "" {
+		summary += " " + also
+	}
+
+	return summary + " " + monthCountSentence(months), confidence
+}
+
+func scoredMonths(buckets []model.TravelWindowMonthBucket) []scoredItem {
+	months := make([]scoredItem, len(buckets))
+	for i, month := range buckets {
+		months[i] = scoredMonth(month)
+	}
+
+	return months
 }
 
 func scoredMonth(month model.TravelWindowMonthBucket) scoredItem {
@@ -185,60 +188,40 @@ func scoredMonth(month model.TravelWindowMonthBucket) scoredItem {
 		sampleSize: month.Flights,
 		confidence: month.Confidence,
 		key:        month.Month,
+		hasRate:    month.Flights > 0,
 	}
 }
 
-// bestWorstMonths compares months with enough data. Thin months are named after it.
-func bestWorstMonths(route string, ranked []scoredItem) string {
-	if len(ranked) == 1 {
-		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). %s, %s.",
-			ranked[0].label, route, ranked[0].percent, sentenceCase(confidencePhrase(ranked[0].confidence)), flightsPhrase([]int{ranked[0].sampleSize}))
+func monthsOutside(all, best, worst []scoredItem) string {
+	named := make(map[int]struct{}, len(best)+len(worst))
+	for _, item := range best {
+		named[item.key] = struct{}{}
 	}
 
-	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
-
-	for _, item := range ranked[1:] {
-		minFlights = min(minFlights, item.sampleSize)
-		maxFlights = max(maxFlights, item.sampleSize)
+	for _, item := range worst {
+		named[item.key] = struct{}{}
 	}
 
-	return monthComparison(route, ranked) + " " + monthCountSentence(len(ranked), minFlights, maxFlights, itemConfidence(ranked))
-}
+	extra := make([]scoredItem, 0)
 
-// monthComparison names the months tied with the highest rate and the months tied
-// with the lowest rate when that highest-rate month differs at 95% from someone.
-func monthComparison(route string, ranked []scoredItem) string {
-	sorted := sortMonths(ranked, true)
-	if len(sorted) < 2 || !itemBeatsAny(sorted[0], sorted[1:]) {
-		return sameMonths(route, sorted)
-	}
-
-	best := itemsTied(sorted[0], sorted)
-	worst := sortMonths(itemsTied(sorted[len(sorted)-1], sorted), false)
-
-	return spreadMonths(route, best, worst)
-}
-
-func itemBeatsAny(leader scoredItem, others []scoredItem) bool {
-	for _, item := range others {
-		if itemDiffers(leader, item) {
-			return true
+	for _, item := range all {
+		if _, ok := named[item.key]; ok {
+			continue
 		}
+
+		extra = append(extra, item)
 	}
 
-	return false
-}
-
-func itemsTied(anchor scoredItem, items []scoredItem) []scoredItem {
-	tied := make([]scoredItem, 0, len(items))
-
-	for _, item := range items {
-		if !itemDiffers(anchor, item) {
-			tied = append(tied, item)
-		}
+	if len(extra) == 0 {
+		return ""
 	}
 
-	return tied
+	parts := make([]string, len(extra))
+	for i, item := range extra {
+		parts[i] = fmt.Sprintf("%s (%d%% on time, %s, %s)", item.label, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))
+	}
+
+	return "Also " + joinAnd(parts) + "."
 }
 
 // sameMonths is the whole set inside the margin of error, so no month is called best or worst.
@@ -272,12 +255,24 @@ func spreadMonths(route string, best, worst []scoredItem) string {
 		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestRates, joinLabels(worst), pluralVerb(len(worst)), worstRates)
 }
 
-// monthCountSentence covers only the months with enough data, not the thin ones named after it.
-func monthCountSentence(months, minFlights, maxFlights int, confidence string) string {
+// monthCountSentence covers every month in the series.
+func monthCountSentence(items []scoredItem) string {
+	minFlights, maxFlights := items[0].sampleSize, items[0].sampleSize
+
+	for _, item := range items[1:] {
+		minFlights = min(minFlights, item.sampleSize)
+		maxFlights = max(maxFlights, item.sampleSize)
+	}
+
 	flights := strconv.Itoa(minFlights)
 	if minFlights != maxFlights {
 		flights += " to " + strconv.Itoa(maxFlights)
 	}
 
-	return fmt.Sprintf("%s. The %d months with enough data have %s flights each.", sentenceCase(confidencePhrase(confidence)), months, flights)
+	noun := "months"
+	if len(items) == 1 {
+		noun = "month"
+	}
+
+	return fmt.Sprintf("%s. The %d %s have %s flights each.", sentenceCase(confidencePhrase(itemConfidence(items))), len(items), noun, flights)
 }

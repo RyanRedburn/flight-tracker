@@ -9,10 +9,9 @@ import (
 
 const (
 	DefaultCarrierStatsSpanDays = 90
-	// Carrier comparison uses the history low band. Route and airport rankings stay at 30.
-	CarrierStatsMinSampleSize = model.HistoryLowSampleBelow
-	CarrierRankMinSampleSize  = 30
-	CarrierStatsTopN          = 5
+	// CarrierRankMinSampleSize is the minimum flights for a route or airport to be ranked.
+	CarrierRankMinSampleSize = 30
+	CarrierStatsTopN         = 5
 )
 
 type CarrierStatsFilter struct {

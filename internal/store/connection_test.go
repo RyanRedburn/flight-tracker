@@ -22,12 +22,11 @@ func TestConnectionRecommendation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		insufficient bool
-		p90          *float64
-		mct          *AirportConnectionMCT
-		want         model.ConnectionGuidance
-		floors       [4]bool
+		name   string
+		p90    *float64
+		mct    *AirportConnectionMCT
+		want   model.ConnectionGuidance
+		floors [4]bool
 	}{
 		{
 			name:   "early-heavy",
@@ -44,12 +43,6 @@ func TestConnectionRecommendation(t *testing.T) {
 		{
 			name: "cancel-only",
 			mct:  allMCT(90),
-		},
-		{
-			name:         "insufficient sample",
-			insufficient: true,
-			p90:          &lateP90,
-			mct:          allMCT(90),
 		},
 		{
 			name: "mct higher than delay",
@@ -123,7 +116,7 @@ func TestConnectionRecommendation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ConnectionRecommendation(tt.insufficient, tt.p90, tt.mct)
+			got := ConnectionRecommendation(tt.p90, tt.mct)
 			assertConnectionGuidance(t, got, withFloors(tt.want, tt.floors))
 		})
 	}

@@ -153,8 +153,7 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 }
 
 func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
-	// Same history bands used to decide whether a carrier is ranked.
-	confidence := model.CountConfidence(row.Flights, model.HistoryLowSampleBelow, model.HistoryHighSampleAt)
+	confidence := model.CountConfidence(row.Flights, model.CarrierLowSampleBelow, model.CarrierHighSampleAt)
 
 	return comparedCarrier{
 		Carrier:        row.Carrier,
@@ -180,10 +179,11 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 			rate:       carrier.comparisonRate,
 			sampleSize: carrier.SampleSize,
 			confidence: carrier.Confidence,
+			hasRate:    carrier.SampleSize > 0,
 		}
 	}
 
-	if len(items) == 1 && comparableConfidence(items[0].confidence) {
+	if len(items) == 1 && items[0].sampleSize > 0 {
 		return soleCarrierSummary(route, items[0])
 	}
 

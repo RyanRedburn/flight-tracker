@@ -188,6 +188,8 @@ func (s *Store) fillOutlookSlot(ctx context.Context, out *model.RouteOutlook, fi
 		return nil
 	}
 
+	counted := onTime
+	out.OnTimeCount = &counted
 	onTimeRate := ratio(onTime, out.Analysis.SampleSize)
 	delayRate := ratio(delayed, out.Analysis.SampleSize)
 	cancelRate := ratio(cancelled, out.Analysis.SampleSize)
@@ -248,7 +250,7 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct = loaded
 	}
 
-	out.Connection = store.ConnectionRecommendation(false, delay, mct)
+	out.Connection = store.ConnectionRecommendation(delay, mct)
 
 	return nil
 }

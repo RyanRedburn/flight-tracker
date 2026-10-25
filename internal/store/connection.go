@@ -25,10 +25,9 @@ type AirportConnectionMCT struct {
 // ConnectionRecommendation is max(0, round(arrivalDelayP90)) + floor per connection type.
 // floor is the airport MCT minute when that bucket is set, otherwise 45, 60, 120, or 120.
 // mct_source is airport for a stored minute, including zero, and default when the bucket is missing.
-// loose_minutes is that recommendation plus 30. A nil p90 or an insufficient sample returns nulls,
-// which were not estimated.
-func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.ConnectionGuidance {
-	if insufficient || arrivalDelayP90 == nil {
+// loose_minutes is that recommendation plus 30. A nil p90 returns nulls, which were not estimated.
+func ConnectionRecommendation(arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.ConnectionGuidance {
+	if arrivalDelayP90 == nil {
 		return model.ConnectionGuidance{}
 	}
 
