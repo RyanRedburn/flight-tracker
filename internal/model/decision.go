@@ -27,6 +27,9 @@ const (
 	// proportionZCritical is the two-sided 95% critical value for a pooled two-proportion z-test.
 	proportionZCritical = 1.96
 
+	// fisherAlpha is the two-sided 0.05 threshold for the Fisher exact test.
+	fisherAlpha = 0.05
+
 	// Seasonal reliability is typical-year on-time performance for a travel-window bucket.
 	// It is not a connection status.
 	// Unreliable is a medium- or high-confidence verdict. Low confidence stays reliability unknown.
@@ -151,8 +154,10 @@ func ConnectionStatus(layover int, minutes *ConnectionMinutes) string {
 	return ConnectionTight
 }
 
-// ProportionsDiffer reports whether two rates differ at 95% under a pooled two-proportion z-test.
-// A gap at or inside the margin of error does not. A non-positive sample does not differ.
+// ProportionsDiffer reports whether two on-time rates differ at 95%.
+// Counts come from the rates and flight totals. A non-positive sample does not differ.
+// A two-sided Fisher exact test is used when any expected cell is below 5.
+// Otherwise the comparison is a pooled two-proportion z-test.
 func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int) bool {
 	if flights1 <= 0 || flights2 <= 0 {
 		return false
@@ -160,6 +165,13 @@ func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int)
 
 	p1 := clampUnit(rate1)
 	p2 := clampUnit(rate2)
+	on1 := countFromRate(p1, flights1)
+	on2 := countFromRate(p2, flights2)
+
+	if expectedCellBelowFive(on1, flights1-on1, on2, flights2-on2) {
+		return fisherTwoSided(on1, flights1-on1, on2, flights2-on2) < fisherAlpha
+	}
+
 	n1 := float64(flights1)
 	n2 := float64(flights2)
 	pooled := (p1*n1 + p2*n2) / (n1 + n2)
@@ -175,6 +187,81 @@ func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int)
 	}
 
 	return z > proportionZCritical
+}
+
+func countFromRate(rate float64, flights int) int {
+	count := int(math.Round(rate * float64(flights)))
+	if count < 0 {
+		return 0
+	}
+
+	if count > flights {
+		return flights
+	}
+
+	return count
+}
+
+func expectedCellBelowFive(on1, off1, on2, off2 int) bool {
+	n1 := float64(on1 + off1)
+	n2 := float64(on2 + off2)
+	on := float64(on1 + on2)
+	off := float64(off1 + off2)
+	total := n1 + n2
+
+	for _, expected := range []float64{n1 * on / total, n1 * off / total, n2 * on / total, n2 * off / total} {
+		if expected < 5 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// fisherTwoSided is the two-sided Fisher exact p-value for a 2x2 table.
+// The table is on-time and not on-time for each sample. Probabilities at or
+// below the observed table are summed.
+func fisherTwoSided(on1, off1, on2, off2 int) float64 {
+	n1 := on1 + off1
+	on := on1 + on2
+	total := n1 + on2 + off2
+	lo := max(0, on-(total-n1))
+	hi := min(on, n1)
+	observed := logHypergeometric(on1, n1, on, total)
+	sum := 0.0
+
+	for count := lo; count <= hi; count++ {
+		lp := logHypergeometric(count, n1, on, total)
+		if lp <= observed+1e-10 {
+			sum += math.Exp(lp)
+		}
+	}
+
+	if sum > 1 {
+		return 1
+	}
+
+	return sum
+}
+
+func logHypergeometric(count, draw, successes, total int) float64 {
+	return logChoose(draw, count) + logChoose(total-draw, successes-count) - logChoose(total, successes)
+}
+
+func logChoose(n, k int) float64 {
+	if k < 0 || k > n {
+		return math.Inf(-1)
+	}
+
+	if k == 0 || k == n {
+		return 0
+	}
+
+	a, _ := math.Lgamma(float64(n + 1))
+	b, _ := math.Lgamma(float64(k + 1))
+	c, _ := math.Lgamma(float64(n - k + 1))
+
+	return a - b - c
 }
 
 // ComparisonRate prefers an on-time count over a rounded rate.

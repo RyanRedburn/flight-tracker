@@ -182,8 +182,8 @@ func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTrave
 }
 
 func tooCloseMonths(route string, months []scoredItem) string {
-	return fmt.Sprintf("All %d months are %s for %s (%s on time), %s, %s.",
-		len(months), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
+	return fmt.Sprintf("%s are %s for %s (%s on time), %s, %s.",
+		countLabel(len(months), nounMonth), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
 }
 
 func scoredMonths(buckets []model.TravelWindowMonthBucket) []scoredItem {
@@ -246,21 +246,21 @@ func ratesCross(best, worst []scoredItem) bool {
 }
 
 func crossedMonths(route string, best, worst []scoredItem) string {
-	lead := best[0]
-	anchor := worst[0]
+	lead := wilsonLeader(best)
+	anchor := wilsonAnchor(worst)
 	sentence := fmt.Sprintf("%s is the most reliable month for %s (%d%% on time), and %s is the least reliable (%d%%).",
 		lead.label, route, lead.percent, anchor.label, anchor.percent)
 
-	if len(best) > 1 {
-		rest := best[1:]
+	bestRest := exceptKey(best, lead.key)
+	if len(bestRest) > 0 {
 		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
-			joinLabels(rest), pluralVerb(len(rest)), phraseTooClose, lead.label, joinItemPercents(rest))
+			joinLabels(bestRest), pluralVerb(len(bestRest)), phraseTooClose, lead.label, joinItemPercents(bestRest))
 	}
 
-	if len(worst) > 1 {
-		rest := worst[1:]
+	worstRest := exceptKey(worst, anchor.key)
+	if len(worstRest) > 0 {
 		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
-			joinLabels(rest), pluralVerb(len(rest)), phraseTooClose, anchor.label, joinItemPercents(rest))
+			joinLabels(worstRest), pluralVerb(len(worstRest)), phraseTooClose, anchor.label, joinItemPercents(worstRest))
 	}
 
 	return sentence
@@ -268,22 +268,5 @@ func crossedMonths(route string, best, worst []scoredItem) string {
 
 // monthCountSentence covers every month in the series.
 func monthCountSentence(items []scoredItem) string {
-	minFlights, maxFlights := items[0].sampleSize, items[0].sampleSize
-
-	for _, item := range items[1:] {
-		minFlights = min(minFlights, item.sampleSize)
-		maxFlights = max(maxFlights, item.sampleSize)
-	}
-
-	flights := strconv.Itoa(minFlights)
-	if minFlights != maxFlights {
-		flights += " to " + strconv.Itoa(maxFlights)
-	}
-
-	noun := "months"
-	if len(items) == 1 {
-		noun = "month"
-	}
-
-	return fmt.Sprintf("%s. The %d %s have %s flights each.", sentenceCase(confidencePhrase(itemConfidence(items))), len(items), noun, flights)
+	return sentenceCase(confidencePhrase(itemConfidence(items))) + ", " + flightSpan(items) + "."
 }

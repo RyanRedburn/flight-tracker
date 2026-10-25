@@ -179,9 +179,10 @@ func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd strin
 // differs at 95% from at least one other. The leader is the highest 95% Wilson
 // lower bound. Worst buckets are the beaten bucket with the lowest Wilson upper
 // bound, plus buckets tied with that one. Each list is capped at
-// TravelWindowBestWorstK. Otherwise the lists are empty and the comparison is
-// too close to call. One bucket leaves both lists empty and comparison single.
-// A bucket with flights is rankable. Ties use the two-proportion test.
+// TravelWindowBestWorstK, then shown by on-time rate, highest first.
+// Otherwise the lists are empty and the comparison is too close to call.
+// One bucket leaves both lists empty and comparison single.
+// A bucket with flights is rankable. Ties use ProportionsDiffer.
 func rankTravelBuckets[T any](
 	items []T,
 	key func(T) int,
@@ -222,6 +223,7 @@ func rankTravelBuckets[T any](
 	}
 
 	best = capTravelBuckets(tied)
+	sortByRateDesc(best, key, onTimeRate, onTimeCount, flights)
 
 	sortByWilsonUpper(beaten, key, onTimeRate, onTimeCount, flights)
 
@@ -236,7 +238,10 @@ func rankTravelBuckets[T any](
 
 	sortByWilsonUpper(worstTied, key, onTimeRate, onTimeCount, flights)
 
-	return best, capTravelBuckets(worstTied), model.ComparisonRanked
+	worst = capTravelBuckets(worstTied)
+	sortByRateDesc(worst, key, onTimeRate, onTimeCount, flights)
+
+	return best, worst, model.ComparisonRanked
 }
 
 func capTravelBuckets[T any](items []T) []T {
@@ -256,6 +261,29 @@ func sortByWilsonLower[T any](
 ) {
 	sort.SliceStable(items, func(i, j int) bool {
 		return wilsonLess(items[i], items[j], key, onTimeRate, onTimeCount, flights, false)
+	})
+}
+
+func sortByRateDesc[T any](
+	items []T,
+	key func(T) int,
+	onTimeRate func(T) float64,
+	onTimeCount func(T) *int,
+	flights func(T) int,
+) {
+	sort.SliceStable(items, func(i, j int) bool {
+		left := travelBucketRate(items[i], onTimeRate, onTimeCount, flights)
+		right := travelBucketRate(items[j], onTimeRate, onTimeCount, flights)
+
+		if left != right {
+			return left > right
+		}
+
+		if flights(items[i]) != flights(items[j]) {
+			return flights(items[i]) > flights(items[j])
+		}
+
+		return key(items[i]) < key(items[j])
 	})
 }
 

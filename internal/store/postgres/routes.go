@@ -108,10 +108,8 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, err
 	}
 
-	if store.OutlookSampleHasFlights(out.Analysis.SampleSize, out.Analysis.SampleReason) {
-		if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
-			return nil, err
-		}
+	if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
+		return nil, err
 	}
 
 	if err := s.attachOutlookWeather(ctx, out); err != nil {
@@ -250,7 +248,7 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct = loaded
 	}
 
-	out.Connection = store.ConnectionRecommendation(delay, mct)
+	store.FinishOutlookConnection(out, delay, mct)
 
 	return nil
 }

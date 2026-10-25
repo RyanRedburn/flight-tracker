@@ -33,7 +33,7 @@ type comparedCarrier struct {
 	Confidence   string  `json:"confidence"`
 	SampleSize   int     `json:"sample_size"`
 	SampleReason string  `json:"sample_reason"`
-	// comparisonRate is the unrounded rate used for the z-test.
+	// comparisonRate is the unrounded rate used to compare carriers.
 	comparisonRate float64
 }
 

@@ -150,7 +150,7 @@ func TestCarrierComparison(t *testing.T) {
 				{Carrier: "UA", OnTimeRate: 0.9, Flights: model.CarrierLowSampleBelow},
 				{Carrier: "AA", OnTimeRate: 0.1, Flights: 1},
 			},
-			want: model.ComparisonRanked,
+			want: model.ComparisonTooCloseToCall,
 		},
 		{
 			name: "zero flights are not compared",

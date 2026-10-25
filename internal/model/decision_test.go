@@ -317,8 +317,35 @@ func TestWilsonBoundsHourLeader(t *testing.T) {
 		t.Fatal("240/300 does not differ from 180/300")
 	}
 
-	if !ProportionsDiffer(0, 1, 0.8, 300) {
-		t.Fatal("0/1 does not differ from 240/300")
+	if ProportionsDiffer(0, 1, 0.8, 300) {
+		t.Fatal("0/1 differs from 240/300")
+	}
+}
+
+func TestFisherExactSmallSamples(t *testing.T) {
+	tests := []struct {
+		name     string
+		rate1    float64
+		flights1 int
+		rate2    float64
+		flights2 int
+		want     bool
+	}{
+		{name: "one flight at 0% against a solid hour", rate1: 0, flights1: 1, rate2: 0.8, flights2: 300},
+		{name: "two perfect flights against a solid hour", rate1: 1, flights1: 2, rate2: 0.8, flights2: 300},
+		{name: "no on-time flights against a perfect sample", rate1: 0, flights1: 8, rate2: 1, flights2: 8, want: true},
+		{name: "large samples stay on the z-test", rate1: 0.9, flights1: 300, rate2: 0.6, flights2: 300, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ProportionsDiffer(tt.rate1, tt.flights1, tt.rate2, tt.flights2)
+			reverse := ProportionsDiffer(tt.rate2, tt.flights2, tt.rate1, tt.flights1)
+
+			if got != tt.want || reverse != tt.want {
+				t.Fatalf("ProportionsDiffer() = %v/%v, want %v", got, reverse, tt.want)
+			}
+		})
 	}
 }
 

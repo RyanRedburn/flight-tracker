@@ -112,7 +112,7 @@ func comparisonSummary(noun, route string, items []scoredItem, detail bool) (str
 	case 1:
 		summary = onlyEnough(noun, route, ranked[0], detail)
 	default:
-		summary = rankedComparison(route, ranked, detail)
+		summary = rankedComparison(noun, route, ranked, detail)
 	}
 
 	if detail {
@@ -158,10 +158,10 @@ func onlyEnough(noun, route string, item scoredItem, detail bool) string {
 		item.label, noun, route, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))
 }
 
-func rankedComparison(route string, ranked []scoredItem, detail bool) string {
+func rankedComparison(noun, route string, ranked []scoredItem, detail bool) string {
 	sorted := sortByWilsonLower(ranked)
 	if !anyItemDiffers(sorted) {
-		return tooCloseItems(route, sorted, detail)
+		return tooCloseItems(noun, route, sorted, detail)
 	}
 
 	if len(sorted) > 2 && allPairsDiffer(sorted) {
@@ -173,42 +173,75 @@ func rankedComparison(route string, ranked []scoredItem, detail bool) string {
 		return leaderSentence(route, leaders, trailers, detail)
 	}
 
-	return mixedComparison(route, sorted, detail)
+	return mixedComparison(noun, route, sorted, detail)
 }
 
-func tooCloseItems(route string, leaders []scoredItem, detail bool) string {
-	named, others := capNamed(leaders)
-	rates := joinItemPercents(named)
-
-	if sameItemPercent(named) {
-		rates = strconv.Itoa(named[0].percent) + "%"
+func tooCloseItems(noun, route string, items []scoredItem, detail bool) string {
+	sentence := fmt.Sprintf("%s are %s on %s (%s on time)",
+		countLabel(len(items), noun), phraseTooClose, route, percentSpan(items))
+	if !detail {
+		return sentence + "."
 	}
 
-	sentence := fmt.Sprintf("%s are %s on %s (%s).",
-		joinLabels(named), phraseTooClose, route, onTimeDetail(rates, flightsPhrase(sampleSizes(named)), confidencePhrase(itemConfidence(named)), detail))
+	return sentence + ", " + confidencePhrase(itemConfidence(items)) + ", " + flightSpan(items) + "."
+}
 
-	return appendOthers(sentence, others)
+func countLabel(n int, noun string) string {
+	plural := pluralNoun(noun)
+	if n == 2 {
+		return "Both " + plural
+	}
+
+	return fmt.Sprintf("All %d %s", n, plural)
+}
+
+func pluralNoun(noun string) string {
+	switch noun {
+	case nounMonth:
+		return "months"
+	case nounCarrier:
+		return "carriers"
+	case nounListedTime:
+		return "times"
+	case "day":
+		return "days"
+	case "hour":
+		return "hours"
+	default:
+		return noun + "s"
+	}
 }
 
 func leaderSentence(route string, leaders, trailers []scoredItem, detail bool) string {
 	compared := append(append([]scoredItem{}, leaders...), trailers...)
 	confidence := confidencePhrase(itemConfidence(compared))
+	namedLeaders, otherLeaders := capNamed(leaders)
+	namedLeaders = sortByRateDesc(namedLeaders)
+	namedTrailers, otherTrailers := tailAndOthers(trailers)
+	named := append(append([]scoredItem{}, namedLeaders...), namedTrailers...)
+	flights := flightsPhrase(sampleSizes(named))
 
-	if len(leaders) == 1 {
-		return fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-			leaders[0].label, joinLabels(trailers), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", leaders[0].percent, joinItemPercents(trailers)), flightsPhrase(sampleSizes(compared)), confidence, detail))
+	others := append(append([]scoredItem{}, otherLeaders...), otherTrailers...)
+
+	if len(namedLeaders) == 1 {
+		sentence := fmt.Sprintf("%s is more reliable than %s on %s (%s).",
+			namedLeaders[0].label, joinLabels(namedTrailers), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", namedLeaders[0].percent, joinItemPercents(namedTrailers)), flights, confidence, detail))
+
+		return appendOthers(sentence, others)
 	}
 
-	leaderRatesText := joinItemPercents(leaders)
+	leaderRatesText := joinItemPercents(namedLeaders)
 	if detail {
-		leaderRatesText = leaderRates(leaders)
+		leaderRatesText = leaderRates(namedLeaders)
 	}
 
-	return fmt.Sprintf("%s are %s and more reliable than %s on %s (%s).",
-		joinLabels(leaders), phraseTooClose, joinLabels(trailers), route, onTimeDetail(leaderRatesText+" vs "+joinItemPercents(trailers), flightsPhrase(sampleSizes(compared)), confidence, detail))
+	sentence := fmt.Sprintf("%s are %s and more reliable than %s on %s (%s).",
+		joinLabels(namedLeaders), phraseTooClose, joinLabels(namedTrailers), route, onTimeDetail(leaderRatesText+" vs "+joinItemPercents(namedTrailers), flights, confidence, detail))
+
+	return appendOthers(sentence, others)
 }
 
-func mixedComparison(route string, sorted []scoredItem, detail bool) string {
+func mixedComparison(noun, route string, sorted []scoredItem, detail bool) string {
 	best := sorted[0]
 	beaten := make([]scoredItem, 0, len(sorted))
 	tied := make([]scoredItem, 0, len(sorted))
@@ -216,6 +249,7 @@ func mixedComparison(route string, sorted []scoredItem, detail bool) string {
 	for _, item := range sorted[1:] {
 		if itemDiffers(best, item) {
 			beaten = append(beaten, item)
+
 			continue
 		}
 
@@ -223,18 +257,35 @@ func mixedComparison(route string, sorted []scoredItem, detail bool) string {
 	}
 
 	if len(beaten) == 0 {
-		return tooCloseItems(route, sorted, detail)
+		return tooCloseItems(noun, route, sorted, detail)
 	}
 
-	compared := append([]scoredItem{best}, beaten...)
-
+	confidence := confidencePhrase(itemConfidence(sorted))
+	namedBeaten, otherBeaten := tailAndOthers(beaten)
+	compared := append([]scoredItem{best}, namedBeaten...)
 	lead := fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-		best.label, joinLabels(beaten), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", best.percent, joinItemPercents(beaten)), flightsPhrase(sampleSizes(compared)), confidencePhrase(itemConfidence(compared)), detail))
+		best.label, joinLabels(namedBeaten), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", best.percent, joinItemPercents(namedBeaten)), flightsPhrase(sampleSizes(compared)), confidence, detail))
+	lead = appendOthers(lead, otherBeaten)
+
 	if len(tied) == 0 {
 		return lead
 	}
 
-	return lead + " " + sentenceCase(fmt.Sprintf("%s %s %s against %s.", joinLabels(tied), pluralVerb(len(tied)), phraseTooClose, best.label))
+	return lead + " " + tiedAgainst(tied, best.label)
+}
+
+func tiedAgainst(tied []scoredItem, against string) string {
+	named, others := capNamed(tied)
+	named = sortByRateDesc(named)
+	labels := make([]string, len(named))
+
+	for i, item := range named {
+		labels[i] = fmt.Sprintf("%s (%d%%)", item.label, item.percent)
+	}
+
+	sentence := sentenceCase(fmt.Sprintf("%s %s %s against %s.", joinAnd(labels), pluralVerb(len(named)), phraseTooClose, against))
+
+	return appendOthers(sentence, others)
 }
 
 func orderedItems(route string, sorted []scoredItem, detail bool) string {
@@ -243,8 +294,14 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 		tied++
 	}
 
-	leaders := sorted[:min(tied, summaryNameCap)]
-	worst, others := tailAndOthers(sorted[len(leaders):])
+	namedCount := min(tied, summaryNameCap)
+	leaders := sortByRateDesc(sorted[:namedCount])
+	worst, others := tailAndOthers(sorted[tied:])
+
+	if tied > summaryNameCap {
+		others = append(append([]scoredItem{}, sorted[namedCount:tied]...), others...)
+	}
+
 	rest := make([]string, 0, len(worst))
 
 	for _, item := range worst {
@@ -261,7 +318,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 	lead := strconv.Itoa(leaders[0].percent) + "%"
 
 	if detail {
-		lead = onTimeDetail(lead, flightsPhrase(sampleSizes(leaders)), confidencePhrase(itemConfidence(leaders)), true)
+		lead = onTimeDetail(lead, flightsPhrase(sampleSizes(leaders)), confidencePhrase(itemConfidence(sorted)), true)
 	} else {
 		lead += " on time"
 	}
@@ -280,12 +337,12 @@ func capNamed(items []scoredItem) (named, others []scoredItem) {
 	return items[:summaryNameCap], items[summaryNameCap:]
 }
 
+// tailAndOthers keeps the lowest Wilson upper bounds, then lists that slice by rate.
 func tailAndOthers(items []scoredItem) (tail, others []scoredItem) {
-	if len(items) <= summaryNameCap {
-		return items, nil
-	}
+	ordered := sortByWilsonUpper(items)
+	tail, others = capNamed(ordered)
 
-	return items[len(items)-summaryNameCap:], items[:len(items)-summaryNameCap]
+	return sortByRateDesc(tail), others
 }
 
 func appendOthers(sentence string, others []scoredItem) string {
@@ -317,7 +374,7 @@ func percentSpan(items []scoredItem) string {
 		return strconv.Itoa(lo) + "%"
 	}
 
-	return strconv.Itoa(lo) + "-" + strconv.Itoa(hi) + "%"
+	return strconv.Itoa(lo) + "–" + strconv.Itoa(hi) + "%"
 }
 
 func flightSpan(items []scoredItem) string {
@@ -337,7 +394,7 @@ func flightSpan(items []scoredItem) string {
 		return strconv.Itoa(lo) + " " + word + " each"
 	}
 
-	return strconv.Itoa(lo) + "-" + strconv.Itoa(hi) + " flights each"
+	return strconv.Itoa(lo) + "–" + strconv.Itoa(hi) + " flights each"
 }
 
 func onTimeDetail(rates, flights, confidence string, detail bool) string {
@@ -415,12 +472,29 @@ func leaderRates(leaders []scoredItem) string {
 }
 
 func sortByWilsonLower(items []scoredItem) []scoredItem {
+	return sortByWilson(items, false)
+}
+
+func sortByWilsonUpper(items []scoredItem) []scoredItem {
+	return sortByWilson(items, true)
+}
+
+func sortByWilson(items []scoredItem, upper bool) []scoredItem {
 	sorted := append([]scoredItem(nil), items...)
 	sort.SliceStable(sorted, func(i, j int) bool {
-		left, _ := model.WilsonBounds(sorted[i].rate, nil, sorted[i].sampleSize)
-		right, _ := model.WilsonBounds(sorted[j].rate, nil, sorted[j].sampleSize)
+		leftLower, leftUpper := model.WilsonBounds(sorted[i].rate, nil, sorted[i].sampleSize)
+		rightLower, rightUpper := model.WilsonBounds(sorted[j].rate, nil, sorted[j].sampleSize)
+		left, right := leftLower, rightLower
+
+		if upper {
+			left, right = leftUpper, rightUpper
+		}
 
 		if left != right {
+			if upper {
+				return left < right
+			}
+
 			return left > right
 		}
 
@@ -436,6 +510,53 @@ func sortByWilsonLower(items []scoredItem) []scoredItem {
 	})
 
 	return sorted
+}
+
+func sortByRateDesc(items []scoredItem) []scoredItem {
+	sorted := append([]scoredItem(nil), items...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].rate != sorted[j].rate {
+			return sorted[i].rate > sorted[j].rate
+		}
+
+		if sorted[i].sampleSize != sorted[j].sampleSize {
+			return sorted[i].sampleSize > sorted[j].sampleSize
+		}
+
+		if sorted[i].key != sorted[j].key {
+			return sorted[i].key < sorted[j].key
+		}
+
+		return sorted[i].label < sorted[j].label
+	})
+
+	return sorted
+}
+
+func wilsonLeader(items []scoredItem) scoredItem {
+	ordered := sortByWilsonLower(items)
+
+	return ordered[0]
+}
+
+func wilsonAnchor(items []scoredItem) scoredItem {
+	ordered := sortByWilsonUpper(items)
+
+	return ordered[0]
+}
+
+func exceptKey(items []scoredItem, key int) []scoredItem {
+	rest := make([]scoredItem, 0, len(items))
+
+	for _, item := range items {
+		if item.key == key {
+			continue
+		}
+
+		rest = append(rest, item)
+	}
+
+	return rest
 }
 
 func itemDiffers(a, b scoredItem) bool {
