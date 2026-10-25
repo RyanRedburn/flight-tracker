@@ -9,8 +9,10 @@ import (
 
 const (
 	DefaultCarrierStatsSpanDays = 90
-	CarrierStatsMinSampleSize   = model.HistoryLowSampleBelow
-	CarrierStatsTopN            = 5
+	// Carrier comparison uses the history low band. Route and airport rankings stay at 30.
+	CarrierStatsMinSampleSize = model.HistoryLowSampleBelow
+	CarrierRankMinSampleSize  = 30
+	CarrierStatsTopN          = 5
 )
 
 type CarrierStatsFilter struct {
@@ -32,7 +34,7 @@ func CarrierStatsWindow(endDate string) (start, end string, ok bool) {
 func RankCarrierRoutes(items []model.CarrierRouteStat) ([]model.CarrierRouteStat, []model.CarrierRouteStat) {
 	qualifying := make([]model.CarrierRouteStat, 0, len(items))
 	for _, item := range items {
-		if item.Flights >= CarrierStatsMinSampleSize {
+		if item.Flights >= CarrierRankMinSampleSize {
 			qualifying = append(qualifying, item)
 		}
 	}
@@ -78,7 +80,7 @@ func RankCarrierRoutes(items []model.CarrierRouteStat) ([]model.CarrierRouteStat
 func RankCarrierAirports(items []model.CarrierAirportStat) ([]model.CarrierAirportStat, []model.CarrierAirportStat) {
 	qualifying := make([]model.CarrierAirportStat, 0, len(items))
 	for _, item := range items {
-		if item.Flights >= CarrierStatsMinSampleSize {
+		if item.Flights >= CarrierRankMinSampleSize {
 			qualifying = append(qualifying, item)
 		}
 	}

@@ -17,8 +17,8 @@ const (
 	ConfidenceLow     = "low"
 	ConfidenceUnknown = "unknown"
 
-	// ComparisonRanked means at least one pair differs at 95%.
-	// ComparisonTooCloseToCall means every compared pair is inside the margin of error.
+	// ComparisonRanked means the highest-rate item differs at 95% from at least one other item.
+	// ComparisonTooCloseToCall means that item is inside the margin of error of every other item.
 	ComparisonRanked         = "ranked"
 	ComparisonTooCloseToCall = "too_close_to_call"
 
@@ -175,6 +175,15 @@ func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int)
 	return z > proportionZCritical
 }
 
+// ComparisonRate prefers an on-time count over a rounded rate.
+func ComparisonRate(rate float64, onTimeCount *int, flights int) float64 {
+	if onTimeCount != nil && flights > 0 {
+		return float64(*onTimeCount) / float64(flights)
+	}
+
+	return rate
+}
+
 func clampUnit(v float64) float64 {
 	if v < 0 {
 		return 0
@@ -306,7 +315,7 @@ func (o *RouteOutlook) DecisionConfidence() string {
 // BlockingSampleReason is empty_sample or insufficient_sample when that sample
 // withholds connection thresholds. A sufficient sample returns an empty string.
 // An explicit sample_reason wins. Otherwise a low-confidence non-empty sample
-// is insufficient_sample, and any other empty sample is empty_sample.
+// is insufficient_sample. An empty sample is empty_sample unless confidence is medium or high.
 // Nil returns an empty string. A missing inbound outlook is not a sample reason.
 func (o *RouteOutlook) BlockingSampleReason() string {
 	if o == nil {
@@ -333,7 +342,7 @@ func (o *RouteOutlook) resolvedSampleReason() string {
 		return SampleReasonInsufficientSample
 	}
 
-	if o.Analysis.SampleSize <= 0 && o.Analysis.Confidence != ConfidenceHigh {
+	if o.Analysis.SampleSize <= 0 && o.Analysis.Confidence != ConfidenceHigh && o.Analysis.Confidence != ConfidenceMedium {
 		return SampleReasonEmptySample
 	}
 

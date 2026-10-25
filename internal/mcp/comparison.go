@@ -29,6 +29,7 @@ type scoredItem struct {
 	rate       float64
 	sampleSize int
 	confidence string
+	key        int
 }
 
 func routeLabel(carrier, origin, dest string) string {
@@ -225,13 +226,7 @@ func mixedComparison(route string, sorted []scoredItem, detail bool) string {
 	}
 
 	if len(beaten) == 0 {
-		better, worse, ok := strongestPair(sorted)
-		if !ok {
-			return tooCloseItems(route, sorted, detail)
-		}
-
-		return fmt.Sprintf("%s is more reliable than %s on %s (%s).",
-			better.label, worse.label, route, onTimeDetail(fmt.Sprintf("%d%% vs %d%%", better.percent, worse.percent), flightsPhrase(sampleSizes([]scoredItem{better, worse})), confidencePhrase(itemConfidence([]scoredItem{better, worse})), detail))
+		return tooCloseItems(route, sorted, detail)
 	}
 
 	compared := append([]scoredItem{best}, beaten...)
@@ -370,6 +365,27 @@ func sortByRate(items []scoredItem) []scoredItem {
 	return sorted
 }
 
+func sortMonths(items []scoredItem, descending bool) []scoredItem {
+	sorted := append([]scoredItem(nil), items...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].rate != sorted[j].rate {
+			if descending {
+				return sorted[i].rate > sorted[j].rate
+			}
+
+			return sorted[i].rate < sorted[j].rate
+		}
+
+		if sorted[i].sampleSize != sorted[j].sampleSize {
+			return sorted[i].sampleSize > sorted[j].sampleSize
+		}
+
+		return sorted[i].key < sorted[j].key
+	})
+
+	return sorted
+}
+
 func itemDiffers(a, b scoredItem) bool {
 	return model.ProportionsDiffer(a.rate, a.sampleSize, b.rate, b.sampleSize)
 }
@@ -433,19 +449,6 @@ func leadersSeparated(leaders, trailers []scoredItem) bool {
 	}
 
 	return true
-}
-
-// strongestPair is the highest-rate item that beats another item, against the lowest-rate item it beats.
-func strongestPair(sorted []scoredItem) (better, worse scoredItem, ok bool) {
-	for i := range sorted {
-		for j := len(sorted) - 1; j > i; j-- {
-			if itemDiffers(sorted[i], sorted[j]) {
-				return sorted[i], sorted[j], true
-			}
-		}
-	}
-
-	return scoredItem{}, scoredItem{}, false
 }
 
 func sameItemPercent(items []scoredItem) bool {

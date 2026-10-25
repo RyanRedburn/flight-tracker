@@ -27,10 +27,10 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			name:  "one time with data",
 			times: []string{"0700"},
 			byTime: map[string]model.RouteOutlook{
-				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 			},
 			want:           "0700 on UA ORD–LAX is on time about 85% of the time, from 30 flights.",
-			wantConfidence: model.ConfidenceHigh,
+			wantConfidence: model.ConfidenceMedium,
 		},
 		{
 			name:  "one medium time reports the rate",
@@ -105,11 +105,11 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			name:  "only one time has data",
 			times: []string{"0700", "1400"},
 			byTime: map[string]model.RouteOutlook{
-				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 				"1400": reliabilityOutlook(0, 0, model.ConfidenceUnknown),
 			},
 			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has no data.",
-			wantConfidence: model.ConfidenceHigh,
+			wantConfidence: model.ConfidenceMedium,
 		},
 		{
 			name:  "no times have data",
@@ -125,11 +125,11 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 			name:  "low confidence time not ranked",
 			times: []string{"0700", "1400"},
 			byTime: map[string]model.RouteOutlook{
-				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceHigh),
+				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 				"1400": reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
 			want:           "0700 is the only listed time with enough data on UA ORD–LAX (85% on time). 1400 has thin data.",
-			wantConfidence: model.ConfidenceHigh,
+			wantConfidence: model.ConfidenceMedium,
 		},
 		{
 			name:  "in-between time lists in order",
@@ -361,6 +361,62 @@ func reliabilityOutlook(rate float64, sample int, confidence string) model.Route
 	}
 
 	return outlook
+}
+
+func TestRouteReliabilitySetsDepTimeWindow(t *testing.T) {
+	window := 45
+
+	tests := []struct {
+		name     string
+		minutes  *int
+		wantSet  bool
+		wantMins int
+	}{
+		{name: "default window is not caller-set", wantSet: false, wantMins: store.DefaultDepTimeWindowMinutes},
+		{name: "explicit window is caller-set", minutes: &window, wantSet: true, wantMins: window},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got store.RouteOutlookFilter
+
+			stub := &storetest.Stub{
+				RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+					got = filter
+
+					return &model.RouteOutlook{OutlookResult: model.OutlookResult{
+						Analysis: model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 40, Confidence: model.ConfidenceMedium},
+					}}, nil
+				},
+				RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+					return &model.RouteStats{
+						Flights:  40,
+						Analysis: model.Analysis{Start: testStatsStart, End: testStatsEnd, SampleSize: 40},
+					}, nil
+				},
+			}
+
+			res, out, err := routeReliability(context.Background(), stub, testLogger(), routeReliabilityInput{
+				Origin:               testCodeORD,
+				Dest:                 testCodeLAX,
+				Carrier:              testCarrierUA,
+				Date:                 testDateOct6,
+				DepTimes:             []string{"0700"},
+				DepTimeWindowMinutes: tt.minutes,
+			})
+			if err != nil {
+				t.Fatalf("routeReliability: %v", err)
+			}
+
+			if res == nil || res.IsError {
+				t.Fatalf("error = %#v", out.Error)
+			}
+
+			if got.DepTimeWindowSet != tt.wantSet || got.DepTimeWindowMinutes != tt.wantMins {
+				t.Fatalf("window set=%v minutes=%d", got.DepTimeWindowSet, got.DepTimeWindowMinutes)
+			}
+		})
+	}
 }
 
 func TestRouteReliabilityNarrowsFlightNumberByDepTime(t *testing.T) {
@@ -787,7 +843,7 @@ func TestRouteDepartureOutlookJSON(t *testing.T) {
 
 	body, err := json.Marshal(newRouteDepartureOutlook(model.RouteOutlook{
 		OutlookResult: model.OutlookResult{
-			Analysis:          model.Analysis{SampleSize: 30, Confidence: model.ConfidenceHigh},
+			Analysis:          model.Analysis{SampleSize: 30, Confidence: model.ConfidenceMedium},
 			OnTimeProbability: &rate,
 			Connection:        model.ConnectionGuidance{DomesticToDomestic: model.NewConnectionMinutes(45)},
 		},

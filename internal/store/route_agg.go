@@ -254,14 +254,16 @@ func ResolveDepTimeWindowMinutes(minutes *int) int {
 
 func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierOnTime {
 	return model.CarrierOnTime{
-		Carrier:    carrier,
-		OnTimeRate: rate(onTime, flights),
-		Flights:    flights,
+		Carrier:     carrier,
+		OnTimeRate:  rate(onTime, flights),
+		Flights:     flights,
+		OnTimeCount: &onTime,
 	}
 }
 
-// CarrierComparison reports whether carriers with at least CarrierStatsMinSampleSize
-// differ at 95%. Fewer than two such carriers is not a comparison.
+// CarrierComparison is ranked when the highest-rate carrier with at least
+// CarrierStatsMinSampleSize flights differs at 95% from another. Fewer than two
+// such carriers is not a comparison.
 func CarrierComparison(items []model.CarrierOnTime) string {
 	eligible := make([]model.CarrierOnTime, 0, len(items))
 
@@ -275,15 +277,39 @@ func CarrierComparison(items []model.CarrierOnTime) string {
 		return ""
 	}
 
-	for i := range eligible {
-		for j := i + 1; j < len(eligible); j++ {
-			if model.ProportionsDiffer(eligible[i].OnTimeRate, eligible[i].Flights, eligible[j].OnTimeRate, eligible[j].Flights) {
-				return model.ComparisonRanked
-			}
+	sort.SliceStable(eligible, func(i, j int) bool {
+		left := model.ComparisonRate(eligible[i].OnTimeRate, eligible[i].OnTimeCount, eligible[i].Flights)
+		right := model.ComparisonRate(eligible[j].OnTimeRate, eligible[j].OnTimeCount, eligible[j].Flights)
+
+		if left != right {
+			return left > right
+		}
+
+		if eligible[i].Flights != eligible[j].Flights {
+			return eligible[i].Flights > eligible[j].Flights
+		}
+
+		return eligible[i].Carrier < eligible[j].Carrier
+	})
+
+	leader := eligible[0]
+
+	for _, item := range eligible[1:] {
+		if carrierDiffers(leader, item) {
+			return model.ComparisonRanked
 		}
 	}
 
 	return model.ComparisonTooCloseToCall
+}
+
+func carrierDiffers(a, b model.CarrierOnTime) bool {
+	return model.ProportionsDiffer(
+		model.ComparisonRate(a.OnTimeRate, a.OnTimeCount, a.Flights),
+		a.Flights,
+		model.ComparisonRate(b.OnTimeRate, b.OnTimeCount, b.Flights),
+		b.Flights,
+	)
 }
 
 func SortCarrierOnTime(items []model.CarrierOnTime) {

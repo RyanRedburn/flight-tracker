@@ -80,14 +80,16 @@ func AssembleRouteTravelWindows(
 			continue
 		}
 
-		onTimeRate := rate(count.OnTimeCount, count.Flights)
+		onTime := count.OnTimeCount
+		onTimeRate := rate(onTime, count.Flights)
 
 		switch count.Grain {
 		case TravelWindowGrainMonth:
 			months = append(months, model.TravelWindowMonthBucket{
-				Month:      count.Bucket,
-				OnTimeRate: onTimeRate,
-				Flights:    count.Flights,
+				Month:       count.Bucket,
+				OnTimeRate:  onTimeRate,
+				Flights:     count.Flights,
+				OnTimeCount: &onTime,
 			})
 		case TravelWindowGrainDayOfWeek:
 			days = append(days, model.TravelWindowDayBucket{
@@ -202,10 +204,11 @@ func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd strin
 	}
 }
 
-// rankTravelMonths keeps the top and bottom months only when every month at the
-// highest rate differs at 95% from every month at the lowest rate. Otherwise the
-// lists are empty and the comparison is too close to call. One eligible month is
-// still returned on both lists and is not a comparison.
+// rankTravelMonths keeps months tied with the highest-rate eligible month, and
+// months tied with the lowest-rate one, only when that highest-rate month differs
+// at 95% from at least one other. Otherwise the lists are empty and the comparison
+// is too close to call. One eligible month is still returned on both lists and is
+// not a comparison. The floor is the caller's minSample, not the confidence band.
 func rankTravelMonths(months []model.TravelWindowMonthBucket, minSample int) (best, worst []model.TravelWindowMonthBucket, comparison string) {
 	eligible := make([]model.TravelWindowMonthBucket, 0, len(months))
 
@@ -215,84 +218,75 @@ func rankTravelMonths(months []model.TravelWindowMonthBucket, minSample int) (be
 		}
 	}
 
-	best = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, true)
-	worst = pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, false)
-
 	if len(eligible) < 2 {
-		return best, worst, ""
+		return pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, true),
+			pickTravelWindowBuckets(months, monthBucketKey, monthBucketRate, monthBucketFlights, minSample, false),
+			""
 	}
 
-	highest, lowest := extremeMonths(eligible)
-	if !monthExtremesDiffer(highest, lowest) {
+	sortTravelMonths(eligible, true)
+
+	if !monthBeatsAny(eligible[0], eligible[1:]) {
 		return []model.TravelWindowMonthBucket{}, []model.TravelWindowMonthBucket{}, model.ComparisonTooCloseToCall
 	}
 
-	return monthsDifferingFromAll(best, lowest), monthsDifferingFromAll(worst, highest), model.ComparisonRanked
+	best = monthsTied(eligible[0], eligible)
+	worst = monthsTied(eligible[len(eligible)-1], eligible)
+	sortTravelMonths(worst, false)
+
+	return best, worst, model.ComparisonRanked
 }
 
-func extremeMonths(eligible []model.TravelWindowMonthBucket) (highest, lowest []model.TravelWindowMonthBucket) {
-	maxRate := eligible[0].OnTimeRate
-	minRate := eligible[0].OnTimeRate
+func sortTravelMonths(months []model.TravelWindowMonthBucket, descending bool) {
+	sort.SliceStable(months, func(i, j int) bool {
+		left := model.ComparisonRate(months[i].OnTimeRate, months[i].OnTimeCount, months[i].Flights)
+		right := model.ComparisonRate(months[j].OnTimeRate, months[j].OnTimeCount, months[j].Flights)
 
-	for _, month := range eligible[1:] {
-		if month.OnTimeRate > maxRate {
-			maxRate = month.OnTimeRate
-		}
-
-		if month.OnTimeRate < minRate {
-			minRate = month.OnTimeRate
-		}
-	}
-
-	for _, month := range eligible {
-		if month.OnTimeRate == maxRate {
-			highest = append(highest, month)
-		}
-
-		if month.OnTimeRate == minRate {
-			lowest = append(lowest, month)
-		}
-	}
-
-	return highest, lowest
-}
-
-func monthExtremesDiffer(highest, lowest []model.TravelWindowMonthBucket) bool {
-	for _, high := range highest {
-		for _, low := range lowest {
-			if !model.ProportionsDiffer(high.OnTimeRate, high.Flights, low.OnTimeRate, low.Flights) {
-				return false
+		if left != right {
+			if descending {
+				return left > right
 			}
+
+			return left < right
+		}
+
+		if months[i].Flights != months[j].Flights {
+			return months[i].Flights > months[j].Flights
+		}
+
+		return months[i].Month < months[j].Month
+	})
+}
+
+func monthBeatsAny(leader model.TravelWindowMonthBucket, others []model.TravelWindowMonthBucket) bool {
+	for _, month := range others {
+		if monthsDiffer(leader, month) {
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
-func monthsDifferingFromAll(months, anchors []model.TravelWindowMonthBucket) []model.TravelWindowMonthBucket {
-	kept := make([]model.TravelWindowMonthBucket, 0, len(months))
+func monthsTied(anchor model.TravelWindowMonthBucket, months []model.TravelWindowMonthBucket) []model.TravelWindowMonthBucket {
+	tied := make([]model.TravelWindowMonthBucket, 0, len(months))
 
 	for _, month := range months {
-		if monthDiffersFromAll(month, anchors) {
-			kept = append(kept, month)
+		if !monthsDiffer(anchor, month) {
+			tied = append(tied, month)
 		}
 	}
 
-	if len(kept) == 0 {
-		return []model.TravelWindowMonthBucket{}
-	}
-
-	return kept
+	return tied
 }
 
-func monthDiffersFromAll(month model.TravelWindowMonthBucket, anchors []model.TravelWindowMonthBucket) bool {
-	for _, anchor := range anchors {
-		if !model.ProportionsDiffer(month.OnTimeRate, month.Flights, anchor.OnTimeRate, anchor.Flights) {
-			return false
-		}
-	}
-
-	return true
+func monthsDiffer(a, b model.TravelWindowMonthBucket) bool {
+	return model.ProportionsDiffer(
+		model.ComparisonRate(a.OnTimeRate, a.OnTimeCount, a.Flights),
+		a.Flights,
+		model.ComparisonRate(b.OnTimeRate, b.OnTimeCount, b.Flights),
+		b.Flights,
+	)
 }
 
 func pickTravelWindowBuckets[T any](

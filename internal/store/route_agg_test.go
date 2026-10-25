@@ -168,6 +168,40 @@ func TestCarrierComparison(t *testing.T) {
 			},
 			want: model.ComparisonRanked,
 		},
+		{
+			name: "lower pair differs but the leader does not",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.88, Flights: 110},
+				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
+				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "leader differs from another carrier",
+			items: []model.CarrierOnTime{
+				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
+				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
+				{Carrier: "UA", OnTimeRate: 0.90, Flights: 400},
+			},
+			want: model.ComparisonRanked,
+		},
+		{
+			name: "counts keep a rounded gap inside the margin",
+			items: []model.CarrierOnTime{
+				carrierCounted("UA", 64, 100, 0.64),
+				carrierCounted("AA", 51, 101, 0.50),
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "the same rounded rates without counts are ranked",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.64, Flights: 100},
+				{Carrier: "AA", OnTimeRate: 0.50, Flights: 101},
+			},
+			want: model.ComparisonRanked,
+		},
 	}
 
 	for _, tt := range tests {
@@ -177,6 +211,13 @@ func TestCarrierComparison(t *testing.T) {
 			}
 		})
 	}
+}
+
+func carrierCounted(carrier string, onTime, flights int, rounded float64) model.CarrierOnTime {
+	item := CarrierOnTimeFromCounts(carrier, onTime, flights)
+	item.OnTimeRate = rounded
+
+	return item
 }
 
 func TestSortCarrierOnTime(t *testing.T) {

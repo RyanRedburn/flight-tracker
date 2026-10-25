@@ -24,6 +24,6 @@ type Analysis struct {
 	// sufficient covers medium and high. insufficient_sample is low.
 	SampleReason string `json:"sample_reason,omitempty" enums:"sufficient,insufficient_sample,empty_sample"`
 	Confidence   string `json:"confidence,omitempty" enums:"high,medium,low,unknown"`
-	// 730 when a thin default departure window was widened from 365 days.
+	// Days of history used: 365, or 730 when a thin default window was widened.
 	LookbackDays int `json:"lookback_days,omitempty"`
 }

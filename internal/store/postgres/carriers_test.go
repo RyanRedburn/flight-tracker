@@ -38,7 +38,8 @@ func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
 		{"origin":"GGG","dest":"HHH","flights":134,"on_time":40,"delayed":54,"cancelled":20,"diverted":20},
 		{"origin":"III","dest":"JJJ","flights":133,"on_time":32,"delayed":61,"cancelled":20,"diverted":20},
 		{"origin":"KKK","dest":"LLL","flights":132,"on_time":24,"delayed":64,"cancelled":22,"diverted":22},
-		{"origin":"QQQ","dest":"RRR","flights":99,"on_time":99,"delayed":0,"cancelled":0,"diverted":0}
+		{"origin":"MMM","dest":"NNN","flights":30,"on_time":15,"delayed":15,"cancelled":0,"diverted":0},
+		{"origin":"QQQ","dest":"RRR","flights":29,"on_time":29,"delayed":0,"cancelled":0,"diverted":0}
 	]`)
 
 	routes, err := unmarshalCarrierRoutes(raw)
@@ -74,14 +75,25 @@ func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
 		t.Fatalf("best=%+v worst=%+v", best, worst)
 	}
 
-	if len(best) != store.CarrierStatsTopN || len(worst) != 1 {
+	if len(best) != store.CarrierStatsTopN || len(worst) != 2 {
 		t.Fatalf("best=%d worst=%d", len(best), len(worst))
 	}
 
-	for _, row := range append(append([]model.CarrierRouteStat{}, best...), worst...) {
+	ranked := append(append([]model.CarrierRouteStat{}, best...), worst...)
+	sawFloor := false
+
+	for _, row := range ranked {
 		if row.Origin == "QQQ" {
-			t.Fatal("99-flight route should not be ranked")
+			t.Fatal("29-flight route should not be ranked")
 		}
+
+		if row.Origin == "MMM" {
+			sawFloor = true
+		}
+	}
+
+	if !sawFloor {
+		t.Fatal("30-flight route should be ranked")
 	}
 }
 

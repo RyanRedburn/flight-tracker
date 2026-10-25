@@ -46,7 +46,7 @@ func TestProportionsDiffer(t *testing.T) {
 		{name: "single flights", rate1: 1, flights1: 1, rate2: 0, flights2: 1},
 		{
 			name:  "ten point gap on uneven samples stays inside the margin",
-			rate1: 0.77, flights1: 99, rate2: 0.67, flights2: 462,
+			rate1: 0.77, flights1: 80, rate2: 0.67, flights2: 150,
 		},
 		{name: "two point gap on small samples", rate1: 0.82, flights1: 40, rate2: 0.80, flights2: 40},
 		{name: "wide gap on small samples", rate1: 0.85, flights1: 40, rate2: 0.60, flights2: 40, want: true},
@@ -204,6 +204,7 @@ func TestBlockingSampleReason(t *testing.T) {
 		{name: "derived sufficient from size", outlook: sampleOutlook(40, "", ConfidenceHigh), want: ""},
 		{name: "explicit medium is sufficient", outlook: sampleOutlook(40, "", ConfidenceMedium), want: ""},
 		{name: "explicit high with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceHigh), want: ""},
+		{name: "explicit medium with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceMedium), want: ""},
 	}
 
 	for _, tt := range tests {

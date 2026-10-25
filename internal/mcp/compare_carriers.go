@@ -33,6 +33,8 @@ type comparedCarrier struct {
 	Confidence   string  `json:"confidence"`
 	SampleSize   int     `json:"sample_size"`
 	SampleReason string  `json:"sample_reason"`
+	// comparisonRate is the unrounded rate used for the z-test.
+	comparisonRate float64
 }
 
 type compareCarriersData struct {
@@ -142,6 +144,7 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 
 	trimmed := *stats
 	trimmed.CarrierOnTime = nil
+	trimmed.CarrierComparison = ""
 
 	return &compareCarriersData{
 		Stats:    trimmed,
@@ -154,11 +157,12 @@ func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
 	confidence := model.CountConfidence(row.Flights, model.HistoryLowSampleBelow, model.HistoryHighSampleAt)
 
 	return comparedCarrier{
-		Carrier:      row.Carrier,
-		OnTimeRate:   row.OnTimeRate,
-		Confidence:   confidence,
-		SampleSize:   row.Flights,
-		SampleReason: sampleReason(row.Flights, confidence),
+		Carrier:        row.Carrier,
+		OnTimeRate:     row.OnTimeRate,
+		Confidence:     confidence,
+		SampleSize:     row.Flights,
+		SampleReason:   sampleReason(row.Flights, confidence),
+		comparisonRate: model.ComparisonRate(row.OnTimeRate, row.OnTimeCount, row.Flights),
 	}
 }
 
@@ -173,7 +177,7 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 		items[i] = scoredItem{
 			label:      carrierLabel(carrier.Carrier),
 			percent:    onTimePercent(carrier.OnTimeRate),
-			rate:       carrier.OnTimeRate,
+			rate:       carrier.comparisonRate,
 			sampleSize: carrier.SampleSize,
 			confidence: carrier.Confidence,
 		}

@@ -1389,7 +1389,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters, and carrier_comparison is too_close_to_call when those carriers do not differ at 95%. The carrier list is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least 100 flights differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1513,7 +1513,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum. Month lists are omitted when the highest and lowest eligible months are inside the margin of error.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst days and hours are the top and bottom 3 buckets that meet the grain minimum. Months need 50 flights. Their lists are the highest-rate month plus months that do not differ from it at 95%, and the same around the lowest-rate month. Both month lists are omitted when that highest-rate month differs from nobody.",
                 "produces": [
                     "application/json"
                 ],
@@ -2146,7 +2146,7 @@
                     "type": "string"
                 },
                 "lookback_days": {
-                    "description": "730 when a thin default departure window was widened from 365 days.",
+                    "description": "Days of history used: 365, or 730 when a thin default window was widened.",
                     "type": "integer"
                 },
                 "sample_reason": {
@@ -2877,7 +2877,7 @@
                     "type": "integer"
                 },
                 "carrier_comparison": {
-                    "description": "CarrierComparison is ranked when a carrier pair differs at 95%, and too_close_to_call when none do.\nOmitted when fewer than two carriers are compared.",
+                    "description": "CarrierComparison is ranked when the highest-rate compared carrier differs at 95% from at least one other,\nand too_close_to_call when it does not. Omitted when fewer than two carriers are compared.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -2987,7 +2987,7 @@
                     "$ref": "#/definitions/model.Filters"
                 },
                 "month_comparison": {
-                    "description": "MonthComparison is too_close_to_call when the highest-rate and lowest-rate eligible months\nare inside the margin of error. Those best and worst lists are empty in that case.",
+                    "description": "MonthComparison is ranked when the highest-rate eligible month differs at 95% from at least one other.\nIt is too_close_to_call when that month differs from nobody, and those best and worst lists are empty.",
                     "type": "string",
                     "enum": [
                         "ranked",

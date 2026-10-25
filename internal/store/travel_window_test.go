@@ -122,25 +122,17 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 	}
 
 	// window 200 → 1% = 2; month floor 50. Month 4 (49 flights) is in the series but not best/worst.
-	// Month 2 is the lowest rate, so it is not also listed as a best month.
+	// Month 1 leads and differs from the others, so it is the only best month. Month 2 is the only worst month.
 	if got.MonthComparison != model.ComparisonRanked {
 		t.Fatalf("month_comparison = %q, want ranked", got.MonthComparison)
 	}
 
-	if len(got.BestMonths) != 2 {
-		t.Fatalf("best_months len = %d, want 2", len(got.BestMonths))
+	if len(got.BestMonths) != 1 || got.BestMonths[0].Month != 1 {
+		t.Fatalf("best_months = %+v, want month 1", got.BestMonths)
 	}
 
-	if got.BestMonths[0].Month != 1 || got.BestMonths[1].Month != 3 {
-		t.Errorf("best_months = %+v", got.BestMonths)
-	}
-
-	if len(got.WorstMonths) != 2 {
-		t.Fatalf("worst_months len = %d, want 2", len(got.WorstMonths))
-	}
-
-	if got.WorstMonths[0].Month != 2 || got.WorstMonths[1].Month != 3 {
-		t.Errorf("worst_months = %+v, want months 2 then 3", got.WorstMonths)
+	if len(got.WorstMonths) != 1 || got.WorstMonths[0].Month != 2 {
+		t.Fatalf("worst_months = %+v, want month 2", got.WorstMonths)
 	}
 
 	if len(got.BestDays) != 1 || got.BestDays[0].DayOfWeek != 1 {
@@ -156,8 +148,12 @@ func TestAssembleRouteTravelWindows(t *testing.T) {
 	}
 
 	again := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
-	if again.ByMonth[0] != got.ByMonth[0] || again.BestHours[0] != got.BestHours[0] {
+	if again.BestHours[0] != got.BestHours[0] || again.ByMonth[0].Month != got.ByMonth[0].Month || again.ByMonth[0].OnTimeRate != got.ByMonth[0].OnTimeRate || again.ByMonth[0].Flights != got.ByMonth[0].Flights || again.ByMonth[0].Confidence != got.ByMonth[0].Confidence || again.ByMonth[0].Reliability != got.ByMonth[0].Reliability {
 		t.Error("AssembleRouteTravelWindows is not idempotent for the same counts")
+	}
+
+	if again.ByMonth[0].OnTimeCount == nil || got.ByMonth[0].OnTimeCount == nil || *again.ByMonth[0].OnTimeCount != *got.ByMonth[0].OnTimeCount {
+		t.Error("on-time count was not preserved")
 	}
 }
 
@@ -224,6 +220,49 @@ func TestAssembleRouteTravelWindowsEligibilityShare(t *testing.T) {
 
 	if got.MonthComparison != "" {
 		t.Errorf("month_comparison = %q, want empty with one eligible month", got.MonthComparison)
+	}
+}
+
+func TestAssembleRouteTravelWindowsLowSampleMonthCanLead(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 54, Flights: 60},
+		{Grain: TravelWindowGrainMonth, Bucket: 6, OnTimeCount: 200, Flights: 400},
+		{Grain: TravelWindowGrainMonth, Bucket: 4, OnTimeCount: 20, Flights: 40},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", testTravelWindowStart, testTravelWindowEnd, 200, counts)
+	if got.MonthComparison != model.ComparisonRanked {
+		t.Fatalf("month_comparison = %q, want ranked", got.MonthComparison)
+	}
+
+	if len(got.BestMonths) != 1 || got.BestMonths[0].Month != 1 || got.BestMonths[0].Flights != 60 {
+		t.Fatalf("best_months = %+v, want the 60-flight month", got.BestMonths)
+	}
+
+	if got.BestMonths[0].Confidence != model.ConfidenceLow || got.BestMonths[0].Reliability != model.ReliabilityUnknown {
+		t.Fatalf("leading month = %+v, want low/unknown", got.BestMonths[0])
+	}
+
+	if len(got.WorstMonths) != 1 || got.WorstMonths[0].Month != 6 {
+		t.Fatalf("worst_months = %+v, want month 6", got.WorstMonths)
+	}
+
+	for _, month := range append(append([]model.TravelWindowMonthBucket{}, got.BestMonths...), got.WorstMonths...) {
+		if month.Month == 4 {
+			t.Fatalf("month 4 is below the floor: %+v", month)
+		}
+	}
+}
+
+func TestRankTravelMonthsLeaderDoesNotSeparate(t *testing.T) {
+	best, worst, comparison := rankTravelMonths([]model.TravelWindowMonthBucket{
+		{Month: 1, OnTimeRate: 0.88, Flights: 110},
+		{Month: 2, OnTimeRate: 0.85, Flights: 3000},
+		{Month: 3, OnTimeRate: 0.82, Flights: 3000},
+	}, TravelWindowMonthFloor)
+
+	if comparison != model.ComparisonTooCloseToCall || len(best) != 0 || len(worst) != 0 {
+		t.Fatalf("best=%+v worst=%+v comparison=%q", best, worst, comparison)
 	}
 }
 

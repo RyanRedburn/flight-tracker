@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -42,6 +43,31 @@ func TestCompareCarriersSummaries(t *testing.T) {
 			want:      "NK and F9 are too close to call on ORD–LAX (77% and 67% on time, medium confidence, 120 and 180 flights).",
 			wantConf:  model.ConfidenceMedium,
 			wantFirst: "NK",
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "lower pair differs but the leader does not",
+			carriers: []model.CarrierOnTime{
+				{Carrier: testCarrierUA, OnTimeRate: 0.88, Flights: 110},
+				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
+				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
+			},
+			want:      "UA, AA and DL are too close to call on ORD–LAX (88%, 85% and 82% on time, medium confidence, 110, 3000 and 3000 flights).",
+			wantConf:  model.ConfidenceMedium,
+			wantFirst: testCarrierUA,
+			wantStart: windowStart,
+			wantEnd:   windowEnd,
+		},
+		{
+			name: "counts keep a rounded gap inside the margin",
+			carriers: []model.CarrierOnTime{
+				carrierCounted("UA", 64, 100, 0.64),
+				carrierCounted("AA", 51, 101, 0.50),
+			},
+			want:      "UA and AA are too close to call on ORD–LAX (64% and 50% on time, medium confidence, 100 and 101 flights).",
+			wantConf:  model.ConfidenceMedium,
+			wantFirst: testCarrierUA,
 			wantStart: windowStart,
 			wantEnd:   windowEnd,
 		},
@@ -533,6 +559,59 @@ func TestCompareCarriersErrors(t *testing.T) {
 				t.Fatalf("error = %#v", out.Error)
 			}
 		})
+	}
+}
+
+func carrierCounted(carrier string, onTime, flights int, rounded float64) model.CarrierOnTime {
+	return model.CarrierOnTime{
+		Carrier:     carrier,
+		OnTimeRate:  rounded,
+		Flights:     flights,
+		OnTimeCount: &onTime,
+	}
+}
+
+func TestCompareCarriersOmitsCarrierComparison(t *testing.T) {
+	stub := &storetest.Stub{
+		RouteLatestFlightDateFn: func(context.Context, string, string) (string, error) {
+			return latestCarrierDate, nil
+		},
+		RouteStatsFn: func(context.Context, store.RouteStatsFilter) (*model.RouteStats, error) {
+			return &model.RouteStats{
+				Analysis:          model.Analysis{Start: testStatsStart, End: latestCarrierDate},
+				CarrierComparison: model.ComparisonRanked,
+				CarrierOnTime: []model.CarrierOnTime{
+					{Carrier: testCarrierUA, OnTimeRate: 0.8, Flights: 300},
+				},
+			}, nil
+		},
+	}
+
+	res := callTool(t, stub, toolCompareCarriers, map[string]any{
+		jsonKeyOrigin: testCodeORD,
+		jsonKeyDest:   testCodeLAX,
+	})
+	if res.IsError {
+		t.Fatalf("IsError content=%s", toolText(t, res))
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal([]byte(toolText(t, res)), &body); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+
+	data, ok := body["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("data = %#v", body["data"])
+	}
+
+	stats, ok := data["stats"].(map[string]any)
+	if !ok {
+		t.Fatalf("stats = %#v", data["stats"])
+	}
+
+	if _, ok := stats["carrier_comparison"]; ok {
+		t.Fatalf("carrier_comparison present: %s", toolText(t, res))
 	}
 }
 
