@@ -177,13 +177,13 @@ func TestCarrierComparison(t *testing.T) {
 			want: model.ComparisonRanked,
 		},
 		{
-			name: "lower pair differs but the leader does not",
+			name: "wilson lower bound leads the large sample",
 			items: []model.CarrierOnTime{
 				{Carrier: "UA", OnTimeRate: 0.88, Flights: 110},
 				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
 				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
 			},
-			want: model.ComparisonTooCloseToCall,
+			want: model.ComparisonRanked,
 		},
 		{
 			name: "leader differs from another carrier",
@@ -467,7 +467,7 @@ func TestApplyOutlookLookback(t *testing.T) {
 		err := ApplyOutlookLookback(out, false, func(days int) error {
 			calls = append(calls, days)
 			if days == OutlookLookbackDays {
-				out.Analysis.SampleSize = MinOutlookSampleSize - 1
+				out.Analysis.SampleSize = model.OutlookLowSampleBelow - 1
 
 				return nil
 			}
@@ -524,7 +524,7 @@ func TestApplyOutlookLookback(t *testing.T) {
 
 		err := ApplyOutlookLookback(out, false, func(days int) error {
 			calls = append(calls, days)
-			out.Analysis.SampleSize = MinOutlookSampleSize
+			out.Analysis.SampleSize = model.OutlookLowSampleBelow
 
 			return nil
 		})

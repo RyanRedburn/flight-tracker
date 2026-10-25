@@ -175,12 +175,13 @@ func emptyRouteTravelWindows(origin, dest, carrier, windowStart, windowEnd strin
 	}
 }
 
-// rankTravelBuckets keeps buckets tied with the highest-rate bucket, only when
-// that bucket differs at 95% from at least one other. Worst buckets are the
-// lowest-rate bucket among those it beats, plus buckets tied with that one.
-// Each list is capped at TravelWindowBestWorstK. Otherwise the lists are empty
-// and the comparison is too close to call. One bucket is returned on both lists
-// and is not a comparison. A bucket with flights is rankable.
+// rankTravelBuckets keeps buckets tied with the leader, only when that leader
+// differs at 95% from at least one other. The leader is the highest 95% Wilson
+// lower bound. Worst buckets are the beaten bucket with the lowest Wilson upper
+// bound, plus buckets tied with that one. Each list is capped at
+// TravelWindowBestWorstK. Otherwise the lists are empty and the comparison is
+// too close to call. One bucket leaves both lists empty and comparison single.
+// A bucket with flights is rankable. Ties use the two-proportion test.
 func rankTravelBuckets[T any](
 	items []T,
 	key func(T) int,
@@ -193,11 +194,11 @@ func rankTravelBuckets[T any](
 	}
 
 	if len(items) == 1 {
-		return []T{items[0]}, []T{items[0]}, ""
+		return []T{}, []T{}, model.ComparisonSingle
 	}
 
 	ordered := append([]T(nil), items...)
-	sortTravelBuckets(ordered, key, onTimeRate, onTimeCount, flights, true)
+	sortByWilsonLower(ordered, key, onTimeRate, onTimeCount, flights)
 
 	leader := ordered[0]
 	beaten := make([]T, 0, len(ordered)-1)
@@ -222,7 +223,7 @@ func rankTravelBuckets[T any](
 
 	best = capTravelBuckets(tied)
 
-	sortTravelBuckets(beaten, key, onTimeRate, onTimeCount, flights, false)
+	sortByWilsonUpper(beaten, key, onTimeRate, onTimeCount, flights)
 
 	anchor := beaten[0]
 	worstTied := make([]T, 0, len(beaten))
@@ -233,7 +234,7 @@ func rankTravelBuckets[T any](
 		}
 	}
 
-	sortTravelBuckets(worstTied, key, onTimeRate, onTimeCount, flights, false)
+	sortByWilsonUpper(worstTied, key, onTimeRate, onTimeCount, flights)
 
 	return best, capTravelBuckets(worstTied), model.ComparisonRanked
 }
@@ -246,32 +247,65 @@ func capTravelBuckets[T any](items []T) []T {
 	return append([]T(nil), items...)
 }
 
-func sortTravelBuckets[T any](
+func sortByWilsonLower[T any](
 	items []T,
 	key func(T) int,
 	onTimeRate func(T) float64,
 	onTimeCount func(T) *int,
 	flights func(T) int,
-	descending bool,
 ) {
 	sort.SliceStable(items, func(i, j int) bool {
-		left := travelBucketRate(items[i], onTimeRate, onTimeCount, flights)
-		right := travelBucketRate(items[j], onTimeRate, onTimeCount, flights)
+		return wilsonLess(items[i], items[j], key, onTimeRate, onTimeCount, flights, false)
+	})
+}
 
-		if left != right {
-			if descending {
-				return left > right
-			}
+func sortByWilsonUpper[T any](
+	items []T,
+	key func(T) int,
+	onTimeRate func(T) float64,
+	onTimeCount func(T) *int,
+	flights func(T) int,
+) {
+	sort.SliceStable(items, func(i, j int) bool {
+		return wilsonLess(items[i], items[j], key, onTimeRate, onTimeCount, flights, true)
+	})
+}
 
+// wilsonLess orders a higher Wilson lower bound first, or a lower Wilson upper bound first.
+// Equal bounds break by more flights, then the smaller key.
+func wilsonLess[T any](
+	a, b T,
+	key func(T) int,
+	onTimeRate func(T) float64,
+	onTimeCount func(T) *int,
+	flights func(T) int,
+	upper bool,
+) bool {
+	aLower, aUpper := bucketWilson(a, onTimeRate, onTimeCount, flights)
+	bLower, bUpper := bucketWilson(b, onTimeRate, onTimeCount, flights)
+	left, right := aLower, bLower
+
+	if upper {
+		left, right = aUpper, bUpper
+	}
+
+	if left != right {
+		if upper {
 			return left < right
 		}
 
-		if flights(items[i]) != flights(items[j]) {
-			return flights(items[i]) > flights(items[j])
-		}
+		return left > right
+	}
 
-		return key(items[i]) < key(items[j])
-	})
+	if flights(a) != flights(b) {
+		return flights(a) > flights(b)
+	}
+
+	return key(a) < key(b)
+}
+
+func bucketWilson[T any](item T, onTimeRate func(T) float64, onTimeCount func(T) *int, flights func(T) int) (lower, upper float64) {
+	return model.WilsonBounds(travelBucketRate(item, onTimeRate, onTimeCount, flights), nil, flights(item))
 }
 
 func travelBucketsDiffer[T any](

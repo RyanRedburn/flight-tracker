@@ -290,6 +290,38 @@ func TestSeasonalDecision(t *testing.T) {
 	}
 }
 
+func TestWilsonBoundsHourLeader(t *testing.T) {
+	two := 2
+	on240 := 240
+	on180 := 180
+	zero := 0
+
+	low05, _ := WilsonBounds(1, &two, 2)
+	low07, _ := WilsonBounds(0.8, &on240, 300)
+	low18, up18 := WilsonBounds(0.6, &on180, 300)
+	low0, up0 := WilsonBounds(0, &zero, 1)
+
+	if low07 <= low05 || low07 <= low18 {
+		t.Fatalf("lowers hour05=%v hour07=%v hour18=%v", low05, low07, low18)
+	}
+
+	if low0 > 1e-9 || up0 <= up18 {
+		t.Fatalf("0/1 bounds = %v %v, hour 18 upper = %v", low0, up0, up18)
+	}
+
+	if ProportionsDiffer(1, 2, 0.8, 300) {
+		t.Fatal("2/2 differs from 240/300")
+	}
+
+	if !ProportionsDiffer(0.8, 300, 0.6, 300) {
+		t.Fatal("240/300 does not differ from 180/300")
+	}
+
+	if !ProportionsDiffer(0, 1, 0.8, 300) {
+		t.Fatal("0/1 does not differ from 240/300")
+	}
+}
+
 func TestSeasonalReliabilityAtMedium(t *testing.T) {
 	tests := []struct {
 		name       string

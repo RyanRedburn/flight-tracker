@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	MinOutlookSampleSize        = model.OutlookLowSampleBelow
 	OutlookLookbackDays         = 365
 	OutlookFallbackLookbackDays = 730
 	MaxStatsSpanDays            = 366
@@ -211,10 +210,10 @@ func TrailingOutlookWindowDays(endDate string, days int) (start, end string, ok 
 	return endTime.AddDate(0, 0, -days).Format("2006-01-02"), endDate, true
 }
 
-// WidenOutlookLookback reports whether a thin default-window slot should be re-queried
-// at OutlookFallbackLookbackDays. A caller-set departure window is never widened.
+// WidenOutlookLookback reports whether a default-window slot below the low outlook band
+// should be re-queried at OutlookFallbackLookbackDays. A caller-set departure window is never widened.
 func WidenOutlookLookback(sampleSize int, windowSet bool) bool {
-	return !windowSet && sampleSize < MinOutlookSampleSize
+	return !windowSet && sampleSize < model.OutlookLowSampleBelow
 }
 
 // ApplyOutlookLookback runs the slot query at 365 days, and at 730 when the default window is still thin.
@@ -261,8 +260,8 @@ func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierO
 	}
 }
 
-// CarrierComparison is ranked when the highest-rate carrier with at least one
-// flight differs at 95% from another. Fewer than two such carriers is not a comparison.
+// CarrierComparison is ranked when the carrier with the highest 95% Wilson lower bound
+// and at least one flight differs at 95% from another. Fewer than two such carriers is not a comparison.
 func CarrierComparison(items []model.CarrierOnTime) string {
 	eligible := make([]model.CarrierOnTime, 0, len(items))
 
@@ -277,8 +276,8 @@ func CarrierComparison(items []model.CarrierOnTime) string {
 	}
 
 	sort.SliceStable(eligible, func(i, j int) bool {
-		left := model.ComparisonRate(eligible[i].OnTimeRate, eligible[i].OnTimeCount, eligible[i].Flights)
-		right := model.ComparisonRate(eligible[j].OnTimeRate, eligible[j].OnTimeCount, eligible[j].Flights)
+		left, _ := model.WilsonBounds(eligible[i].OnTimeRate, eligible[i].OnTimeCount, eligible[i].Flights)
+		right, _ := model.WilsonBounds(eligible[j].OnTimeRate, eligible[j].OnTimeCount, eligible[j].Flights)
 
 		if left != right {
 			return left > right

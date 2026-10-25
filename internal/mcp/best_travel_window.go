@@ -37,12 +37,13 @@ type travelMonth struct {
 }
 
 type bestTravelWindowData struct {
-	Filters     model.Filters `json:"filters"`
-	Start       string        `json:"start"`
-	End         string        `json:"end"`
-	ByMonth     []travelMonth `json:"by_month"`
-	BestMonths  []travelMonth `json:"best_months"`
-	WorstMonths []travelMonth `json:"worst_months"`
+	Filters         model.Filters `json:"filters"`
+	Start           string        `json:"start"`
+	End             string        `json:"end"`
+	ByMonth         []travelMonth `json:"by_month"`
+	MonthComparison string        `json:"month_comparison,omitempty"`
+	BestMonths      []int         `json:"best_months"`
+	WorstMonths     []int         `json:"worst_months"`
 }
 
 func bestTravelWindowInputSchema() *jsonschema.Schema {
@@ -111,13 +112,23 @@ func bestTravelWindow(ctx context.Context, s store.Store, logger *slog.Logger, i
 
 func newBestTravelWindowData(windows *model.RouteTravelWindows) *bestTravelWindowData {
 	return &bestTravelWindowData{
-		Filters:     windows.Filters,
-		Start:       windows.Analysis.Start,
-		End:         windows.Analysis.End,
-		ByMonth:     travelMonths(windows.ByMonth),
-		BestMonths:  travelMonths(windows.BestMonths),
-		WorstMonths: travelMonths(windows.WorstMonths),
+		Filters:         windows.Filters,
+		Start:           windows.Analysis.Start,
+		End:             windows.Analysis.End,
+		ByMonth:         travelMonths(windows.ByMonth),
+		MonthComparison: windows.MonthComparison,
+		BestMonths:      monthNumbers(windows.BestMonths),
+		WorstMonths:     monthNumbers(windows.WorstMonths),
 	}
+}
+
+func monthNumbers(buckets []model.TravelWindowMonthBucket) []int {
+	months := make([]int, 0, len(buckets))
+	for _, bucket := range buckets {
+		months = append(months, bucket.Month)
+	}
+
+	return months
 }
 
 func travelMonths(buckets []model.TravelWindowMonthBucket) []travelMonth {
@@ -149,7 +160,7 @@ func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTrave
 	months := scoredMonths(windows.ByMonth)
 	confidence := itemConfidence(months)
 
-	if windows.MonthComparison == "" {
+	if windows.MonthComparison == model.ComparisonSingle || len(windows.ByMonth) == 1 {
 		only := months[0]
 
 		return fmt.Sprintf("%s is the only month for %s (%d%% on time). %s, %s.",
@@ -157,18 +168,22 @@ func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTrave
 	}
 
 	if windows.MonthComparison == model.ComparisonTooCloseToCall {
-		return sameMonths(route, sortMonths(months, true)) + " " + monthCountSentence(months), confidence
+		return tooCloseMonths(route, months), confidence
 	}
 
 	best := scoredMonths(windows.BestMonths)
 	worst := scoredMonths(windows.WorstMonths)
-	summary := spreadMonths(route, best, worst)
 
-	if also := monthsOutside(months, best, worst); also != "" {
-		summary += " " + also
+	if len(best) == 0 || len(worst) == 0 {
+		return tooCloseMonths(route, months), confidence
 	}
 
-	return summary + " " + monthCountSentence(months), confidence
+	return spreadMonths(route, best, worst) + " " + monthCountSentence(months), confidence
+}
+
+func tooCloseMonths(route string, months []scoredItem) string {
+	return fmt.Sprintf("All %d months are %s for %s (%s on time), %s, %s.",
+		len(months), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
 }
 
 func scoredMonths(buckets []model.TravelWindowMonthBucket) []scoredItem {
@@ -192,50 +207,13 @@ func scoredMonth(month model.TravelWindowMonthBucket) scoredItem {
 	}
 }
 
-func monthsOutside(all, best, worst []scoredItem) string {
-	named := make(map[int]struct{}, len(best)+len(worst))
-	for _, item := range best {
-		named[item.key] = struct{}{}
-	}
-
-	for _, item := range worst {
-		named[item.key] = struct{}{}
-	}
-
-	extra := make([]scoredItem, 0)
-
-	for _, item := range all {
-		if _, ok := named[item.key]; ok {
-			continue
-		}
-
-		extra = append(extra, item)
-	}
-
-	if len(extra) == 0 {
-		return ""
-	}
-
-	parts := make([]string, len(extra))
-	for i, item := range extra {
-		parts[i] = fmt.Sprintf("%s (%d%% on time, %s, %s)", item.label, item.percent, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))
-	}
-
-	return "Also " + joinAnd(parts) + "."
-}
-
-// sameMonths is the whole set inside the margin of error, so no month is called best or worst.
-func sameMonths(route string, ranked []scoredItem) string {
-	rates := joinItemPercents(ranked)
-	if sameItemPercent(ranked) {
-		rates = strconv.Itoa(ranked[0].percent) + "%"
-	}
-
-	return fmt.Sprintf("%s are %s for %s (%s on time).", joinLabels(ranked), phraseTooClose, route, rates)
-}
-
 // spreadMonths names the months too close to the best and the months too close to the worst.
+// A best-list percent at or below a worst-list percent is not called most reliable.
 func spreadMonths(route string, best, worst []scoredItem) string {
+	if ratesCross(best, worst) {
+		return crossedMonths(route, best, worst)
+	}
+
 	bestNoun := "month"
 	if len(best) > 1 {
 		bestNoun = "months"
@@ -253,6 +231,39 @@ func spreadMonths(route string, best, worst []scoredItem) string {
 
 	return fmt.Sprintf("%s %s the most reliable %s for %s (%s on time), and %s %s the least reliable (%s).",
 		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestRates, joinLabels(worst), pluralVerb(len(worst)), worstRates)
+}
+
+func ratesCross(best, worst []scoredItem) bool {
+	for _, item := range best {
+		for _, other := range worst {
+			if item.percent <= other.percent {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func crossedMonths(route string, best, worst []scoredItem) string {
+	lead := best[0]
+	anchor := worst[0]
+	sentence := fmt.Sprintf("%s is the most reliable month for %s (%d%% on time), and %s is the least reliable (%d%%).",
+		lead.label, route, lead.percent, anchor.label, anchor.percent)
+
+	if len(best) > 1 {
+		rest := best[1:]
+		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
+			joinLabels(rest), pluralVerb(len(rest)), phraseTooClose, lead.label, joinItemPercents(rest))
+	}
+
+	if len(worst) > 1 {
+		rest := worst[1:]
+		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
+			joinLabels(rest), pluralVerb(len(rest)), phraseTooClose, anchor.label, joinItemPercents(rest))
+	}
+
+	return sentence
 }
 
 // monthCountSentence covers every month in the series.

@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. Best is the highest-rate bucket plus buckets that do not differ from it at 95%, capped at 3, and only when that bucket differs from another. Worst is the lowest-rate bucket among those it beats, plus buckets tied with that one, capped at 3. Both lists are omitted when the highest-rate bucket differs from nobody.
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. The leader is the highest 95% Wilson lower bound. Best is that bucket plus buckets the two-proportion test does not separate from it, capped at 3, and only when it differs from another. Worst is the lowest Wilson upper bound among those it beats, plus ties, capped at 3. Both lists are empty when that leader differs from nobody, or when there is one bucket (single).
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

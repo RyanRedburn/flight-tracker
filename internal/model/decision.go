@@ -17,10 +17,12 @@ const (
 	ConfidenceLow     = "low"
 	ConfidenceUnknown = "unknown"
 
-	// ComparisonRanked means the highest-rate item differs at 95% from at least one other item.
+	// ComparisonRanked means the item with the highest 95% Wilson lower bound differs at 95% from at least one other item.
 	// ComparisonTooCloseToCall means that item is inside the margin of error of every other item.
+	// ComparisonSingle means one item, so there is no best or worst list.
 	ComparisonRanked         = "ranked"
 	ComparisonTooCloseToCall = "too_close_to_call"
+	ComparisonSingle         = "single"
 
 	// proportionZCritical is the two-sided 95% critical value for a pooled two-proportion z-test.
 	proportionZCritical = 1.96
@@ -182,6 +184,24 @@ func ComparisonRate(rate float64, onTimeCount *int, flights int) float64 {
 	}
 
 	return rate
+}
+
+// WilsonBounds is the 95% Wilson score interval for an on-time proportion.
+// The lower bound orders a leader. The upper bound orders a worst anchor.
+// Ties still use ProportionsDiffer. A non-positive sample is 0, 0.
+func WilsonBounds(rate float64, onTimeCount *int, flights int) (lower, upper float64) {
+	if flights <= 0 {
+		return 0, 0
+	}
+
+	p := clampUnit(ComparisonRate(rate, onTimeCount, flights))
+	n := float64(flights)
+	z2 := proportionZCritical * proportionZCritical
+	denom := 1 + z2/n
+	center := (p + z2/(2*n)) / denom
+	margin := proportionZCritical * math.Sqrt(p*(1-p)/n+z2/(4*n*n)) / denom
+
+	return clampUnit(center - margin), clampUnit(center + margin)
 }
 
 func clampUnit(v float64) float64 {

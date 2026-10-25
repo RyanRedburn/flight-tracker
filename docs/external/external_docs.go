@@ -308,7 +308,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the highest-rate carrier with at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -432,7 +432,7 @@ const docTemplateexternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. Best is the highest-rate bucket plus buckets that do not differ from it at 95%, capped at 3, and only when that bucket differs from another. Worst is the lowest-rate bucket among those it beats, plus buckets tied with that one, capped at 3. Both lists are omitted when the highest-rate bucket differs from nobody.",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. The leader is the highest 95% Wilson lower bound. Best is that bucket plus buckets the two-proportion test does not separate from it, capped at 3, and only when it differs from another. Worst is the lowest Wilson upper bound among those it beats, plus ties, capped at 3. Both lists are empty when that leader differs from nobody, or when there is one bucket (single).",
                 "produces": [
                     "application/json"
                 ],
@@ -1050,7 +1050,6 @@ const docTemplateexternal = `{
                         "missing_country",
                         "missing_outlook",
                         "empty_sample",
-                        "insufficient_sample",
                         "missing_threshold",
                         "negative_layover",
                         "invalid_schedule"
@@ -1312,7 +1311,7 @@ const docTemplateexternal = `{
                     "type": "integer"
                 },
                 "carrier_comparison": {
-                    "description": "CarrierComparison is ranked when the highest-rate compared carrier differs at 95% from at least one other,\nand too_close_to_call when it does not. Omitted when fewer than two carriers are compared.",
+                    "description": "CarrierComparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another,\nand too_close_to_call when it does not. Omitted when fewer than two carriers are compared.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -1423,7 +1422,8 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "ranked",
-                        "too_close_to_call"
+                        "too_close_to_call",
+                        "single"
                     ]
                 },
                 "filters": {
@@ -1434,15 +1434,17 @@ const docTemplateexternal = `{
                     "type": "string",
                     "enum": [
                         "ranked",
-                        "too_close_to_call"
+                        "too_close_to_call",
+                        "single"
                     ]
                 },
                 "month_comparison": {
-                    "description": "MonthComparison is ranked when the highest-rate month differs at 95% from another month.\nBest months are that month plus months tied with it, capped at 3. Worst months are the lowest-rate month among those it beats, plus months tied with that one, capped at 3. Too close to call leaves both lists empty.",
+                    "description": "MonthComparison is ranked when the month with the highest 95% Wilson lower bound differs at 95% from another month.\nBest months are that month plus months the test does not separate from it, capped at 3.\nWorst months are the beaten month with the lowest Wilson upper bound, plus months tied with that one, capped at 3.\ntoo_close_to_call and single leave both lists empty. single is one month.",
                     "type": "string",
                     "enum": [
                         "ranked",
-                        "too_close_to_call"
+                        "too_close_to_call",
+                        "single"
                     ]
                 },
                 "worst_days": {

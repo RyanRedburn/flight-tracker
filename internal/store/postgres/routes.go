@@ -108,7 +108,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 		return nil, err
 	}
 
-	if out.Analysis.SampleReason == model.SampleReasonSufficient {
+	if store.OutlookSampleHasFlights(out.Analysis.SampleSize, out.Analysis.SampleReason) {
 		if err := s.setRecommendedConnection(ctx, out, p90Arr); err != nil {
 			return nil, err
 		}

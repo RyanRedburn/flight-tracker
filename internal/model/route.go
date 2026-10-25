@@ -58,7 +58,7 @@ type RouteStats struct {
 	DiversionAirports               []AirportCount        `json:"diversion_airports"`
 	// Present only when the carrier query filter is omitted. Sorted by on_time_rate desc, then flights desc, then carrier asc.
 	CarrierOnTime []CarrierOnTime `json:"carrier_on_time,omitzero"`
-	// CarrierComparison is ranked when the highest-rate compared carrier differs at 95% from at least one other,
+	// CarrierComparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another,
 	// and too_close_to_call when it does not. Omitted when fewer than two carriers are compared.
 	CarrierComparison string `json:"carrier_comparison,omitempty" enums:"ranked,too_close_to_call"`
 }
@@ -141,17 +141,19 @@ type RouteTravelWindows struct {
 	ByHour      []TravelWindowHourBucket  `json:"by_hour"`
 	BestMonths  []TravelWindowMonthBucket `json:"best_months"`
 	WorstMonths []TravelWindowMonthBucket `json:"worst_months"`
-	// MonthComparison is ranked when the highest-rate month differs at 95% from another month.
-	// Best months are that month plus months tied with it, capped at 3. Worst months are the lowest-rate month among those it beats, plus months tied with that one, capped at 3. Too close to call leaves both lists empty.
-	MonthComparison string                  `json:"month_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	// MonthComparison is ranked when the month with the highest 95% Wilson lower bound differs at 95% from another month.
+	// Best months are that month plus months the test does not separate from it, capped at 3.
+	// Worst months are the beaten month with the lowest Wilson upper bound, plus months tied with that one, capped at 3.
+	// too_close_to_call and single leave both lists empty. single is one month.
+	MonthComparison string                  `json:"month_comparison,omitempty" enums:"ranked,too_close_to_call,single"`
 	BestDays        []TravelWindowDayBucket `json:"best_days"`
 	WorstDays       []TravelWindowDayBucket `json:"worst_days"`
 	// DayComparison uses the same rule as month_comparison.
-	DayComparison string                   `json:"day_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	DayComparison string                   `json:"day_comparison,omitempty" enums:"ranked,too_close_to_call,single"`
 	BestHours     []TravelWindowHourBucket `json:"best_hours"`
 	WorstHours    []TravelWindowHourBucket `json:"worst_hours"`
 	// HourComparison uses the same rule as month_comparison.
-	HourComparison string `json:"hour_comparison,omitempty" enums:"ranked,too_close_to_call"`
+	HourComparison string `json:"hour_comparison,omitempty" enums:"ranked,too_close_to_call,single"`
 }
 
 // RoundForResponse rounds rates and probabilities to two decimal places and

@@ -127,9 +127,10 @@ func (a *weatherSideAccum) add(count WeatherCategoryCount) {
 // AssembleRouteOutlookWeather folds per-side rollup counts into the outlook modifier.
 // Fair is VFR_FAIR. Adverse is every other category except UNKNOWN.
 // UNMATCHED and unknown category strings are excluded.
-// Confidence uses the thinner of the two groups and the outlook sample minimum:
-// absent fair or adverse flights are unknown, and a short group is low.
-// Rates stay on a low-confidence side. A missing group is a null rate, so adverse_delta is null.
+// Confidence uses the thinner of the two groups and the outlook bands:
+// below 30 is low, 30–49 is medium, and 50 or more is high.
+// Absent fair or adverse flights are unknown. Rates stay on a low-confidence side.
+// A missing group is a null rate, so adverse_delta is null.
 func AssembleRouteOutlookWeather(counts []WeatherCategoryCount) model.RouteOutlookWeather {
 	origin := &outlookWeatherAccum{}
 	dest := &outlookWeatherAccum{}

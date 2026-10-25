@@ -213,15 +213,23 @@ func TestAssembleRouteTravelWindowsLowSampleMonthCanLead(t *testing.T) {
 	}
 }
 
-func TestRankTravelMonthsLeaderDoesNotSeparate(t *testing.T) {
+func TestRankTravelMonthsWilsonLeader(t *testing.T) {
 	best, worst, comparison := rankTravelBuckets([]model.TravelWindowMonthBucket{
 		{Month: 1, OnTimeRate: 0.88, Flights: 110},
 		{Month: 2, OnTimeRate: 0.85, Flights: 3000},
 		{Month: 3, OnTimeRate: 0.82, Flights: 3000},
 	}, monthBucketKey, monthBucketRate, monthBucketCount, monthBucketFlights)
 
-	if comparison != model.ComparisonTooCloseToCall || len(best) != 0 || len(worst) != 0 {
-		t.Fatalf("best=%+v worst=%+v comparison=%q", best, worst, comparison)
+	if comparison != model.ComparisonRanked {
+		t.Fatalf("comparison = %q, want ranked", comparison)
+	}
+
+	if len(best) != 2 || best[0].Month != 2 || best[1].Month != 1 {
+		t.Fatalf("best = %+v, want the 3000-flight month then the thin 88%%", best)
+	}
+
+	if len(worst) != 1 || worst[0].Month != 3 {
+		t.Fatalf("worst = %+v, want the 82%% month", worst)
 	}
 }
 
@@ -286,7 +294,7 @@ func TestAssembleRouteTravelWindowsEmptyEligible(t *testing.T) {
 		t.Fatalf("by_month len = %d, want 1", len(got.ByMonth))
 	}
 
-	if len(got.BestMonths) != 1 || len(got.WorstMonths) != 1 || got.BestMonths[0].Month != 1 || got.MonthComparison != "" {
+	if len(got.BestMonths) != 0 || len(got.WorstMonths) != 0 || got.MonthComparison != model.ComparisonSingle {
 		t.Errorf("best/worst months = %v / %v comparison %q", got.BestMonths, got.WorstMonths, got.MonthComparison)
 	}
 
@@ -371,5 +379,47 @@ func TestAssembleRouteTravelWindowsCapsTiedBuckets(t *testing.T) {
 		if hour.Hour == 4 {
 			t.Fatalf("hour 4 was capped out of best and must stay out of worst: %+v", got.WorstHours)
 		}
+	}
+}
+
+func TestAssembleRouteTravelWindowsWilsonHourLeader(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainHour, Bucket: 5, OnTimeCount: 2, Flights: 2},
+		{Grain: TravelWindowGrainHour, Bucket: 7, OnTimeCount: 240, Flights: 300},
+		{Grain: TravelWindowGrainHour, Bucket: 18, OnTimeCount: 180, Flights: 300},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", "2025-01-01", "2026-01-01", 602, counts)
+	if got.HourComparison != model.ComparisonRanked {
+		t.Fatalf("hour_comparison = %q", got.HourComparison)
+	}
+
+	// Hour 05 is 2/2. Its Wilson lower bound loses to hour 07, and the two-proportion test does not separate them.
+	if len(got.BestHours) != 2 || got.BestHours[0].Hour != 7 || got.BestHours[1].Hour != 5 {
+		t.Fatalf("best_hours = %+v, want 07 then 05", got.BestHours)
+	}
+
+	if len(got.WorstHours) != 1 || got.WorstHours[0].Hour != 18 {
+		t.Fatalf("worst_hours = %+v, want 18", got.WorstHours)
+	}
+}
+
+func TestAssembleRouteTravelWindowsZeroOnTimeFlight(t *testing.T) {
+	counts := []TravelWindowBucketCount{
+		{Grain: TravelWindowGrainHour, Bucket: 5, OnTimeCount: 0, Flights: 1},
+		{Grain: TravelWindowGrainHour, Bucket: 7, OnTimeCount: 240, Flights: 300},
+	}
+
+	got := AssembleRouteTravelWindows(testTravelOrigin, testTravelDest, "", "2025-01-01", "2026-01-01", 301, counts)
+	if len(got.ByHour) != 2 || got.ByHour[0].Hour != 5 || got.ByHour[0].OnTimeRate != 0 || got.ByHour[0].Flights != 1 {
+		t.Fatalf("by_hour = %+v, want the 0%% flight included", got.ByHour)
+	}
+
+	if got.ByHour[0].Confidence != model.ConfidenceLow || got.ByHour[0].Reliability != model.ReliabilityUnknown {
+		t.Fatalf("zero-flight hour = %+v, want low/unknown", got.ByHour[0])
+	}
+
+	if got.HourComparison != model.ComparisonRanked || len(got.BestHours) != 1 || got.BestHours[0].Hour != 7 || len(got.WorstHours) != 1 || got.WorstHours[0].Hour != 5 {
+		t.Fatalf("hours best %+v worst %+v comparison %q", got.BestHours, got.WorstHours, got.HourComparison)
 	}
 }

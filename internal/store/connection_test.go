@@ -204,6 +204,51 @@ func percentileCont(p float64, values []float64) float64 {
 	return sorted[lo-1] + (rn-float64(lo))*(sorted[hi-1]-sorted[lo-1])
 }
 
+func TestFinishOutlookConnection(t *testing.T) {
+	p90 := 15.0
+
+	t.Run("low sample gets thresholds", func(t *testing.T) {
+		out := &model.RouteOutlook{
+			OutlookResult: model.OutlookResult{
+				Analysis: model.Analysis{SampleSize: 4, SampleReason: model.SampleReasonInsufficientSample},
+			},
+		}
+		FinishOutlookConnection(out, &p90, nil)
+
+		bucket := out.Connection.DomesticToDomestic
+		if bucket == nil || bucket.RecommendedMinutes != 60 || bucket.LooseMinutes != 90 || bucket.MCTSource != model.MCTSourceDefault {
+			t.Fatalf("connection = %+v", out.Connection)
+		}
+	})
+
+	t.Run("empty sample clears a delay", func(t *testing.T) {
+		out := &model.RouteOutlook{
+			OutlookResult: model.OutlookResult{
+				Analysis:   model.Analysis{SampleSize: 0, SampleReason: model.SampleReasonEmptySample},
+				Connection: model.ConnectionGuidanceFromRecommended(60, 75, 90, 120),
+			},
+		}
+		FinishOutlookConnection(out, &p90, nil)
+
+		if out.Connection.DomesticToDomestic != nil {
+			t.Fatalf("connection = %+v", out.Connection)
+		}
+	})
+
+	t.Run("zero flights without the empty reason stay clear", func(t *testing.T) {
+		out := &model.RouteOutlook{
+			OutlookResult: model.OutlookResult{
+				Analysis: model.Analysis{SampleSize: 0, SampleReason: model.SampleReasonInsufficientSample},
+			},
+		}
+		FinishOutlookConnection(out, &p90, nil)
+
+		if out.Connection.DomesticToDomestic != nil {
+			t.Fatalf("connection = %+v", out.Connection)
+		}
+	})
+}
+
 func intPtr(v int) *int {
 	return &v
 }

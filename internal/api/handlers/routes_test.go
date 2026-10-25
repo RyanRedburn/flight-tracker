@@ -352,7 +352,7 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 					Carrier: "UA",
 				},
 				OutlookResult: model.OutlookResult{
-					Analysis:          model.Analysis{SampleSize: store.MinOutlookSampleSize},
+					Analysis:          model.Analysis{SampleSize: model.OutlookLowSampleBelow},
 					OnTimeProbability: floatPtr(0),
 					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 				},

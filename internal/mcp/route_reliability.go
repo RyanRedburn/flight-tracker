@@ -334,7 +334,8 @@ func oneDepartureSummary(route string, dep routeDepartureOutlook) string {
 	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
 
 	if dep.Analysis.SampleSize > 0 && ok {
-		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Analysis.SampleSize)
+		return fmt.Sprintf("%s is on time about %d%% of the time, %s, from %d flights.",
+			label, onTimePercent(rate), confidencePhrase(outlookConfidence(dep.Analysis)), dep.Analysis.SampleSize)
 	}
 
 	return label + " has no data for this day and time."
