@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ const (
 	phraseUnknownConfidence = "unknown confidence"
 	phraseTooClose          = "too close to call"
 	summaryNameCap          = 3
+	wordFlights             = "flights"
 
 	nounMonth      = "month"
 	nounCarrier    = "carrier"
@@ -178,7 +180,7 @@ func rankedComparison(noun, route string, ranked []scoredItem, detail bool) stri
 
 func tooCloseItems(noun, route string, items []scoredItem, detail bool) string {
 	sentence := fmt.Sprintf("%s are %s on %s (%s on time)",
-		countLabel(len(items), noun), phraseTooClose, route, percentSpan(items))
+		tooCloseLabel(items, noun), phraseTooClose, route, percentSpan(items))
 	if !detail {
 		return sentence + "."
 	}
@@ -186,13 +188,13 @@ func tooCloseItems(noun, route string, items []scoredItem, detail bool) string {
 	return sentence + ", " + confidencePhrase(itemConfidence(items)) + ", " + flightSpan(items) + "."
 }
 
-func countLabel(n int, noun string) string {
-	plural := pluralNoun(noun)
-	if n == 2 {
-		return "Both " + plural
+// tooCloseLabel names up to summaryNameCap items by rate and counts larger sets.
+func tooCloseLabel(items []scoredItem, noun string) string {
+	if len(items) <= summaryNameCap {
+		return joinLabels(sortByRateDesc(items))
 	}
 
-	return fmt.Sprintf("All %d %s", n, plural)
+	return fmt.Sprintf("All %d %s", len(items), pluralNoun(noun))
 }
 
 func pluralNoun(noun string) string {
@@ -221,13 +223,11 @@ func leaderSentence(route string, leaders, trailers []scoredItem, detail bool) s
 	named := append(append([]scoredItem{}, namedLeaders...), namedTrailers...)
 	flights := flightsPhrase(sampleSizes(named))
 
-	others := append(append([]scoredItem{}, otherLeaders...), otherTrailers...)
-
 	if len(namedLeaders) == 1 {
 		sentence := fmt.Sprintf("%s is more reliable than %s on %s (%s).",
 			namedLeaders[0].label, joinLabels(namedTrailers), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", namedLeaders[0].percent, joinItemPercents(namedTrailers)), flights, confidence, detail))
 
-		return appendOthers(sentence, others)
+		return appendTrailing(appendTied(sentence, otherLeaders), otherTrailers)
 	}
 
 	leaderRatesText := joinItemPercents(namedLeaders)
@@ -238,7 +238,7 @@ func leaderSentence(route string, leaders, trailers []scoredItem, detail bool) s
 	sentence := fmt.Sprintf("%s are %s and more reliable than %s on %s (%s).",
 		joinLabels(namedLeaders), phraseTooClose, joinLabels(namedTrailers), route, onTimeDetail(leaderRatesText+" vs "+joinItemPercents(namedTrailers), flights, confidence, detail))
 
-	return appendOthers(sentence, others)
+	return appendTrailing(appendTied(sentence, otherLeaders), otherTrailers)
 }
 
 func mixedComparison(noun, route string, sorted []scoredItem, detail bool) string {
@@ -265,7 +265,7 @@ func mixedComparison(noun, route string, sorted []scoredItem, detail bool) strin
 	compared := append([]scoredItem{best}, namedBeaten...)
 	lead := fmt.Sprintf("%s is more reliable than %s on %s (%s).",
 		best.label, joinLabels(namedBeaten), route, onTimeDetail(fmt.Sprintf("%d%% vs %s", best.percent, joinItemPercents(namedBeaten)), flightsPhrase(sampleSizes(compared)), confidence, detail))
-	lead = appendOthers(lead, otherBeaten)
+	lead = appendTrailing(lead, otherBeaten)
 
 	if len(tied) == 0 {
 		return lead
@@ -285,7 +285,7 @@ func tiedAgainst(tied []scoredItem, against string) string {
 
 	sentence := sentenceCase(fmt.Sprintf("%s %s %s against %s.", joinAnd(labels), pluralVerb(len(named)), phraseTooClose, against))
 
-	return appendOthers(sentence, others)
+	return appendTied(sentence, others)
 }
 
 func orderedItems(route string, sorted []scoredItem, detail bool) string {
@@ -297,10 +297,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 	namedCount := min(tied, summaryNameCap)
 	leaders := sortByRateDesc(sorted[:namedCount])
 	worst, others := tailAndOthers(sorted[tied:])
-
-	if tied > summaryNameCap {
-		others = append(append([]scoredItem{}, sorted[namedCount:tied]...), others...)
-	}
+	otherLeaders := sorted[namedCount:tied]
 
 	rest := make([]string, 0, len(worst))
 
@@ -326,7 +323,7 @@ func orderedItems(route string, sorted []scoredItem, detail bool) string {
 	sentence := fmt.Sprintf("%s %s most reliable on %s (%s), then %s.",
 		joinLabels(leaders), verb, route, lead, joinAnd(rest))
 
-	return appendOthers(sentence, others)
+	return appendTrailing(appendTied(sentence, otherLeaders), others)
 }
 
 func capNamed(items []scoredItem) (named, others []scoredItem) {
@@ -345,21 +342,30 @@ func tailAndOthers(items []scoredItem) (tail, others []scoredItem) {
 	return sortByRateDesc(tail), others
 }
 
-func appendOthers(sentence string, others []scoredItem) string {
+// appendTrailing notes unnamed items that also trail the leader.
+func appendTrailing(sentence string, others []scoredItem) string {
 	if len(others) == 0 {
 		return sentence
 	}
 
-	return sentence + " " + othersPhrase(others) + "."
-}
-
-func othersPhrase(items []scoredItem) string {
-	noun := "others"
-	if len(items) == 1 {
-		noun = "other"
+	if len(others) == 1 {
+		return fmt.Sprintf("%s 1 other also trails (%s).", sentence, percentSpan(others))
 	}
 
-	return fmt.Sprintf("%d %s, %s", len(items), noun, percentSpan(items))
+	return fmt.Sprintf("%s %d others also trail (%s).", sentence, len(others), percentSpan(others))
+}
+
+// appendTied notes unnamed items that are also too close to call against the leader.
+func appendTied(sentence string, others []scoredItem) string {
+	if len(others) == 0 {
+		return sentence
+	}
+
+	if len(others) == 1 {
+		return fmt.Sprintf("%s 1 other is also %s (%s).", sentence, phraseTooClose, percentSpan(others))
+	}
+
+	return fmt.Sprintf("%s %d others are also %s (%s).", sentence, len(others), phraseTooClose, percentSpan(others))
 }
 
 func percentSpan(items []scoredItem) string {
@@ -386,7 +392,7 @@ func flightSpan(items []scoredItem) string {
 	}
 
 	if lo == hi {
-		word := "flights"
+		word := wordFlights
 		if lo == 1 {
 			word = "flight"
 		}
@@ -667,9 +673,17 @@ func flightsPhrase(sizes []int) string {
 		parts[i] = strconv.Itoa(n)
 	}
 
-	word := "flights"
-	if len(sizes) == 1 && sizes[0] == 1 {
+	word := wordFlights
+	if sizes[0] == 1 && slices.Max(sizes) == 1 {
 		word = "flight"
+	}
+
+	if len(sizes) > 1 && slices.Min(sizes) == slices.Max(sizes) {
+		return strconv.Itoa(sizes[0]) + " " + word + " each"
+	}
+
+	if len(sizes) > 1 {
+		word = wordFlights
 	}
 
 	return joinAnd(parts) + " " + word

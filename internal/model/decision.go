@@ -155,7 +155,8 @@ func ConnectionStatus(layover int, minutes *ConnectionMinutes) string {
 }
 
 // ProportionsDiffer reports whether two on-time rates differ at 95%.
-// Counts come from the rates and flight totals. A non-positive sample does not differ.
+// Callers pass ComparisonRate, so the on-time counts are exact when known and
+// rounded from the rate only when a count is missing. A non-positive sample does not differ.
 // A two-sided Fisher exact test is used when any expected cell is below 5.
 // Otherwise the comparison is a pooled two-proportion z-test.
 func ProportionsDiffer(rate1 float64, flights1 int, rate2 float64, flights2 int) bool {

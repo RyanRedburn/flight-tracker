@@ -183,7 +183,7 @@ func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTrave
 
 func tooCloseMonths(route string, months []scoredItem) string {
 	return fmt.Sprintf("%s are %s for %s (%s on time), %s, %s.",
-		countLabel(len(months), nounMonth), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
+		tooCloseLabel(months, nounMonth), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
 }
 
 func scoredMonths(buckets []model.TravelWindowMonthBucket) []scoredItem {

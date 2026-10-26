@@ -97,7 +97,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 				"1400": reliabilityOutlook(0.80, 36, model.ConfidenceHigh),
 			},
-			want:           "Both times are too close to call on UA ORD–LAX (80% on time).",
+			want:           "0700 and 1400 are too close to call on UA ORD–LAX (80% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -107,7 +107,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.82, 40, model.ConfidenceHigh),
 				"1400": reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 			},
-			want:           "Both times are too close to call on UA ORD–LAX (80–82% on time).",
+			want:           "0700 and 1400 are too close to call on UA ORD–LAX (80–82% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -137,7 +137,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"0700": reliabilityOutlook(0.85, 30, model.ConfidenceMedium),
 				"1400": reliabilityOutlook(0.95, 4, model.ConfidenceLow),
 			},
-			want:           "Both times are too close to call on UA ORD–LAX (85–95% on time).",
+			want:           "1400 and 0700 are too close to call on UA ORD–LAX (85–95% on time).",
 			wantConfidence: model.ConfidenceLow,
 		},
 		{
@@ -148,7 +148,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				"1400": reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 				"1800": reliabilityOutlook(0.81, 40, model.ConfidenceHigh),
 			},
-			want:           "All 3 times are too close to call on UA ORD–LAX (81–85% on time).",
+			want:           "0700, 1400 and 1800 are too close to call on UA ORD–LAX (81–85% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -172,7 +172,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep0900: reliabilityOutlook(0.84, 40, model.ConfidenceHigh),
 				testDep1100: reliabilityOutlook(0.80, 40, model.ConfidenceHigh),
 			},
-			want:           "All 3 times are too close to call on UA ORD–LAX (80–85% on time).",
+			want:           "0700, 0900 and 1100 are too close to call on UA ORD–LAX (80–85% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
@@ -183,7 +183,7 @@ func TestRouteReliabilitySummaries(t *testing.T) {
 				testDep0900: reliabilityOutlook(0.85, 40, model.ConfidenceHigh),
 				testDep1100: reliabilityOutlook(0.83, 40, model.ConfidenceHigh),
 			},
-			want:           "All 3 times are too close to call on UA ORD–LAX (81–85% on time).",
+			want:           "0900, 1100 and 0700 are too close to call on UA ORD–LAX (81–85% on time).",
 			wantConfidence: model.ConfidenceHigh,
 		},
 		{
