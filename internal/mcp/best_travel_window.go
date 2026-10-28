@@ -105,9 +105,9 @@ func bestTravelWindow(ctx context.Context, s store.Store, logger *slog.Logger, i
 	}
 
 	data := newBestTravelWindowData(windows)
-	summary, confidence := travelWindowSummary(carrier, origin, dest, windows)
+	summary, _ := travelWindowSummary(carrier, origin, dest, windows)
 
-	return successResult(summary, confidence, data)
+	return successResult(summary, "", data)
 }
 
 func newBestTravelWindowData(windows *model.RouteTravelWindows) *bestTravelWindowData {

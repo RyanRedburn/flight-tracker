@@ -131,7 +131,11 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 	}
 
 	data := newCompareCarriersData(stats)
+
 	summary, confidence := compareCarriersSummary(origin, dest, data)
+	if len(data.Carriers) > 1 {
+		confidence = ""
+	}
 
 	return successResult(summary, confidence, data)
 }

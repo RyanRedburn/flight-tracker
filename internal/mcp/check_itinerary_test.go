@@ -32,10 +32,8 @@ func TestCheckItineraryTightConnection(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
-	if !out.Data.Summary.ConnectionRisk {
-		t.Fatalf("connection_risk = false")
-	}
+	out := decodeResult[checkItineraryData](t, res)
+	assertTextJSONEqualsStructured(t, res)
 
 	if out.Confidence != model.ConfidenceHigh {
 		t.Fatalf("confidence = %q", out.Confidence)
@@ -54,7 +52,7 @@ func TestCheckItineraryTwoTightConnections(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	out := decodeResult[checkItineraryData](t, res)
 
 	want := "Connections at ORD and DFW look tight; allow more time or pick later outbounds."
 	if out.Summary != want {
@@ -70,7 +68,7 @@ func TestCheckItineraryTightAndUnknownConnections(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	out := decodeResult[checkItineraryData](t, res)
 
 	want := "Connection at ORD looks tight and risk at DFW is unknown; allow more time or pick a later outbound."
 	if out.Summary != want {
@@ -104,7 +102,7 @@ func TestCheckItineraryFlightNumberAmbiguous(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	out := decodeResult[checkItineraryData](t, res)
 	if out.Error == nil || out.Error.Code != CodeFlightNumberAmbiguous {
 		t.Fatalf("error = %#v", out.Error)
 	}
@@ -147,7 +145,7 @@ func TestCheckItineraryResolvesFlightNumber(t *testing.T) {
 		t.Fatalf("IsError content=%s", toolText(t, res))
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	out := decodeResult[checkItineraryData](t, res)
 	leg := out.Data.Legs[0]
 
 	if leg.Outlook == nil || leg.Outlook.Filters.Origin != testCodeBOS || leg.Outlook.Filters.Dest != testCodeORD {
@@ -178,7 +176,7 @@ func TestCheckItineraryFlightNumberNotFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	out := decodeResult[model.ItineraryOutlookResponse](t, res)
+	out := decodeResult[checkItineraryData](t, res)
 	if out.Error == nil || out.Error.Code != CodeFlightNumberNotFound {
 		t.Fatalf("error = %#v", out.Error)
 	}

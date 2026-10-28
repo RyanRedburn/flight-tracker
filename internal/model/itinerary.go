@@ -56,7 +56,7 @@ type ItineraryOutlookResponse struct {
 type ItineraryOutlookSummary struct {
 	Origin      string `json:"origin"`
 	Destination string `json:"destination"`
-	// A missing outlook counts as unknown.
+	// The lowest confidence among the legs.
 	Confidence string `json:"confidence" enums:"high,medium,low,unknown"`
 	// True when any connection is tight or unknown.
 	ConnectionRisk bool `json:"connection_risk"`

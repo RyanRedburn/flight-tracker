@@ -217,6 +217,9 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 	}
 
 	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
+	if len(departures) > 1 {
+		confidence = ""
+	}
 
 	return successResult(summary, confidence, &routeReliabilityData{
 		Stats:      *stats,

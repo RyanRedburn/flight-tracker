@@ -2697,7 +2697,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
-                    "description": "A missing outlook counts as unknown.",
+                    "description": "The lowest confidence among the legs.",
                     "type": "string",
                     "enum": [
                         "high",
