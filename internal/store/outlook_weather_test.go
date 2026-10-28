@@ -80,13 +80,42 @@ func TestAssembleRouteOutlookWeatherEmptyAndThin(t *testing.T) {
 		{Side: WeatherSideDest, Category: model.WeatherCategoryVFRFair, OnTimeCount: 10, Flights: 10},
 		{Side: WeatherSideDest, Category: model.WeatherCategoryIFR, OnTimeCount: 10, Flights: 10},
 	})
-	assertOutlookWeatherSide(t, "meets minimum", meets.Dest, floatPtr(1), floatPtr(1), floatPtr(0), 10, model.ConfidenceHigh)
+	assertOutlookWeatherSide(t, "ten flights", meets.Dest, floatPtr(1), floatPtr(1), floatPtr(0), 10, model.ConfidenceLow)
 
 	better := AssembleRouteOutlookWeather([]WeatherCategoryCount{
 		{Side: WeatherSideOrigin, Category: model.WeatherCategoryVFRFair, OnTimeCount: 10, Flights: 40},
 		{Side: WeatherSideOrigin, Category: model.WeatherCategoryMVFR, OnTimeCount: 30, Flights: 40},
 	})
-	assertOutlookWeatherSide(t, "adverse better", better.Origin, floatPtr(0.25), floatPtr(0.75), floatPtr(0.5), 40, model.ConfidenceHigh)
+	assertOutlookWeatherSide(t, "adverse better", better.Origin, floatPtr(0.25), floatPtr(0.75), floatPtr(0.5), 40, model.ConfidenceMedium)
+}
+
+func TestWeatherSideConfidenceBands(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		fair    int
+		adverse int
+		want    string
+	}{
+		{name: "thinner 29", fair: 29, adverse: 100, want: model.ConfidenceLow},
+		{name: "thinner 30", fair: 100, adverse: 30, want: model.ConfidenceMedium},
+		{name: "thinner 49", fair: 49, adverse: 80, want: model.ConfidenceMedium},
+		{name: "thinner 50", fair: 50, adverse: 80, want: model.ConfidenceHigh},
+		{name: "missing fair", fair: 0, adverse: 50, want: model.ConfidenceUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := AssembleRouteOutlookWeather([]WeatherCategoryCount{
+				{Side: WeatherSideOrigin, Category: model.WeatherCategoryVFRFair, OnTimeCount: tt.fair, Flights: tt.fair},
+				{Side: WeatherSideOrigin, Category: model.WeatherCategoryIFR, OnTimeCount: tt.adverse, Flights: tt.adverse},
+			})
+			if got.Origin.Confidence != tt.want {
+				t.Errorf("confidence = %q, want %q", got.Origin.Confidence, tt.want)
+			}
+		})
+	}
 }
 
 func TestAssembleRouteOutlookWeatherCountsEveryAdverseCategory(t *testing.T) {

@@ -117,6 +117,7 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		DayOfWeek:            day,
 		DepTime:              store.FormatHHMM(q.DepTime),
 		DepTimeWindowMinutes: window,
+		DepTimeWindowSet:     q.DepTimeWindowMinutes != nil,
 	}
 	if err := filter.Validate(); err != nil {
 		return store.RouteOutlookFilter{}, err

@@ -22,13 +22,34 @@ type AirportConnectionMCT struct {
 	InternationalToInternational *int
 }
 
+// OutlookSampleHasFlights reports whether a slot has flights to base connection guidance on.
+// A low sample still has flights. empty_sample and a zero count do not.
+func OutlookSampleHasFlights(sampleSize int, sampleReason string) bool {
+	return sampleSize > 0 && sampleReason != model.SampleReasonEmptySample
+}
+
+// FinishOutlookConnection sets connection thresholds from the arrival-delay p90 when the slot has flights.
+// An empty sample clears them, including a delay that was still present.
+func FinishOutlookConnection(out *model.RouteOutlook, arrivalDelayP90 *float64, mct *AirportConnectionMCT) {
+	if out == nil {
+		return
+	}
+
+	if !OutlookSampleHasFlights(out.Analysis.SampleSize, out.Analysis.SampleReason) {
+		out.Connection = model.ConnectionGuidance{}
+
+		return
+	}
+
+	out.Connection = ConnectionRecommendation(arrivalDelayP90, mct)
+}
+
 // ConnectionRecommendation is max(0, round(arrivalDelayP90)) + floor per connection type.
 // floor is the airport MCT minute when that bucket is set, otherwise 45, 60, 120, or 120.
 // mct_source is airport for a stored minute, including zero, and default when the bucket is missing.
-// loose_minutes is that recommendation plus 30. A nil p90 or an insufficient sample returns nulls,
-// which were not estimated.
-func ConnectionRecommendation(insufficient bool, arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.ConnectionGuidance {
-	if insufficient || arrivalDelayP90 == nil {
+// loose_minutes is that recommendation plus 30. A nil p90 returns nulls, which were not estimated.
+func ConnectionRecommendation(arrivalDelayP90 *float64, mct *AirportConnectionMCT) model.ConnectionGuidance {
+	if arrivalDelayP90 == nil {
 		return model.ConnectionGuidance{}
 	}
 

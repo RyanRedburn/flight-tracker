@@ -222,9 +222,10 @@ func TestRoutesOutlook(t *testing.T) {
 				OutlookResult: model.OutlookResult{
 					Analysis:          model.Analysis{SampleSize: 3, End: testAnalysisEnd},
 					OnTimeProbability: floatPtr(0),
+					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -261,7 +262,9 @@ func TestRoutesOutlook(t *testing.T) {
 		t.Errorf("analysis end = %q, want %q", out.Analysis.End, testAnalysisEnd)
 	}
 
-	assertNullConnectionMinutesJSON(t, body)
+	if out.Connection.DomesticToDomestic == nil || out.Connection.DomesticToDomestic.RecommendedMinutes != 45 {
+		t.Fatalf("connection = %+v", out.Connection.DomesticToDomestic)
+	}
 }
 
 func TestRoutesOutlookEmpty(t *testing.T) {
@@ -299,7 +302,7 @@ func TestRoutesOutlookEmptyFilters(t *testing.T) {
 					OnTimeProbability: &zero,
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -349,12 +352,12 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 					Carrier: "UA",
 				},
 				OutlookResult: model.OutlookResult{
-					Analysis:          model.Analysis{SampleSize: store.MinOutlookSampleSize},
+					Analysis:          model.Analysis{SampleSize: model.OutlookLowSampleBelow},
 					OnTimeProbability: floatPtr(0),
 					Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 90, 120),
 				},
 			}
-			out.ApplyOutlookSample(store.MinOutlookSampleSize)
+			out.ApplyOutlookSample()
 
 			return out, nil
 		},
@@ -373,7 +376,7 @@ func TestRoutesOutlookSufficientKeepsZeroRate(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceHigh {
+	if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceMedium {
 		t.Fatalf("solid slot = %+v", out.Analysis)
 	}
 

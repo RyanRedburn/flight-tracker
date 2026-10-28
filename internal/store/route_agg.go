@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	MinOutlookSampleSize        = 10
 	OutlookLookbackDays         = 365
+	OutlookFallbackLookbackDays = 730
 	MaxStatsSpanDays            = 366
-	DefaultDepTimeWindowMinutes = 30
+	DefaultDepTimeWindowMinutes = 60
 	MaxDepTimeWindowMinutes     = 120
 )
 
@@ -44,6 +44,9 @@ type RouteOutlookFilter struct {
 	DayOfWeek            int
 	DepTime              string
 	DepTimeWindowMinutes int
+	// DepTimeWindowSet is true when the caller passed a window.
+	// The default window may widen lookback. An explicit window does not.
+	DepTimeWindowSet bool
 }
 
 // ParseOutlookDay resolves an outlook weekday. Exactly one of date or dayOfWeek must be set.
@@ -194,12 +197,50 @@ func ISOWeekdayFromDate(date string) (int, bool) {
 // TrailingOutlookWindow is the inclusive trailing outlook year ending at endDate.
 // Route outlook and compare_carriers share it; the span fits in MaxStatsSpanDays.
 func TrailingOutlookWindow(endDate string) (start, end string, ok bool) {
+	return TrailingOutlookWindowDays(endDate, OutlookLookbackDays)
+}
+
+// TrailingOutlookWindowDays is the inclusive trailing window of days ending at endDate.
+func TrailingOutlookWindowDays(endDate string, days int) (start, end string, ok bool) {
 	endTime, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		return "", "", false
 	}
 
-	return endTime.AddDate(0, 0, -OutlookLookbackDays).Format("2006-01-02"), endDate, true
+	return endTime.AddDate(0, 0, -days).Format("2006-01-02"), endDate, true
+}
+
+// WidenOutlookLookback reports whether a default-window slot below the low outlook band
+// should be re-queried at OutlookFallbackLookbackDays. A caller-set departure window is never widened.
+func WidenOutlookLookback(sampleSize int, windowSet bool) bool {
+	return !windowSet && sampleSize < model.OutlookLowSampleBelow
+}
+
+// ApplyOutlookLookback runs the slot query at 365 days, and at 730 when the default window is still thin.
+// It records lookback_days and then applies the outlook sample rule.
+func ApplyOutlookLookback(out *model.RouteOutlook, windowSet bool, query func(lookbackDays int) error) error {
+	if out == nil {
+		return nil
+	}
+
+	if err := query(OutlookLookbackDays); err != nil {
+		return err
+	}
+
+	lookback := OutlookLookbackDays
+
+	if WidenOutlookLookback(out.Analysis.SampleSize, windowSet) {
+		if err := query(OutlookFallbackLookbackDays); err != nil {
+			return err
+		}
+
+		lookback = OutlookFallbackLookbackDays
+	}
+
+	out.Analysis.LookbackDays = lookback
+	out.ApplyOutlookSample()
+
+	return nil
 }
 
 func ResolveDepTimeWindowMinutes(minutes *int) int {
@@ -212,10 +253,61 @@ func ResolveDepTimeWindowMinutes(minutes *int) int {
 
 func CarrierOnTimeFromCounts(carrier string, onTime, flights int) model.CarrierOnTime {
 	return model.CarrierOnTime{
-		Carrier:    carrier,
-		OnTimeRate: rate(onTime, flights),
-		Flights:    flights,
+		Carrier:     carrier,
+		OnTimeRate:  rate(onTime, flights),
+		Flights:     flights,
+		OnTimeCount: &onTime,
 	}
+}
+
+// CarrierComparison is ranked when the carrier with the highest 95% Wilson lower bound
+// and at least one flight differs at 95% from another. Fewer than two such carriers is not a comparison.
+func CarrierComparison(items []model.CarrierOnTime) string {
+	eligible := make([]model.CarrierOnTime, 0, len(items))
+
+	for _, item := range items {
+		if item.Flights >= 1 {
+			eligible = append(eligible, item)
+		}
+	}
+
+	if len(eligible) < 2 {
+		return ""
+	}
+
+	sort.SliceStable(eligible, func(i, j int) bool {
+		left, _ := model.WilsonBounds(eligible[i].OnTimeRate, eligible[i].OnTimeCount, eligible[i].Flights)
+		right, _ := model.WilsonBounds(eligible[j].OnTimeRate, eligible[j].OnTimeCount, eligible[j].Flights)
+
+		if left != right {
+			return left > right
+		}
+
+		if eligible[i].Flights != eligible[j].Flights {
+			return eligible[i].Flights > eligible[j].Flights
+		}
+
+		return eligible[i].Carrier < eligible[j].Carrier
+	})
+
+	leader := eligible[0]
+
+	for _, item := range eligible[1:] {
+		if carrierDiffers(leader, item) {
+			return model.ComparisonRanked
+		}
+	}
+
+	return model.ComparisonTooCloseToCall
+}
+
+func carrierDiffers(a, b model.CarrierOnTime) bool {
+	return model.ProportionsDiffer(
+		model.ComparisonRate(a.OnTimeRate, a.OnTimeCount, a.Flights),
+		a.Flights,
+		model.ComparisonRate(b.OnTimeRate, b.OnTimeCount, b.Flights),
+		b.Flights,
+	)
 }
 
 func SortCarrierOnTime(items []model.CarrierOnTime) {

@@ -71,8 +71,8 @@ func ConnectionType(originCountry, hubCountry, destCountry string) (string, bool
 
 // AssessConnection labels one hop between inbound and outbound.
 // Reason is chosen in this order: multi_airport, missing_country, missing_outlook,
-// empty_sample or insufficient_sample, missing_threshold, negative_layover or
-// invalid_schedule, overnight, evaluated.
+// empty_sample, missing_threshold, negative_layover or invalid_schedule, overnight, evaluated.
+// A low sample is still classified.
 // A later outbound date sets overnight even when an earlier reason wins.
 // mct_source is copied only from a published bucket.
 func AssessConnection(inbound, outbound model.ItineraryLeg, outlook *model.RouteOutlook, countries map[string]string) model.ItineraryConnection {

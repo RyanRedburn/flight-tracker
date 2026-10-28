@@ -33,6 +33,8 @@ type comparedCarrier struct {
 	Confidence   string  `json:"confidence"`
 	SampleSize   int     `json:"sample_size"`
 	SampleReason string  `json:"sample_reason"`
+	// comparisonRate is the unrounded rate used to compare carriers.
+	comparisonRate float64
 }
 
 type compareCarriersData struct {
@@ -129,7 +131,11 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 	}
 
 	data := newCompareCarriersData(stats)
+
 	summary, confidence := compareCarriersSummary(origin, dest, data)
+	if len(data.Carriers) > 1 {
+		confidence = ""
+	}
 
 	return successResult(summary, confidence, data)
 }
@@ -142,6 +148,7 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 
 	trimmed := *stats
 	trimmed.CarrierOnTime = nil
+	trimmed.CarrierComparison = ""
 
 	return &compareCarriersData{
 		Stats:    trimmed,
@@ -150,15 +157,15 @@ func newCompareCarriersData(stats *model.RouteStats) *compareCarriersData {
 }
 
 func comparedCarrierFrom(row model.CarrierOnTime) comparedCarrier {
-	// Same 30-flight minimum used to rank a carrier's routes.
-	confidence := model.SeasonalConfidence(row.Flights, store.CarrierStatsMinSampleSize)
+	confidence := model.CountConfidence(row.Flights, model.CarrierLowSampleBelow, model.CarrierHighSampleAt)
 
 	return comparedCarrier{
-		Carrier:      row.Carrier,
-		OnTimeRate:   row.OnTimeRate,
-		Confidence:   confidence,
-		SampleSize:   row.Flights,
-		SampleReason: sampleReason(row.Flights, confidence),
+		Carrier:        row.Carrier,
+		OnTimeRate:     row.OnTimeRate,
+		Confidence:     confidence,
+		SampleSize:     row.Flights,
+		SampleReason:   sampleReason(row.Flights, confidence),
+		comparisonRate: model.ComparisonRate(row.OnTimeRate, row.OnTimeCount, row.Flights),
 	}
 }
 
@@ -173,12 +180,14 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 		items[i] = scoredItem{
 			label:      carrierLabel(carrier.Carrier),
 			percent:    onTimePercent(carrier.OnTimeRate),
+			rate:       carrier.comparisonRate,
 			sampleSize: carrier.SampleSize,
 			confidence: carrier.Confidence,
+			hasRate:    carrier.SampleSize > 0,
 		}
 	}
 
-	if len(items) == 1 && items[0].confidence == model.ConfidenceHigh {
+	if len(items) == 1 && items[0].sampleSize > 0 {
 		return soleCarrierSummary(route, items[0])
 	}
 
@@ -187,5 +196,5 @@ func compareCarriersSummary(origin, dest string, data *compareCarriersData) (str
 
 func soleCarrierSummary(route string, item scoredItem) (string, string) {
 	return sentenceCase(fmt.Sprintf("%s is on time about %d%% of the time on %s (%s, %s).",
-		item.label, item.percent, route, phraseHighConfidence, flightsPhrase([]int{item.sampleSize}))), model.ConfidenceHigh
+		item.label, item.percent, route, confidencePhrase(item.confidence), flightsPhrase([]int{item.sampleSize}))), item.confidence
 }
