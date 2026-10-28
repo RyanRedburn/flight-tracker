@@ -1395,7 +1395,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.",
+                "description": "Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison says whether those carriers can be ranked. Both fields are omitted when carrier is set.",
                 "produces": [
                     "application/json"
                 ],
@@ -1519,7 +1519,7 @@ const docTemplateinternal = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. The leader is the highest 95% Wilson lower bound. Best is that bucket plus buckets the two-proportion test does not separate from it, capped at 3, and only when it differs from another. Worst is the lowest Wilson upper bound among those it beats, plus ties, capped at 3. Both lists are empty when that leader differs from nobody, or when there is one bucket (single).",
+                "description": "Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is included. Best and worst lists hold up to 3 buckets each and never overlap. month_comparison, day_comparison and hour_comparison say when they are empty.",
                 "produces": [
                     "application/json"
                 ],
@@ -2140,6 +2140,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
+                    "description": "Outlook only: low under 30 flights, medium 30–49, high 50 or more.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -2152,7 +2153,7 @@ const docTemplateinternal = `{
                     "type": "string"
                 },
                 "lookback_days": {
-                    "description": "Days of history used: 365, or 730 when a thin default window was widened.",
+                    "description": "Outlook only. Days of history used: 365, or 730 when dep_time_window_minutes was not set and the last 365 days had fewer than 30 flights.",
                     "type": "integer"
                 },
                 "sample_reason": {
@@ -2572,7 +2573,7 @@ const docTemplateinternal = `{
                     "type": "boolean"
                 },
                 "reason": {
-                    "description": "Reason is why status is unknown, except overnight, which means a later date was still classified. empty_sample matches the inbound sample_reason when that slot has no flights. A low sample is still classified. missing_outlook does not.",
+                    "description": "Why status is unknown. overnight is the exception: a later outbound date was still classified. empty_sample means the inbound slot has no flights. A low-confidence slot is still classified.",
                     "type": "string",
                     "enum": [
                         "evaluated",
@@ -2767,7 +2768,7 @@ const docTemplateinternal = `{
                     "type": "number"
                 },
                 "connection": {
-                    "description": "Cleared when the slot has no flights. A low sample keeps these thresholds.",
+                    "description": "Empty when the slot has no flights. Present at any confidence otherwise.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.ConnectionGuidance"
@@ -2842,7 +2843,7 @@ const docTemplateinternal = `{
                     "type": "number"
                 },
                 "confidence": {
-                    "description": "Confidence follows the thinner of the fair and adverse counts, and is unknown when either count is zero.",
+                    "description": "Based on the smaller of the fair and adverse flight counts: low under 30, medium 30–49, high 50 or more. Unknown when either count is zero.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -2882,7 +2883,7 @@ const docTemplateinternal = `{
                     "type": "integer"
                 },
                 "carrier_comparison": {
-                    "description": "CarrierComparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another,\nand too_close_to_call when it does not. Omitted when fewer than two carriers are compared.",
+                    "description": "ranked: the most reliable carrier (highest on-time rate, allowing for sample size) differs from at least one other at 95% statistical significance.\ntoo_close_to_call: it differs significantly from none. Omitted when fewer than two carriers have flights.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -2989,7 +2990,7 @@ const docTemplateinternal = `{
                     }
                 },
                 "day_comparison": {
-                    "description": "DayComparison uses the same rule as month_comparison.",
+                    "description": "Same values and rules as month_comparison, for best_days and worst_days.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -3001,7 +3002,7 @@ const docTemplateinternal = `{
                     "$ref": "#/definitions/model.Filters"
                 },
                 "hour_comparison": {
-                    "description": "HourComparison uses the same rule as month_comparison.",
+                    "description": "Same values and rules as month_comparison, for best_hours and worst_hours.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -3010,7 +3011,7 @@ const docTemplateinternal = `{
                     ]
                 },
                 "month_comparison": {
-                    "description": "MonthComparison is ranked when the month with the highest 95% Wilson lower bound differs at 95% from another month.\nBest months are that month plus months the test does not separate from it, capped at 3.\nWorst months are the beaten month with the lowest Wilson upper bound, plus months tied with that one, capped at 3.\ntoo_close_to_call and single leave both lists empty. single is one month.",
+                    "description": "ranked: the most reliable month (highest on-time rate, allowing for sample size) differs from at least one other month at 95% statistical significance.\nbest_months is that month plus months not significantly different from it. worst_months is the least reliable month it beats plus months not significantly different from that one.\nEach list has at most 3 months and they never overlap.\ntoo_close_to_call: no month differs significantly from the most reliable one. single: only one month has flights. Both leave the lists empty.\nOmitted when no month has flights.",
                     "type": "string",
                     "enum": [
                         "ranked",
@@ -3062,6 +3063,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
+                    "description": "Low under 30 flights, medium 30–49, high 50 or more.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -3094,6 +3096,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
+                    "description": "Low under 30 flights, medium 30–49, high 50 or more.",
                     "type": "string",
                     "enum": [
                         "high",
@@ -3126,6 +3129,7 @@ const docTemplateinternal = `{
             "type": "object",
             "properties": {
                 "confidence": {
+                    "description": "Low under 30 flights, medium 30–49, high 50 or more.",
                     "type": "string",
                     "enum": [
                         "high",

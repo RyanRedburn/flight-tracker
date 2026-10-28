@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison is ranked when the carrier with the highest 95% Wilson lower bound and at least one flight differs at 95% from another, and too_close_to_call when it does not. The carrier list is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison says whether those carriers can be ranked. Both fields are omitted when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is ranked. The leader is the highest 95% Wilson lower bound. Best is that bucket plus buckets the two-proportion test does not separate from it, capped at 3, and only when it differs from another. Worst is the lowest Wilson upper bound among those it beats, plus ties, capped at 3. Both lists are empty when that leader differs from nobody, or when there is one bucket (single).
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is included. Best and worst lists hold up to 3 buckets each and never overlap. month_comparison, day_comparison and hour_comparison say when they are empty.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

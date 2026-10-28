@@ -63,7 +63,7 @@ type RouteOutlookWeatherSide struct {
 	AdverseDelta *float64 `json:"adverse_delta"`
 	// AdverseFlights counts adverse-category flights. UNKNOWN and unmatched flights are excluded.
 	AdverseFlights int `json:"adverse_flights"`
-	// Confidence follows the thinner of the fair and adverse counts, and is unknown when either count is zero.
+	// Based on the smaller of the fair and adverse flight counts: low under 30, medium 30–49, high 50 or more. Unknown when either count is zero.
 	Confidence string `json:"confidence" enums:"high,medium,low,unknown"`
 }
 
