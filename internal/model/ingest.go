@@ -9,11 +9,6 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-const MinFlightPerformanceIngestYear = 2018
-
-// MinWeatherIngestYear matches BTS flight-performance coverage.
-const MinWeatherIngestYear = 2018
-
 var ingestValidate = validator.New()
 
 func init() {

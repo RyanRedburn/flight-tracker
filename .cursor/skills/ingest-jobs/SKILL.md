@@ -37,7 +37,7 @@ Shared helpers:
 - `ingest.DownloadFile` — HTTP GET to a temp file + cleanup
 - `ingest/csvparse.Parse` — header mapper to canonical DB columns
 
-Earliest supported year is **2018** (`model.MinFlightPerformanceIngestYear` / `MinWeatherIngestYear`).
+Earliest supported year is **2018** (`gte=2018` on the ingest request fields).
 
 IEM downloads are throttled (~1 req/s) and retry HTTP 503. Preserve that if you touch the IEM client.
 
