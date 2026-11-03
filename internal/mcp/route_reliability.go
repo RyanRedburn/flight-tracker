@@ -216,12 +216,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
-	if len(departures) > 1 {
-		confidence = ""
-	}
-
-	return successResult(summary, confidence, &routeReliabilityData{
+	return successResult(routeReliabilitySummary(carrier, origin, dest, departures), "", &routeReliabilityData{
 		Stats:      *stats,
 		Departures: departures,
 	})
@@ -290,41 +285,14 @@ func depTimeFailure(err error) *Failure {
 	return invalidInput(err)
 }
 
-func routeReliabilitySummary(carrier, origin, dest string, departures []routeDepartureOutlook) (string, string) {
+func routeReliabilitySummary(carrier, origin, dest string, departures []routeDepartureOutlook) string {
 	route := carrier + " " + origin + "–" + dest
-	confidence := departureConfidence(departures)
 
 	if len(departures) == 1 {
-		return oneDepartureSummary(route, departures[0]), confidence
+		return oneDepartureSummary(route, departures[0])
 	}
 
-	return manyDepartureSummary(route, departures), confidence
-}
-
-func departureConfidence(departures []routeDepartureOutlook) string {
-	ranked := make([]string, 0, len(departures))
-	all := make([]string, len(departures))
-
-	for i, dep := range departures {
-		confidence := outlookConfidence(dep.Analysis)
-		all[i] = confidence
-
-		if dep.Analysis.SampleSize <= 0 {
-			continue
-		}
-
-		if _, ok := outlookOnTimeRate(dep.OnTimeProbability); !ok {
-			continue
-		}
-
-		ranked = append(ranked, confidence)
-	}
-
-	if len(ranked) == 0 {
-		return model.MinConfidence(all...)
-	}
-
-	return model.MinConfidence(ranked...)
+	return manyDepartureSummary(route, departures)
 }
 
 func outlookConfidence(analysis model.Analysis) string {
