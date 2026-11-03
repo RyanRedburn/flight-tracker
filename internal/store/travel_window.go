@@ -2,14 +2,12 @@ package store
 
 import (
 	"sort"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
 const (
-	TravelWindowLookbackYears = 2
-	TravelWindowBestWorstK    = 3
+	TravelWindowBestWorstK = 3
 
 	TravelWindowGrainMonth     = "month"
 	TravelWindowGrainDayOfWeek = "day_of_week"
@@ -33,18 +31,6 @@ type TravelWindowBucketCount struct {
 	Bucket      int
 	OnTimeCount int
 	Flights     int
-}
-
-// TravelWindowBounds returns the inclusive analysis window of up to the last
-// two years ending at maxDate. If history is shorter, start is minDate.
-// Rebuild SQL uses the same rule: GREATEST(min_date, (max_date - INTERVAL '2 years')::date).
-func TravelWindowBounds(minDate, maxDate time.Time) (start, end time.Time) {
-	start = maxDate.AddDate(-TravelWindowLookbackYears, 0, 0)
-	if minDate.After(start) {
-		start = minDate
-	}
-
-	return start, maxDate
 }
 
 func AssembleRouteTravelWindows(

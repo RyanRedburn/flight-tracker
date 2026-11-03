@@ -7,20 +7,11 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
-// LayoverMinutes is the gap from inbound arrival to outbound departure.
+// layoverDetail is the gap from inbound arrival to outbound departure.
 // Each instant is that leg's local date plus clock time, so a later outbound
 // date is an overnight or multi-day connection. A negative gap is not a layover.
-func LayoverMinutes(inboundDate, inboundArr, outboundDate, outboundDep string) (int, bool) {
-	mins, _, failure := layoverDetail(inboundDate, inboundArr, outboundDate, outboundDep)
-	if failure != "" {
-		return 0, false
-	}
-
-	return mins, true
-}
-
-// layoverDetail reports a non-negative gap, whether the outbound local date is later,
-// and negative_layover or invalid_schedule when the gap is not a layover.
+// It reports the minutes, whether the outbound local date is later, and
+// negative_layover or invalid_schedule when the gap is not a layover.
 func layoverDetail(inboundDate, inboundArr, outboundDate, outboundDep string) (mins int, overnight bool, failure string) {
 	in, okIn := localDateTime(inboundDate, inboundArr)
 	if !okIn {
