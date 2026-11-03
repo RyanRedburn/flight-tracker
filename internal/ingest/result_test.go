@@ -20,3 +20,15 @@ func TestMonthImportResultJSON(t *testing.T) {
 		t.Errorf("result = %v", decoded)
 	}
 }
+
+func TestDatasetImportResultJSON(t *testing.T) {
+	payload, err := json.Marshal(DatasetImportResult{Dataset: "airports", RowsImported: 42})
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+
+	const want = `{"dataset":"airports","rows_imported":42}`
+	if string(payload) != want {
+		t.Errorf("json = %s, want %s", payload, want)
+	}
+}

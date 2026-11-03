@@ -23,7 +23,7 @@ const (
 	testCDG        = "CDG"
 )
 
-func TestLayoverMinutes(t *testing.T) {
+func TestLayoverDetail(t *testing.T) {
 	tests := []struct {
 		name    string
 		inDate  string
