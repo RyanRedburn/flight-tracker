@@ -245,7 +245,7 @@ func localDateTime(date, hhmm string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 
-	mins, ok := HHMMToMinutes(hhmm)
+	mins, ok := model.HHMMToMinutes(hhmm)
 	if !ok {
 		return time.Time{}, false
 	}

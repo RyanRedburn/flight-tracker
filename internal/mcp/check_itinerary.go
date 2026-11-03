@@ -176,11 +176,11 @@ func prepareItineraryLeg(in checkItineraryLegInput) (model.ItineraryLeg, bool, *
 		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidDate)
 	}
 
-	if _, ok := store.HHMMToMinutes(in.DepTime); !ok {
+	if _, ok := model.HHMMToMinutes(in.DepTime); !ok {
 		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidHHMM)
 	}
 
-	if _, ok := store.HHMMToMinutes(in.ArrTime); !ok {
+	if _, ok := model.HHMMToMinutes(in.ArrTime); !ok {
 		return model.ItineraryLeg{}, false, &Failure{
 			Code:    CodeInvalidInput,
 			Message: "arr_time must be a valid local time (hhmm).",

@@ -30,7 +30,7 @@ func TestHHMMToMinutes(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got, ok := HHMMToMinutes(tt.raw)
+		got, ok := model.HHMMToMinutes(tt.raw)
 		if ok != tt.wantOK || got != tt.want {
 			t.Errorf("HHMMToMinutes(%q) = (%d,%v), want (%d,%v)", tt.raw, got, ok, tt.want, tt.wantOK)
 		}

@@ -106,7 +106,7 @@ func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, win
 	labels := make([]string, 0, len(depTimes))
 
 	for _, dep := range depTimes {
-		target, ok := store.HHMMToMinutes(dep)
+		target, ok := model.HHMMToMinutes(dep)
 		if !ok {
 			continue
 		}
@@ -123,7 +123,7 @@ func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, win
 	hit := make([]bool, len(targets))
 
 	for _, route := range routes {
-		usual, ok := store.HHMMToMinutes(route.UsualDepTime)
+		usual, ok := model.HHMMToMinutes(route.UsualDepTime)
 		if !ok {
 			continue
 		}
