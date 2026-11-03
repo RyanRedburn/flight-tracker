@@ -47,6 +47,7 @@ func TestLayoverMinutes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, _, failure := layoverDetail(tt.inDate, tt.inArr, tt.outDate, tt.outDep)
 			ok := failure == ""
+
 			if ok != tt.wantOK || (ok && got != tt.want) {
 				t.Fatalf("layoverDetail() = (%d, %q), want (%d, ok=%v)", got, failure, tt.want, tt.wantOK)
 			}
