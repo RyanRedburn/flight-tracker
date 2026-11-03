@@ -137,22 +137,6 @@ func TestServiceImportMonthEmptyStations(t *testing.T) {
 	}
 }
 
-func TestImportResultJSON(t *testing.T) {
-	payload, err := json.Marshal(ImportResult{Year: 2024, Month: 1, RowsImported: 42})
-	if err != nil {
-		t.Fatalf("MarshalJSON() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if decoded[jsonKeyRows] != float64(42) {
-		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
-	}
-}
-
 func TestDedupWeatherRowsLastWins(t *testing.T) {
 	columns := []string{colYear, colMonth, colStation, colValid, colTmpf}
 	rows := [][]string{

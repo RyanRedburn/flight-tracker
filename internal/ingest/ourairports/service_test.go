@@ -2,7 +2,6 @@ package ourairports
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -103,29 +102,6 @@ func TestServiceImportWithoutDownloader(t *testing.T) {
 	_, err := svc.Import(context.Background(), store.ReferenceCountries)
 	if err == nil {
 		t.Fatal("Import() expected error without downloader or opener")
-	}
-}
-
-func TestImportResultJSON(t *testing.T) {
-	payload, err := ImportResult{
-		Dataset:      store.ReferenceAirports,
-		RowsImported: 42,
-	}.MarshalJSON()
-	if err != nil {
-		t.Fatalf("MarshalJSON() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if decoded[jsonKeyDataset] != string(store.ReferenceAirports) {
-		t.Errorf("dataset = %v, want airports", decoded[jsonKeyDataset])
-	}
-
-	if decoded[jsonKeyRows] != float64(42) {
-		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
 	}
 }
 

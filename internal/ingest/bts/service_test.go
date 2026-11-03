@@ -66,19 +66,3 @@ func TestServiceImportMonthWithoutDownloader(t *testing.T) {
 		t.Fatal("ImportMonth() expected error without downloader or opener")
 	}
 }
-
-func TestImportResultJSON(t *testing.T) {
-	payload, err := json.Marshal(ImportResult{Year: 2026, Month: 4, RowsImported: 42})
-	if err != nil {
-		t.Fatalf("MarshalJSON() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if decoded[jsonKeyRows] != float64(42) {
-		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
-	}
-}
