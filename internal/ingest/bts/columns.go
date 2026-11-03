@@ -8,7 +8,6 @@ import (
 const (
 	colYear       = "year"
 	colDayOfMonth = "day_of_month"
-	jsonKeyRows   = "rows_imported"
 
 	colFlightNumberMarketing = "flight_number_marketing_airline"
 	colFlightNumberOperating = "flight_number_operating_airline"

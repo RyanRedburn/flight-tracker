@@ -114,7 +114,7 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	if decoded[jsonKeyRows] == nil {
+	if decoded["rows_imported"] == nil {
 		t.Fatal("expected rows_imported in json result")
 	}
 }
