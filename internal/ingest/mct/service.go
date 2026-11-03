@@ -4,10 +4,10 @@ package mct
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -21,10 +21,7 @@ type Service struct {
 }
 
 // ImportResult is the JSON stored on a completed import_airport_mct job.
-type ImportResult struct {
-	Dataset      store.ReferenceDataset `json:"dataset"`
-	RowsImported int                    `json:"rows_imported"`
-}
+type ImportResult = ingest.DatasetImportResult
 
 func NewService(s store.Store, downloader *Downloader) *Service {
 	svc := &Service{store: s}
@@ -39,13 +36,6 @@ func (s *Service) WithFetcher(fetch Fetcher) *Service {
 	s.fetch = fetch
 
 	return s
-}
-
-func (r ImportResult) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{
-		jsonKeyDataset: string(r.Dataset),
-		jsonKeyRows:    r.RowsImported,
-	})
 }
 
 // Import downloads the catalog and full-replaces airport_mct. force is not

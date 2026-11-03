@@ -14,8 +14,6 @@ const (
 	colContinent     = "continent"
 	colWikipediaLink = "wikipedia_link"
 	colKeywords      = "keywords"
-	jsonKeyDataset   = "dataset"
-	jsonKeyRows      = "rows_imported"
 	defaultBaseURL   = "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main"
 )
 
