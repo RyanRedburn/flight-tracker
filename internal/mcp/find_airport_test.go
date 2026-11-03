@@ -343,53 +343,17 @@ func TestFindAirportOmittedLimit(t *testing.T) {
 	}
 }
 
-func TestToolsAreReadOnlyFindAirport(t *testing.T) {
-	session := connectServer(t, &storetest.Stub{})
-	ctx := context.Background()
-
-	var names []string
-
-	for tool, err := range session.Tools(ctx, nil) {
-		if err != nil {
-			t.Fatalf("tools: %v", err)
-		}
-
-		names = append(names, tool.Name)
-
-		if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
-			t.Errorf("%s readOnlyHint = %#v", tool.Name, tool.Annotations)
-		}
-	}
-
-	want := map[string]bool{
-		toolFindAirport:      true,
-		toolCheckItinerary:   true,
-		toolRouteReliability: true,
-		toolBestTravelWindow: true,
-		toolCompareCarriers:  true,
-	}
-
-	if len(names) != len(want) {
-		t.Fatalf("tools = %#v", names)
-	}
-
-	for _, name := range names {
-		if !want[name] {
-			t.Fatalf("unexpected tool %q in %#v", name, names)
-		}
-	}
-}
-
-func TestCheckItineraryAndRouteReliabilityAnnotations(t *testing.T) {
+func TestToolListAndAnnotations(t *testing.T) {
 	session := connectServer(t, &storetest.Stub{})
 
 	wantTitle := map[string]string{
+		toolFindAirport:      "Find airport",
 		toolCheckItinerary:   "Check itinerary",
 		toolRouteReliability: "Route reliability",
 		toolBestTravelWindow: "Best travel window",
 		toolCompareCarriers:  "Compare carriers",
 	}
-	seen := 0
+	seen := map[string]bool{}
 
 	for tool, err := range session.Tools(context.Background(), nil) {
 		if err != nil {
@@ -398,10 +362,10 @@ func TestCheckItineraryAndRouteReliabilityAnnotations(t *testing.T) {
 
 		title, ok := wantTitle[tool.Name]
 		if !ok {
-			continue
+			t.Fatalf("unexpected tool %q", tool.Name)
 		}
 
-		seen++
+		seen[tool.Name] = true
 
 		ann := tool.Annotations
 		if ann == nil || !ann.ReadOnlyHint || ann.Title != title || ann.OpenWorldHint == nil || *ann.OpenWorldHint {
@@ -409,8 +373,8 @@ func TestCheckItineraryAndRouteReliabilityAnnotations(t *testing.T) {
 		}
 	}
 
-	if seen != len(wantTitle) {
-		t.Fatalf("seen %d tools, want %d", seen, len(wantTitle))
+	if len(seen) != len(wantTitle) {
+		t.Fatalf("tools = %#v, want %d", seen, len(wantTitle))
 	}
 }
 
