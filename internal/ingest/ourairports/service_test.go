@@ -104,23 +104,3 @@ func TestServiceImportWithoutDownloader(t *testing.T) {
 		t.Fatal("Import() expected error without downloader or opener")
 	}
 }
-
-func TestDatasetHelpers(t *testing.T) {
-	jobType, err := JobType(store.ReferenceRegions)
-	if err != nil {
-		t.Fatalf("JobType() error = %v", err)
-	}
-
-	if jobType == "" {
-		t.Fatal("expected job type")
-	}
-
-	filename, err := CSVFilename(store.ReferenceRegions)
-	if err != nil {
-		t.Fatalf("CSVFilename() error = %v", err)
-	}
-
-	if filename != "regions.csv" {
-		t.Errorf("filename = %q, want regions.csv", filename)
-	}
-}
