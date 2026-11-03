@@ -37,6 +37,11 @@ type checkItineraryInput struct {
 	Legs []checkItineraryLegInput `json:"legs" jsonschema:"Ordered flight legs, 2 to 4"`
 }
 
+type checkItineraryData struct {
+	Legs        []model.ItineraryOutlookLeg `json:"legs"`
+	Connections []model.ItineraryConnection `json:"connections"`
+}
+
 func checkItineraryInputSchema() *jsonschema.Schema {
 	schema, err := jsonschema.ForType(reflect.TypeFor[checkItineraryInput](), &jsonschema.ForOptions{})
 	if err != nil {
@@ -73,14 +78,14 @@ func addCheckItinerary(server *mcpsdk.Server, s store.Store, logger *slog.Logger
 			ReadOnlyHint:  true,
 			OpenWorldHint: &closedWorld,
 		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[model.ItineraryOutlookResponse], error) {
+	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
 		return checkItinerary(ctx, s, logger, in)
 	})
 }
 
-func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[model.ItineraryOutlookResponse], error) {
+func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
 	if len(in.Legs) < checkItineraryMinLegs || len(in.Legs) > checkItineraryMaxLegs {
-		return failureResult[model.ItineraryOutlookResponse](&Failure{
+		return failureResult[checkItineraryData](&Failure{
 			Code:    CodeInvalidInput,
 			Message: "Legs must contain from " + strconv.Itoa(checkItineraryMinLegs) + " to " + strconv.Itoa(checkItineraryMaxLegs) + " flights.",
 		})
@@ -93,7 +98,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 	for i, legIn := range in.Legs {
 		leg, lookup, fail := prepareItineraryLeg(legIn)
 		if fail != nil {
-			return failureResult[model.ItineraryOutlookResponse](fail)
+			return failureResult[checkItineraryData](fail)
 		}
 
 		legs[i] = leg
@@ -106,7 +111,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 
 	if !needLookup {
 		if fail := validateItineraryLegs(legs); fail != nil {
-			return failureResult[model.ItineraryOutlookResponse](fail)
+			return failureResult[checkItineraryData](fail)
 		}
 	}
 
@@ -120,7 +125,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 		origin, dest, _, fail := resolveRouteFromFlightNumber(ctx, s, logger, toolCheckItinerary,
 			legIn.Carrier, legIn.FlightNumber, []string{legIn.DepTime}, legIn.Origin, legIn.Dest, window)
 		if fail != nil {
-			return failureResult[model.ItineraryOutlookResponse](fail)
+			return failureResult[checkItineraryData](fail)
 		}
 
 		legs[i].Origin = origin
@@ -129,7 +134,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 
 	if needLookup {
 		if fail := validateItineraryLegs(legs); fail != nil {
-			return failureResult[model.ItineraryOutlookResponse](fail)
+			return failureResult[checkItineraryData](fail)
 		}
 	}
 
@@ -137,19 +142,22 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 	if err != nil {
 		logger.Error(toolCheckItinerary, "error", err)
 
-		return failureResult[model.ItineraryOutlookResponse](&Failure{
+		return failureResult[checkItineraryData](&Failure{
 			Code:    CodeUnavailable,
 			Message: "Itinerary outlook is unavailable. Try again.",
 		})
 	}
 
 	if fail := missingItineraryAirports(ctx, s, logger, legs, fromFlightNumber, out); fail != nil {
-		return failureResult[model.ItineraryOutlookResponse](fail)
+		return failureResult[checkItineraryData](fail)
 	}
 
 	summary, confidence := itineraryToolResult(out)
 
-	return successResult(summary, confidence, &out)
+	return successResult(summary, confidence, &checkItineraryData{
+		Legs:        out.Legs,
+		Connections: out.Connections,
+	})
 }
 
 func prepareItineraryLeg(in checkItineraryLegInput) (model.ItineraryLeg, bool, *Failure) {

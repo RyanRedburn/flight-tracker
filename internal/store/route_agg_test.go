@@ -137,6 +137,97 @@ func TestCarrierOnTimeMatchesAggregateOnTime(t *testing.T) {
 	}
 }
 
+func TestCarrierComparison(t *testing.T) {
+	tests := []struct {
+		name  string
+		items []model.CarrierOnTime
+		want  string
+	}{
+		{name: "one carrier", items: []model.CarrierOnTime{{Carrier: "UA", OnTimeRate: 0.8, Flights: 1}}, want: ""},
+		{
+			name: "a low-flight carrier is compared",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: model.CarrierLowSampleBelow},
+				{Carrier: "AA", OnTimeRate: 0.1, Flights: 1},
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "zero flights are not compared",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: 1},
+				{Carrier: "AA", OnTimeRate: 0.1, Flights: 0},
+			},
+			want: "",
+		},
+		{
+			name: "ten point gap on uneven samples",
+			items: []model.CarrierOnTime{
+				{Carrier: "NK", OnTimeRate: 0.77, Flights: 120},
+				{Carrier: "F9", OnTimeRate: 0.67, Flights: 180},
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "wide gap",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.9, Flights: 200},
+				{Carrier: "AA", OnTimeRate: 0.5, Flights: 200},
+			},
+			want: model.ComparisonRanked,
+		},
+		{
+			name: "wilson lower bound leads the large sample",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.88, Flights: 110},
+				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
+				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
+			},
+			want: model.ComparisonRanked,
+		},
+		{
+			name: "leader differs from another carrier",
+			items: []model.CarrierOnTime{
+				{Carrier: "DL", OnTimeRate: 0.82, Flights: 3000},
+				{Carrier: "AA", OnTimeRate: 0.85, Flights: 3000},
+				{Carrier: "UA", OnTimeRate: 0.90, Flights: 400},
+			},
+			want: model.ComparisonRanked,
+		},
+		{
+			name: "counts keep a rounded gap inside the margin",
+			items: []model.CarrierOnTime{
+				carrierCounted("UA", 64, 100, 0.64),
+				carrierCounted("AA", 51, 101, 0.50),
+			},
+			want: model.ComparisonTooCloseToCall,
+		},
+		{
+			name: "the same rounded rates without counts are ranked",
+			items: []model.CarrierOnTime{
+				{Carrier: "UA", OnTimeRate: 0.64, Flights: 100},
+				{Carrier: "AA", OnTimeRate: 0.50, Flights: 101},
+			},
+			want: model.ComparisonRanked,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CarrierComparison(tt.items); got != tt.want {
+				t.Fatalf("CarrierComparison() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func carrierCounted(carrier string, onTime, flights int, rounded float64) model.CarrierOnTime {
+	item := CarrierOnTimeFromCounts(carrier, onTime, flights)
+	item.OnTimeRate = rounded
+
+	return item
+}
+
 func TestSortCarrierOnTime(t *testing.T) {
 	items := []model.CarrierOnTime{
 		{Carrier: "UA", OnTimeRate: 0.5, Flights: 2},
@@ -361,4 +452,88 @@ func TestTrailingOutlookWindow(t *testing.T) {
 	if _, _, ok := TrailingOutlookWindow("not-a-date"); ok {
 		t.Fatal("expected invalid date")
 	}
+}
+
+func TestApplyOutlookLookback(t *testing.T) {
+	if err := ApplyOutlookLookback(nil, false, func(int) error { return nil }); err != nil {
+		t.Fatalf("nil outlook: %v", err)
+	}
+
+	t.Run("thin default window widens", func(t *testing.T) {
+		out := &model.RouteOutlook{}
+
+		var calls []int
+
+		err := ApplyOutlookLookback(out, false, func(days int) error {
+			calls = append(calls, days)
+			if days == OutlookLookbackDays {
+				out.Analysis.SampleSize = model.OutlookLowSampleBelow - 1
+
+				return nil
+			}
+
+			out.Analysis.SampleSize = 40
+
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("ApplyOutlookLookback() error = %v", err)
+		}
+
+		if len(calls) != 2 || calls[0] != OutlookLookbackDays || calls[1] != OutlookFallbackLookbackDays {
+			t.Fatalf("calls = %v", calls)
+		}
+
+		if out.Analysis.LookbackDays != OutlookFallbackLookbackDays {
+			t.Fatalf("lookback_days = %d", out.Analysis.LookbackDays)
+		}
+
+		if out.Analysis.SampleReason != model.SampleReasonSufficient || out.Analysis.Confidence != model.ConfidenceMedium {
+			t.Fatalf("sample = %+v", out.Analysis)
+		}
+	})
+
+	t.Run("caller window does not widen", func(t *testing.T) {
+		out := &model.RouteOutlook{}
+
+		var calls []int
+
+		err := ApplyOutlookLookback(out, true, func(days int) error {
+			calls = append(calls, days)
+			out.Analysis.SampleSize = 1
+
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("ApplyOutlookLookback() error = %v", err)
+		}
+
+		if len(calls) != 1 || calls[0] != OutlookLookbackDays {
+			t.Fatalf("calls = %v", calls)
+		}
+
+		if out.Analysis.LookbackDays != OutlookLookbackDays || out.Analysis.Confidence != model.ConfidenceLow {
+			t.Fatalf("sample = %+v", out.Analysis)
+		}
+	})
+
+	t.Run("enough flights stay on the default window", func(t *testing.T) {
+		out := &model.RouteOutlook{}
+
+		var calls []int
+
+		err := ApplyOutlookLookback(out, false, func(days int) error {
+			calls = append(calls, days)
+			out.Analysis.SampleSize = model.OutlookLowSampleBelow
+
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("ApplyOutlookLookback() error = %v", err)
+		}
+
+		if len(calls) != 1 || out.Analysis.LookbackDays != OutlookLookbackDays || out.Analysis.Confidence != model.ConfidenceMedium {
+			t.Fatalf("calls = %v sample = %+v", calls, out.Analysis)
+		}
+	})
 }

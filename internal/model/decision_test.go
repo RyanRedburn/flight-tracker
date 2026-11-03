@@ -31,6 +31,41 @@ func TestConnectionStatus(t *testing.T) {
 	}
 }
 
+func TestProportionsDiffer(t *testing.T) {
+	tests := []struct {
+		name     string
+		rate1    float64
+		flights1 int
+		rate2    float64
+		flights2 int
+		want     bool
+	}{
+		{name: "empty sample", rate1: 0.9, flights1: 0, rate2: 0.1, flights2: 40},
+		{name: "equal rates", rate1: 0.8, flights1: 200, rate2: 0.8, flights2: 180},
+		{name: "both perfect", rate1: 1, flights1: 50, rate2: 1, flights2: 40},
+		{name: "single flights", rate1: 1, flights1: 1, rate2: 0, flights2: 1},
+		{
+			name:  "ten point gap on uneven samples stays inside the margin",
+			rate1: 0.77, flights1: 80, rate2: 0.67, flights2: 150,
+		},
+		{name: "two point gap on small samples", rate1: 0.82, flights1: 40, rate2: 0.80, flights2: 40},
+		{name: "wide gap on small samples", rate1: 0.85, flights1: 40, rate2: 0.60, flights2: 40, want: true},
+		{name: "wide gap on large samples", rate1: 0.90, flights1: 200, rate2: 0.60, flights2: 200, want: true},
+		{name: "rates outside 0 and 1 are clamped", rate1: 1.4, flights1: 200, rate2: -0.2, flights2: 200, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ProportionsDiffer(tt.rate1, tt.flights1, tt.rate2, tt.flights2)
+			reverse := ProportionsDiffer(tt.rate2, tt.flights2, tt.rate1, tt.flights1)
+
+			if got != tt.want || reverse != tt.want {
+				t.Fatalf("ProportionsDiffer() = %v/%v, want %v", got, reverse, tt.want)
+			}
+		})
+	}
+}
+
 func TestMinConfidence(t *testing.T) {
 	if got := MinConfidence(); got != ConfidenceUnknown {
 		t.Fatalf("MinConfidence() = %q", got)
@@ -42,6 +77,8 @@ func TestMinConfidence(t *testing.T) {
 		want   string
 	}{
 		{name: "high alone", values: []string{ConfidenceHigh}, want: ConfidenceHigh},
+		{name: "medium weakens high", values: []string{ConfidenceHigh, ConfidenceMedium}, want: ConfidenceMedium},
+		{name: "low weakens medium", values: []string{ConfidenceMedium, ConfidenceLow}, want: ConfidenceLow},
 		{name: "low weakens high", values: []string{ConfidenceHigh, ConfidenceLow}, want: ConfidenceLow},
 		{name: "unknown weakest", values: []string{ConfidenceLow, ConfidenceUnknown, ConfidenceHigh}, want: ConfidenceUnknown},
 		{name: "blank is weaker than high", values: []string{ConfidenceHigh, ""}, want: ""},
@@ -56,30 +93,38 @@ func TestMinConfidence(t *testing.T) {
 	}
 }
 
-func TestOutlookConfidence(t *testing.T) {
+func TestCountConfidence(t *testing.T) {
 	tests := []struct {
-		name         string
-		sampleSize   int
-		insufficient bool
-		want         string
+		name     string
+		count    int
+		lowBelow int
+		highAt   int
+		want     string
 	}{
-		{name: "empty sample", sampleSize: 0, want: ConfidenceUnknown},
-		{name: "empty wins over flag", sampleSize: 0, insufficient: true, want: ConfidenceUnknown},
-		{name: "thin sample", sampleSize: 4, insufficient: true, want: ConfidenceLow},
-		{name: "usable sample", sampleSize: 40, want: ConfidenceHigh},
+		{name: "empty outlook", lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceUnknown},
+		{name: "outlook 29", count: 29, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceLow},
+		{name: "outlook 30", count: 30, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceMedium},
+		{name: "outlook 49", count: 49, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceMedium},
+		{name: "outlook 50", count: 50, lowBelow: OutlookLowSampleBelow, highAt: OutlookHighSampleAt, want: ConfidenceHigh},
+		{name: "carrier 99", count: 99, lowBelow: CarrierLowSampleBelow, highAt: CarrierHighSampleAt, want: ConfidenceLow},
+		{name: "carrier 100", count: 100, lowBelow: CarrierLowSampleBelow, highAt: CarrierHighSampleAt, want: ConfidenceMedium},
+		{name: "carrier 299", count: 299, lowBelow: CarrierLowSampleBelow, highAt: CarrierHighSampleAt, want: ConfidenceMedium},
+		{name: "carrier 300", count: 300, lowBelow: CarrierLowSampleBelow, highAt: CarrierHighSampleAt, want: ConfidenceHigh},
+		{name: "no low band", count: 1, highAt: 1, want: ConfidenceHigh},
+		{name: "no medium band", count: 10, lowBelow: 30, highAt: 30, want: ConfidenceLow},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := OutlookConfidence(tt.sampleSize, tt.insufficient); got != tt.want {
-				t.Errorf("OutlookConfidence() = %q, want %q", got, tt.want)
+			if got := CountConfidence(tt.count, tt.lowBelow, tt.highAt); got != tt.want {
+				t.Errorf("CountConfidence() = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
 func TestApplyOutlookSample(t *testing.T) {
-	(*RouteOutlook)(nil).ApplyOutlookSample(10)
+	(*RouteOutlook)(nil).ApplyOutlookSample()
 
 	zero := 0.0
 	planted := ConnectionGuidanceFromRecommended(45, 60, 90, 120)
@@ -87,18 +132,16 @@ func TestApplyOutlookSample(t *testing.T) {
 	tests := []struct {
 		name               string
 		sampleSize         int
-		minSample          int
 		wantReason         string
 		wantConfidence     string
 		wantConnectionKept bool
 	}{
-		{name: "empty slot", minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
-		{name: "negative size", sampleSize: -3, minSample: 10, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
-		{name: "thin sample", sampleSize: 4, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
-		{name: "one below minimum", sampleSize: 9, minSample: 10, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow},
-		{name: "meets minimum", sampleSize: 10, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
-		{name: "solid sample", sampleSize: 40, minSample: 10, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
-		{name: "no minimum treats non-empty as sufficient", sampleSize: 1, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
+		{name: "empty slot", wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "negative size", sampleSize: -3, wantReason: SampleReasonEmptySample, wantConfidence: ConfidenceUnknown},
+		{name: "outlook 29", sampleSize: 29, wantReason: SampleReasonInsufficientSample, wantConfidence: ConfidenceLow, wantConnectionKept: true},
+		{name: "outlook 30", sampleSize: 30, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceMedium, wantConnectionKept: true},
+		{name: "outlook 49", sampleSize: 49, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceMedium, wantConnectionKept: true},
+		{name: "outlook 50", sampleSize: 50, wantReason: SampleReasonSufficient, wantConfidence: ConfidenceHigh, wantConnectionKept: true},
 	}
 
 	for _, tt := range tests {
@@ -111,7 +154,7 @@ func TestApplyOutlookSample(t *testing.T) {
 					Connection:                planted,
 				},
 			}
-			out.ApplyOutlookSample(tt.minSample)
+			out.ApplyOutlookSample()
 
 			if out.Analysis.SampleReason != tt.wantReason || out.Analysis.Confidence != tt.wantConfidence {
 				t.Fatalf("sample = reason %q confidence %q", out.Analysis.SampleReason, out.Analysis.Confidence)
@@ -153,13 +196,15 @@ func TestBlockingSampleReason(t *testing.T) {
 	}{
 		{name: "explicit sufficient", outlook: sampleOutlook(40, SampleReasonSufficient, ConfidenceHigh), want: ""},
 		{name: "explicit empty", outlook: sampleOutlook(0, SampleReasonEmptySample, ""), want: SampleReasonEmptySample},
-		{name: "explicit thin", outlook: sampleOutlook(4, SampleReasonInsufficientSample, ConfidenceLow), want: SampleReasonInsufficientSample},
+		{name: "explicit thin", outlook: sampleOutlook(4, SampleReasonInsufficientSample, ConfidenceLow), want: ""},
 		{name: "explicit empty wins over thresholds", outlook: withConnection(sampleOutlook(0, SampleReasonEmptySample, ConfidenceHigh), ConnectionGuidanceFromRecommended(45, 60, 120, 120)), want: SampleReasonEmptySample},
-		{name: "derived thin", outlook: sampleOutlook(4, "", ConfidenceLow), want: SampleReasonInsufficientSample},
-		{name: "derived low confidence", outlook: sampleOutlook(40, "", ConfidenceLow), want: SampleReasonInsufficientSample},
+		{name: "derived thin", outlook: sampleOutlook(4, "", ConfidenceLow), want: ""},
+		{name: "derived low confidence", outlook: sampleOutlook(40, "", ConfidenceLow), want: ""},
 		{name: "derived empty", outlook: sampleOutlook(0, "", ConfidenceUnknown), want: SampleReasonEmptySample},
 		{name: "derived sufficient from size", outlook: sampleOutlook(40, "", ConfidenceHigh), want: ""},
+		{name: "explicit medium is sufficient", outlook: sampleOutlook(40, "", ConfidenceMedium), want: ""},
 		{name: "explicit high with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceHigh), want: ""},
+		{name: "explicit medium with empty size stays open", outlook: sampleOutlook(0, "", ConfidenceMedium), want: ""},
 	}
 
 	for _, tt := range tests {
@@ -185,6 +230,21 @@ func TestDecisionConfidence(t *testing.T) {
 	if got := derived.DecisionConfidence(); got != ConfidenceLow {
 		t.Errorf("derived confidence = %q, want low", got)
 	}
+
+	medium := sampleOutlook(40, "", "")
+	if got := medium.DecisionConfidence(); got != ConfidenceMedium {
+		t.Errorf("derived confidence = %q, want medium", got)
+	}
+
+	high := sampleOutlook(50, "", "")
+	if got := high.DecisionConfidence(); got != ConfidenceHigh {
+		t.Errorf("derived confidence = %q, want high", got)
+	}
+
+	forcedLow := sampleOutlook(40, SampleReasonInsufficientSample, "")
+	if got := forcedLow.DecisionConfidence(); got != ConfidenceLow {
+		t.Errorf("insufficient reason = %q, want low", got)
+	}
 }
 
 func sampleOutlook(size int, reason, confidence string) RouteOutlook {
@@ -209,23 +269,103 @@ func TestSeasonalDecision(t *testing.T) {
 		name            string
 		flights         int
 		rate            float64
-		minSample       int
 		wantConfidence  string
 		wantReliability string
 	}{
-		{name: "no flights", minSample: 30, wantConfidence: ConfidenceUnknown, wantReliability: ReliabilityUnknown},
-		{name: "below minimum", flights: 10, rate: 0.95, minSample: 30, wantConfidence: ConfidenceLow, wantReliability: ReliabilityUnknown},
-		{name: "reliable boundary", flights: 30, rate: SeasonalReliableMinRate, minSample: 30, wantConfidence: ConfidenceHigh, wantReliability: ReliabilityReliable},
-		{name: "typical just under reliable", flights: 30, rate: SeasonalReliableMinRate - 0.01, minSample: 30, wantConfidence: ConfidenceHigh, wantReliability: ReliabilityTypical},
-		{name: "typical boundary", flights: 30, rate: SeasonalTypicalMinRate, minSample: 30, wantConfidence: ConfidenceHigh, wantReliability: ReliabilityTypical},
-		{name: "unreliable", flights: 30, rate: SeasonalTypicalMinRate - 0.01, minSample: 30, wantConfidence: ConfidenceHigh, wantReliability: ReliabilityUnreliable},
+		{name: "no flights", wantConfidence: ConfidenceUnknown, wantReliability: ReliabilityUnknown},
+		{name: "low band", flights: 10, rate: 0.95, wantConfidence: ConfidenceLow, wantReliability: ReliabilityUnknown},
+		{name: "medium reliable", flights: 30, rate: SeasonalReliableMinRate, wantConfidence: ConfidenceMedium, wantReliability: ReliabilityReliable},
+		{name: "medium typical", flights: 30, rate: SeasonalReliableMinRate - 0.01, wantConfidence: ConfidenceMedium, wantReliability: ReliabilityTypical},
+		{name: "medium boundary", flights: 49, rate: SeasonalTypicalMinRate, wantConfidence: ConfidenceMedium, wantReliability: ReliabilityTypical},
+		{name: "high unreliable", flights: 50, rate: SeasonalTypicalMinRate - 0.01, wantConfidence: ConfidenceHigh, wantReliability: ReliabilityUnreliable},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			confidence, reliability := SeasonalDecision(tt.flights, tt.rate, tt.minSample)
+			confidence, reliability := SeasonalDecision(tt.flights, tt.rate)
 			if confidence != tt.wantConfidence || reliability != tt.wantReliability {
 				t.Errorf("SeasonalDecision() = %q/%q, want %q/%q", confidence, reliability, tt.wantConfidence, tt.wantReliability)
+			}
+		})
+	}
+}
+
+func TestWilsonBoundsHourLeader(t *testing.T) {
+	two := 2
+	on240 := 240
+	on180 := 180
+	zero := 0
+
+	low05, _ := WilsonBounds(1, &two, 2)
+	low07, _ := WilsonBounds(0.8, &on240, 300)
+	low18, up18 := WilsonBounds(0.6, &on180, 300)
+	low0, up0 := WilsonBounds(0, &zero, 1)
+
+	if low07 <= low05 || low07 <= low18 {
+		t.Fatalf("lowers hour05=%v hour07=%v hour18=%v", low05, low07, low18)
+	}
+
+	if low0 > 1e-9 || up0 <= up18 {
+		t.Fatalf("0/1 bounds = %v %v, hour 18 upper = %v", low0, up0, up18)
+	}
+
+	if ProportionsDiffer(1, 2, 0.8, 300) {
+		t.Fatal("2/2 differs from 240/300")
+	}
+
+	if !ProportionsDiffer(0.8, 300, 0.6, 300) {
+		t.Fatal("240/300 does not differ from 180/300")
+	}
+
+	if ProportionsDiffer(0, 1, 0.8, 300) {
+		t.Fatal("0/1 differs from 240/300")
+	}
+}
+
+func TestFisherExactSmallSamples(t *testing.T) {
+	tests := []struct {
+		name     string
+		rate1    float64
+		flights1 int
+		rate2    float64
+		flights2 int
+		want     bool
+	}{
+		{name: "one flight at 0% against a solid hour", rate1: 0, flights1: 1, rate2: 0.8, flights2: 300},
+		{name: "two perfect flights against a solid hour", rate1: 1, flights1: 2, rate2: 0.8, flights2: 300},
+		{name: "no on-time flights against a perfect sample", rate1: 0, flights1: 8, rate2: 1, flights2: 8, want: true},
+		{name: "large samples stay on the z-test", rate1: 0.9, flights1: 300, rate2: 0.6, flights2: 300, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ProportionsDiffer(tt.rate1, tt.flights1, tt.rate2, tt.flights2)
+			reverse := ProportionsDiffer(tt.rate2, tt.flights2, tt.rate1, tt.flights1)
+
+			if got != tt.want || reverse != tt.want {
+				t.Fatalf("ProportionsDiffer() = %v/%v, want %v", got, reverse, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeasonalReliabilityAtMedium(t *testing.T) {
+	tests := []struct {
+		name       string
+		rate       float64
+		confidence string
+		want       string
+	}{
+		{name: "reliable", rate: SeasonalReliableMinRate, confidence: ConfidenceMedium, want: ReliabilityReliable},
+		{name: "typical", rate: SeasonalTypicalMinRate, confidence: ConfidenceMedium, want: ReliabilityTypical},
+		{name: "unreliable", rate: SeasonalTypicalMinRate - 0.01, confidence: ConfidenceMedium, want: ReliabilityUnreliable},
+		{name: "low stays unknown", rate: 0.95, confidence: ConfidenceLow, want: ReliabilityUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SeasonalReliability(tt.rate, tt.confidence); got != tt.want {
+				t.Errorf("SeasonalReliability() = %q, want %q", got, tt.want)
 			}
 		})
 	}

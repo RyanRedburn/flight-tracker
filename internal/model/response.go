@@ -21,7 +21,10 @@ type Analysis struct {
 	End        string `json:"end"`
 	SampleSize int    `json:"sample_size"`
 	// empty_sample means the slot has no flights: confidence is unknown and estimates are null.
-	// sufficient is high confidence; insufficient_sample is low.
+	// sufficient covers medium and high. insufficient_sample is low.
 	SampleReason string `json:"sample_reason,omitempty" enums:"sufficient,insufficient_sample,empty_sample"`
-	Confidence   string `json:"confidence,omitempty" enums:"high,low,unknown"`
+	// Outlook only: low under 30 flights, medium 30–49, high 50 or more.
+	Confidence string `json:"confidence,omitempty" enums:"high,medium,low,unknown"`
+	// Outlook only. Days of history used: 365, or 730 when dep_time_window_minutes was not set and the last 365 days had fewer than 30 flights.
+	LookbackDays int `json:"lookback_days,omitempty"`
 }

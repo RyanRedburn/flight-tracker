@@ -15,17 +15,24 @@ definitions:
   model.Analysis:
     properties:
       confidence:
+        description: 'Outlook only: low under 30 flights, medium 30–49, high 50 or
+          more.'
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
       end:
         type: string
+      lookback_days:
+        description: 'Outlook only. Days of history used: 365, or 730 when dep_time_window_minutes
+          was not set and the last 365 days had fewer than 30 flights.'
+        type: integer
       sample_reason:
         description: |-
           empty_sample means the slot has no flights: confidence is unknown and estimates are null.
-          sufficient is high confidence; insufficient_sample is low.
+          sufficient covers medium and high. insufficient_sample is low.
         enum:
         - sufficient
         - insufficient_sample
@@ -243,6 +250,7 @@ definitions:
       confidence:
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -268,9 +276,9 @@ definitions:
           when reason names another cause.
         type: boolean
       reason:
-        description: Reason is why status is unknown. overnight means a later date
-          was still classified. empty_sample and insufficient_sample match the inbound
-          sample_reason; missing_outlook does not.
+        description: 'Why status is unknown. overnight is the exception: a later outbound
+          date was still classified. empty_sample means the inbound slot has no flights.
+          A low-confidence slot is still classified.'
         enum:
         - evaluated
         - overnight
@@ -278,7 +286,6 @@ definitions:
         - missing_country
         - missing_outlook
         - empty_sample
-        - insufficient_sample
         - missing_threshold
         - negative_layover
         - invalid_schedule
@@ -359,9 +366,10 @@ definitions:
   model.ItineraryOutlookSummary:
     properties:
       confidence:
-        description: A missing outlook counts as unknown.
+        description: The lowest confidence among the legs.
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -382,7 +390,8 @@ definitions:
       connection:
         allOf:
         - $ref: '#/definitions/model.ConnectionGuidance'
-        description: Cleared for empty_sample and insufficient_sample.
+        description: Empty when the slot has no flights. Present at any confidence
+          otherwise.
       delay_probability:
         type: number
       diversion_probability:
@@ -431,11 +440,12 @@ definitions:
         description: AdverseOnTimeRate is null when this side has no adverse flights.
         type: number
       confidence:
-        description: Confidence is unknown when fair or adverse flights are absent,
-          and low when the thinner group is below the outlook minimum. A thin sample
-          keeps its rates.
+        description: 'Based on the smaller of the fair and adverse flight counts:
+          low under 30, medium 30–49, high 50 or more. Unknown when either count is
+          zero.'
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -459,6 +469,14 @@ definitions:
         type: number
       cancelled:
         type: integer
+      carrier_comparison:
+        description: |-
+          ranked: the most reliable carrier (highest on-time rate, allowing for sample size) differs from at least one other at 95% statistical significance.
+          too_close_to_call: it differs significantly from none. Omitted when fewer than two carriers have flights.
+        enum:
+        - ranked
+        - too_close_to_call
+        type: string
       carrier_on_time:
         description: Present only when the carrier query filter is omitted. Sorted
           by on_time_rate desc, then flights desc, then carrier asc.
@@ -526,8 +544,36 @@ definitions:
         items:
           $ref: '#/definitions/model.TravelWindowMonthBucket'
         type: array
+      day_comparison:
+        description: Same values and rules as month_comparison, for best_days and
+          worst_days.
+        enum:
+        - ranked
+        - too_close_to_call
+        - single
+        type: string
       filters:
         $ref: '#/definitions/model.Filters'
+      hour_comparison:
+        description: Same values and rules as month_comparison, for best_hours and
+          worst_hours.
+        enum:
+        - ranked
+        - too_close_to_call
+        - single
+        type: string
+      month_comparison:
+        description: |-
+          ranked: the most reliable month (highest on-time rate, allowing for sample size) differs from at least one other month at 95% statistical significance.
+          best_months is that month plus months not significantly different from it. worst_months is the least reliable month it beats plus months not significantly different from that one.
+          Each list has at most 3 months and they never overlap.
+          too_close_to_call: no month differs significantly from the most reliable one. single: only one month has flights. Both leave the lists empty.
+          Omitted when no month has flights.
+        enum:
+        - ranked
+        - too_close_to_call
+        - single
+        type: string
       worst_days:
         items:
           $ref: '#/definitions/model.TravelWindowDayBucket'
@@ -557,8 +603,10 @@ definitions:
   model.TravelWindowDayBucket:
     properties:
       confidence:
+        description: Low under 30 flights, medium 30–49, high 50 or more.
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -579,8 +627,10 @@ definitions:
   model.TravelWindowHourBucket:
     properties:
       confidence:
+        description: Low under 30 flights, medium 30–49, high 50 or more.
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -601,8 +651,10 @@ definitions:
   model.TravelWindowMonthBucket:
     properties:
       confidence:
+        description: Low under 30 flights, medium 30–49, high 50 or more.
         enum:
         - high
+        - medium
         - low
         - unknown
         type: string
@@ -817,7 +869,7 @@ paths:
         name: dep_time
         required: true
         type: string
-      - description: Minutes around dep_time to include (default 30, max 120)
+      - description: Minutes around dep_time to include (default 60, max 120)
         in: query
         maximum: 120
         minimum: 1
@@ -865,7 +917,8 @@ paths:
       description: Aggregated on-time, delay, cancellation, and diversion stats for
         a route over a date range (max 366 days). When carrier is omitted, carrier_on_time
         lists per-marketing-carrier on-time rates and flight counts for the same filters.
-        The field is omitted entirely when carrier is set.
+        carrier_comparison says whether those carriers can be ranked. Both fields
+        are omitted when carrier is set.
       parameters:
       - description: Origin airport IATA code
         in: query
@@ -953,8 +1006,9 @@ paths:
   /api/v1/routes/travel-windows:
     get:
       description: Typical-year on-time rates by month, weekday, and local departure
-        hour, from up to the last 2 years. Best and worst lists are the top and bottom
-        3 buckets that meet the grain minimum.
+        hour, from up to the last 2 years. Every bucket with at least one flight is
+        included. Best and worst lists hold up to 3 buckets each and never overlap.
+        month_comparison, day_comparison and hour_comparison say when they are empty.
       parameters:
       - description: Origin airport IATA code
         in: query

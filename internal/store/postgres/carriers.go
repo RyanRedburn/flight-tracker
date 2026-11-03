@@ -171,7 +171,7 @@ func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (s
 	query := strings.Replace(template, carrierStatsExtraPlaceholder, extra, 1)
 	query = strings.Replace(query, carrierStatsOriginAirportPlaceholder, originAirport, 1)
 	query = strings.Replace(query, carrierStatsDestAirportPlaceholder, destAirport, 1)
-	query = strings.ReplaceAll(query, carrierStatsMinSamplePlaceholder, strconv.Itoa(store.CarrierStatsMinSampleSize))
+	query = strings.ReplaceAll(query, carrierStatsMinSamplePlaceholder, strconv.Itoa(store.CarrierRankMinSampleSize))
 
 	return query, args
 }

@@ -68,30 +68,73 @@ func TestGoldenOutlookItineraryConnection(t *testing.T) {
 	}
 }
 
-func TestGoldenThinSampleStaysUnknown(t *testing.T) {
+func TestGoldenThinSampleKeepsConnection(t *testing.T) {
+	p90 := 15.0
 	outlook := goldenOutlook(4, model.SampleReasonInsufficientSample, model.ConfidenceLow, model.ConnectionGuidance{})
+
+	serve := func(filter store.RouteOutlookFilter) *model.RouteOutlook {
+		out := *outlook
+		out.Filters = outlookFilters(filter)
+		store.FinishOutlookConnection(&out, &p90, nil)
+
+		return &out
+	}
+
+	h := NewRoutesHandler(&storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return serve(filter), nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/routes/outlook?origin=BOS&dest=ORD&carrier=UA&day_of_week=2&dep_time=0700", nil)
+	rec := httptest.NewRecorder()
+	h.Outlook(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("outlook status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var gotOutlook model.RouteOutlook
+	if err := json.Unmarshal(rec.Body.Bytes(), &gotOutlook); err != nil {
+		t.Fatalf("decode outlook: %v", err)
+	}
+
+	if gotOutlook.Analysis.Confidence != model.ConfidenceLow || gotOutlook.Connection.DomesticToDomestic == nil || gotOutlook.Connection.DomesticToDomestic.RecommendedMinutes != 60 || gotOutlook.Connection.DomesticToDomestic.LooseMinutes != 90 {
+		t.Fatalf("thin outlook = %+v", gotOutlook.Connection)
+	}
+
 	countries := map[string]string{
 		testOriginBOS: "US",
 		testOriginORD: "US",
 		testDestLAX:   "US",
 	}
 
-	gotOutlook := getOutlook(t, outlook)
-	if gotOutlook.Analysis.Confidence != model.ConfidenceLow || gotOutlook.Connection.DomesticToDomestic != nil {
-		t.Fatalf("thin outlook = %+v", gotOutlook.Connection)
-	}
+	ih := NewItinerariesHandler(&storetest.Stub{
+		RouteOutlookFn: func(_ context.Context, filter store.RouteOutlookFilter) (*model.RouteOutlook, error) {
+			return serve(filter), nil
+		},
+		ListAirportCountriesByIATAFn: func(context.Context, []string) (map[string]string, error) {
+			return countries, nil
+		},
+	})
 
-	conn := postConnection(t, outlook, countries, model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
+	body := model.ItineraryOutlookRequest{Legs: []model.ItineraryLeg{
 		{Origin: testOriginBOS, Dest: testOriginORD, Carrier: "UA", Date: testDateTue, DepTime: "0700", ArrTime: testArr0905},
 		{Origin: testOriginORD, Dest: testDestLAX, Carrier: "UA", Date: testDateTue, DepTime: "1100", ArrTime: "1330"},
-	}})
+	}}
+	out := decodeItinerary(t, postItinerary(t, ih, body))
 
-	if conn.Status != model.ConnectionUnknown || conn.Confidence != gotOutlook.Analysis.Confidence || conn.Reason != model.SampleReasonInsufficientSample || conn.MCTSource != nil {
-		t.Fatalf("connection = %+v, outlook confidence %q", conn, gotOutlook.Analysis.Confidence)
+	if len(out.Connections) != 1 {
+		t.Fatalf("connections = %+v", out.Connections)
 	}
 
-	if conn.RecommendedMinutes != nil || conn.LooseMinutes != nil || conn.SlackMinutes != nil {
-		t.Fatalf("thin connection published thresholds: %+v", conn)
+	conn := out.Connections[0]
+	if conn.Status != model.ConnectionLoose || conn.Confidence != model.ConfidenceLow || conn.Reason != model.ConnectionReasonEvaluated {
+		t.Fatalf("connection = %+v", conn)
+	}
+
+	if conn.RecommendedMinutes == nil || *conn.RecommendedMinutes != 60 || conn.LooseMinutes == nil || *conn.LooseMinutes != 90 {
+		t.Fatalf("thin connection thresholds: %+v", conn)
 	}
 }
 

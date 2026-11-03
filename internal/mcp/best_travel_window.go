@@ -37,12 +37,13 @@ type travelMonth struct {
 }
 
 type bestTravelWindowData struct {
-	Filters     model.Filters `json:"filters"`
-	Start       string        `json:"start"`
-	End         string        `json:"end"`
-	ByMonth     []travelMonth `json:"by_month"`
-	BestMonths  []travelMonth `json:"best_months"`
-	WorstMonths []travelMonth `json:"worst_months"`
+	Filters         model.Filters `json:"filters"`
+	Start           string        `json:"start"`
+	End             string        `json:"end"`
+	ByMonth         []travelMonth `json:"by_month"`
+	MonthComparison string        `json:"month_comparison,omitempty"`
+	BestMonths      []int         `json:"best_months"`
+	WorstMonths     []int         `json:"worst_months"`
 }
 
 func bestTravelWindowInputSchema() *jsonschema.Schema {
@@ -104,20 +105,30 @@ func bestTravelWindow(ctx context.Context, s store.Store, logger *slog.Logger, i
 	}
 
 	data := newBestTravelWindowData(windows)
-	summary, confidence := travelWindowSummary(carrier, origin, dest, data)
+	summary, _ := travelWindowSummary(carrier, origin, dest, windows)
 
-	return successResult(summary, confidence, data)
+	return successResult(summary, "", data)
 }
 
 func newBestTravelWindowData(windows *model.RouteTravelWindows) *bestTravelWindowData {
 	return &bestTravelWindowData{
-		Filters:     windows.Filters,
-		Start:       windows.Analysis.Start,
-		End:         windows.Analysis.End,
-		ByMonth:     travelMonths(windows.ByMonth),
-		BestMonths:  travelMonths(windows.BestMonths),
-		WorstMonths: travelMonths(windows.WorstMonths),
+		Filters:         windows.Filters,
+		Start:           windows.Analysis.Start,
+		End:             windows.Analysis.End,
+		ByMonth:         travelMonths(windows.ByMonth),
+		MonthComparison: windows.MonthComparison,
+		BestMonths:      monthNumbers(windows.BestMonths),
+		WorstMonths:     monthNumbers(windows.WorstMonths),
 	}
+}
+
+func monthNumbers(buckets []model.TravelWindowMonthBucket) []int {
+	months := make([]int, 0, len(buckets))
+	for _, bucket := range buckets {
+		months = append(months, bucket.Month)
+	}
+
+	return months
 }
 
 func travelMonths(buckets []model.TravelWindowMonthBucket) []travelMonth {
@@ -140,78 +151,67 @@ func travelMonthFrom(bucket model.TravelWindowMonthBucket) travelMonth {
 	}
 }
 
-func travelWindowSummary(carrier, origin, dest string, data *bestTravelWindowData) (string, string) {
+func travelWindowSummary(carrier, origin, dest string, windows *model.RouteTravelWindows) (string, string) {
 	route := routeLabel(carrier, origin, dest)
-	if len(data.ByMonth) == 0 {
-		return emptyWindowSummary("month-of-year history", route, data.Start, data.End), model.ConfidenceUnknown
+	if len(windows.ByMonth) == 0 {
+		return emptyWindowSummary("month-of-year history", route, windows.Analysis.Start, windows.Analysis.End), model.ConfidenceUnknown
 	}
 
-	items := make([]scoredItem, len(data.ByMonth))
-	for i, month := range data.ByMonth {
-		items[i] = scoredItem{
-			label:      monthLabel(month.Month),
-			percent:    onTimePercent(month.OnTimeRate),
-			sampleSize: month.SampleSize,
-			confidence: month.Confidence,
-		}
+	months := scoredMonths(windows.ByMonth)
+	confidence := itemConfidence(months)
+
+	if windows.MonthComparison == model.ComparisonSingle || len(windows.ByMonth) == 1 {
+		only := months[0]
+
+		return fmt.Sprintf("%s is the only month for %s (%d%% on time). %s, %s.",
+			only.label, route, only.percent, sentenceCase(confidencePhrase(only.confidence)), flightsPhrase([]int{only.sampleSize})), confidence
 	}
 
-	ranked, thin, none := splitByConfidence(items)
-	if len(ranked) == 0 {
-		return appendNote("No month for "+route+" has enough data to compare.", thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+	if windows.MonthComparison == model.ComparisonTooCloseToCall {
+		return tooCloseMonths(route, months), confidence
 	}
 
-	return appendNote(bestWorstMonths(route, ranked), thinSentence(thin), noneSentence(none)), comparisonConfidence(ranked, thin, none)
+	best := scoredMonths(windows.BestMonths)
+	worst := scoredMonths(windows.WorstMonths)
+
+	if len(best) == 0 || len(worst) == 0 {
+		return tooCloseMonths(route, months), confidence
+	}
+
+	return spreadMonths(route, best, worst) + " " + monthCountSentence(months), confidence
 }
 
-// bestWorstMonths compares only the high-confidence months. Thin months are named after it.
-func bestWorstMonths(route string, ranked []scoredItem) string {
-	bestPct, worstPct := ranked[0].percent, ranked[0].percent
-	minFlights, maxFlights := ranked[0].sampleSize, ranked[0].sampleSize
-
-	for _, item := range ranked[1:] {
-		bestPct = max(bestPct, item.percent)
-		worstPct = min(worstPct, item.percent)
-		minFlights = min(minFlights, item.sampleSize)
-		maxFlights = max(maxFlights, item.sampleSize)
-	}
-
-	if len(ranked) == 1 {
-		return fmt.Sprintf("%s is the only month with enough data for %s (%d%% on time). High confidence, %s.",
-			ranked[0].label, route, bestPct, flightsPhrase([]int{minFlights}))
-	}
-
-	lead := spreadMonths(route, ranked, bestPct, worstPct)
-	if bestPct-worstPct < routeReliabilitySamePointGap {
-		lead = sameMonths(route, ranked, bestPct, worstPct)
-	}
-
-	return lead + " " + monthCountSentence(len(ranked), minFlights, maxFlights)
+func tooCloseMonths(route string, months []scoredItem) string {
+	return fmt.Sprintf("%s are %s for %s (%s on time), %s, %s.",
+		tooCloseLabel(months, nounMonth), phraseTooClose, route, percentSpan(months), confidencePhrase(itemConfidence(months)), flightSpan(months))
 }
 
-// sameMonths is for a spread under the shared same-point gap, so no month is called best or worst.
-func sameMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
-	rates := joinItemPercents(ranked)
-	if bestPct == worstPct {
-		rates = strconv.Itoa(bestPct) + "%"
+func scoredMonths(buckets []model.TravelWindowMonthBucket) []scoredItem {
+	months := make([]scoredItem, len(buckets))
+	for i, month := range buckets {
+		months[i] = scoredMonth(month)
 	}
 
-	return fmt.Sprintf("%s are about the same for %s (%s on time).", joinLabels(ranked), route, rates)
+	return months
 }
 
-// spreadMonths names every month tied for best and every month tied for worst.
-func spreadMonths(route string, ranked []scoredItem, bestPct, worstPct int) string {
-	best := make([]scoredItem, 0, len(ranked))
-	worst := make([]scoredItem, 0, len(ranked))
+func scoredMonth(month model.TravelWindowMonthBucket) scoredItem {
+	return scoredItem{
+		label:      monthLabel(month.Month),
+		percent:    onTimePercent(month.OnTimeRate),
+		rate:       model.ComparisonRate(month.OnTimeRate, month.OnTimeCount, month.Flights),
+		sampleSize: month.Flights,
+		confidence: month.Confidence,
+		key:        month.Month,
+		hasRate:    month.Flights > 0,
+	}
+}
 
-	for _, item := range ranked {
-		if item.percent == bestPct {
-			best = append(best, item)
-		}
-
-		if item.percent == worstPct {
-			worst = append(worst, item)
-		}
+// spreadMonths names the months too close to the best and the months too close to the worst.
+// A best-list percent at or below a worst-list percent is not called most reliable.
+func spreadMonths(route string, best, worst []scoredItem) string {
+	if ratesCross(best, worst) {
+		return crossedMonths(route, best, worst)
 	}
 
 	bestNoun := "month"
@@ -219,16 +219,54 @@ func spreadMonths(route string, ranked []scoredItem, bestPct, worstPct int) stri
 		bestNoun = "months"
 	}
 
-	return fmt.Sprintf("%s %s the most reliable %s for %s (%d%% on time), and %s %s the least reliable (%d%%).",
-		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestPct, joinLabels(worst), pluralVerb(len(worst)), worstPct)
-}
-
-// monthCountSentence covers only the months with enough data, not the thin ones named after it.
-func monthCountSentence(months, minFlights, maxFlights int) string {
-	flights := strconv.Itoa(minFlights)
-	if minFlights != maxFlights {
-		flights += " to " + strconv.Itoa(maxFlights)
+	bestRates := strconv.Itoa(best[0].percent) + "%"
+	if !sameItemPercent(best) {
+		bestRates = joinItemPercents(best)
 	}
 
-	return fmt.Sprintf("High confidence. The %d months with enough data have %s flights each.", months, flights)
+	worstRates := strconv.Itoa(worst[0].percent) + "%"
+	if !sameItemPercent(worst) {
+		worstRates = joinItemPercents(worst)
+	}
+
+	return fmt.Sprintf("%s %s the most reliable %s for %s (%s on time), and %s %s the least reliable (%s).",
+		joinLabels(best), pluralVerb(len(best)), bestNoun, route, bestRates, joinLabels(worst), pluralVerb(len(worst)), worstRates)
+}
+
+func ratesCross(best, worst []scoredItem) bool {
+	for _, item := range best {
+		for _, other := range worst {
+			if item.percent <= other.percent {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func crossedMonths(route string, best, worst []scoredItem) string {
+	lead := wilsonLeader(best)
+	anchor := wilsonAnchor(worst)
+	sentence := fmt.Sprintf("%s is the most reliable month for %s (%d%% on time), and %s is the least reliable (%d%%).",
+		lead.label, route, lead.percent, anchor.label, anchor.percent)
+
+	bestRest := exceptKey(best, lead.key)
+	if len(bestRest) > 0 {
+		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
+			joinLabels(bestRest), pluralVerb(len(bestRest)), phraseTooClose, lead.label, joinItemPercents(bestRest))
+	}
+
+	worstRest := exceptKey(worst, anchor.key)
+	if len(worstRest) > 0 {
+		sentence += fmt.Sprintf(" %s %s %s against %s (%s).",
+			joinLabels(worstRest), pluralVerb(len(worstRest)), phraseTooClose, anchor.label, joinItemPercents(worstRest))
+	}
+
+	return sentence
+}
+
+// monthCountSentence covers every month in the series.
+func monthCountSentence(items []scoredItem) string {
+	return sentenceCase(confidencePhrase(itemConfidence(items))) + ", " + flightSpan(items) + "."
 }

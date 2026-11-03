@@ -19,7 +19,7 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 // Stats returns historical on-time performance for a route.
 //
 //	@Summary		Route performance stats
-//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. The field is omitted entirely when carrier is set.
+//	@Description	Aggregated on-time, delay, cancellation, and diversion stats for a route over a date range (max 366 days). When carrier is omitted, carrier_on_time lists per-marketing-carrier on-time rates and flight counts for the same filters. carrier_comparison says whether those carriers can be ranked. Both fields are omitted when carrier is set.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin			query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)
@@ -72,7 +72,7 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 //	@Param			day_of_week					query		int		false	"Weekday (1=Mon … 7=Sun); exactly one of day_of_week or date"	minimum(1)	maximum(7)
 //	@Param			date						query		string	false	"Calendar date (YYYY-MM-DD); exactly one of day_of_week or date"	Format(date)
 //	@Param			dep_time					query		string	true	"Scheduled departure time (HHmm)"
-//	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 30, max 120)"	minimum(1)	maximum(120)
+//	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 60, max 120)"	minimum(1)	maximum(120)
 //	@Success		200							{object}	model.RouteOutlook
 //	@Failure		400							{object}	ErrorResponse
 //	@Failure		401							{object}	ErrorResponse
@@ -107,7 +107,7 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 // TravelWindows returns typical-year on-time patterns for a route.
 //
 //	@Summary		Route travel windows
-//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Best and worst lists are the top and bottom 3 buckets that meet the grain minimum.
+//	@Description	Typical-year on-time rates by month, weekday, and local departure hour, from up to the last 2 years. Every bucket with at least one flight is included. Best and worst lists hold up to 3 buckets each and never overlap. month_comparison, day_comparison and hour_comparison say when they are empty.
 //	@Tags			routes,external
 //	@Produce		json
 //	@Param			origin	query		string	true	"Origin airport IATA code"	minlength(3)	maxlength(3)

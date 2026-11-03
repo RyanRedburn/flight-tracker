@@ -32,12 +32,13 @@ func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
 	}
 
 	raw := []byte(`[
-		{"origin":"AAA","dest":"BBB","flights":40,"on_time":32,"delayed":4,"cancelled":2,"diverted":2},
-		{"origin":"CCC","dest":"DDD","flights":38,"on_time":20,"delayed":10,"cancelled":4,"diverted":4},
-		{"origin":"EEE","dest":"FFF","flights":36,"on_time":18,"delayed":10,"cancelled":4,"diverted":4},
-		{"origin":"GGG","dest":"HHH","flights":34,"on_time":10,"delayed":14,"cancelled":5,"diverted":5},
-		{"origin":"III","dest":"JJJ","flights":33,"on_time":8,"delayed":15,"cancelled":5,"diverted":5},
-		{"origin":"KKK","dest":"LLL","flights":32,"on_time":6,"delayed":16,"cancelled":5,"diverted":5},
+		{"origin":"AAA","dest":"BBB","flights":140,"on_time":112,"delayed":14,"cancelled":7,"diverted":7},
+		{"origin":"CCC","dest":"DDD","flights":138,"on_time":70,"delayed":36,"cancelled":16,"diverted":16},
+		{"origin":"EEE","dest":"FFF","flights":136,"on_time":68,"delayed":36,"cancelled":16,"diverted":16},
+		{"origin":"GGG","dest":"HHH","flights":134,"on_time":40,"delayed":54,"cancelled":20,"diverted":20},
+		{"origin":"III","dest":"JJJ","flights":133,"on_time":32,"delayed":61,"cancelled":20,"diverted":20},
+		{"origin":"KKK","dest":"LLL","flights":132,"on_time":24,"delayed":64,"cancelled":22,"diverted":22},
+		{"origin":"MMM","dest":"NNN","flights":30,"on_time":15,"delayed":15,"cancelled":0,"diverted":0},
 		{"origin":"QQQ","dest":"RRR","flights":29,"on_time":29,"delayed":0,"cancelled":0,"diverted":0}
 	]`)
 
@@ -74,14 +75,25 @@ func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
 		t.Fatalf("best=%+v worst=%+v", best, worst)
 	}
 
-	if len(best) != store.CarrierStatsTopN || len(worst) != 1 {
+	if len(best) != store.CarrierStatsTopN || len(worst) != 2 {
 		t.Fatalf("best=%d worst=%d", len(best), len(worst))
 	}
 
-	for _, row := range append(append([]model.CarrierRouteStat{}, best...), worst...) {
+	ranked := append(append([]model.CarrierRouteStat{}, best...), worst...)
+	sawFloor := false
+
+	for _, row := range ranked {
 		if row.Origin == "QQQ" {
 			t.Fatal("29-flight route should not be ranked")
 		}
+
+		if row.Origin == "MMM" {
+			sawFloor = true
+		}
+	}
+
+	if !sawFloor {
+		t.Fatal("30-flight route should be ranked")
 	}
 }
 
@@ -99,7 +111,7 @@ func TestUnmarshalCarrierAirportsMatchesCountedRates(t *testing.T) {
 		t.Fatal("expected invalid json to fail")
 	}
 
-	raw := []byte(`[{"airport":"AAA","flights":70,"on_time":47,"delayed":14,"cancelled":5,"diverted":4}]`)
+	raw := []byte(`[{"airport":"AAA","flights":100,"on_time":47,"delayed":14,"cancelled":5,"diverted":4}]`)
 
 	airports, err := unmarshalCarrierAirports(raw)
 	if err != nil {
@@ -111,7 +123,7 @@ func TestUnmarshalCarrierAirportsMatchesCountedRates(t *testing.T) {
 	}
 
 	got := airports[0]
-	if got.Airport != "AAA" || got.Flights != 70 || got.OnTime != 47 || got.OnTimeRate != ratio(47, 70) || got.DelayRate != ratio(14, 70) || got.CancellationRate != ratio(5, 70) || got.DiversionRate != ratio(4, 70) {
+	if got.Airport != "AAA" || got.Flights != 100 || got.OnTime != 47 || got.OnTimeRate != ratio(47, 100) || got.DelayRate != ratio(14, 100) || got.CancellationRate != ratio(5, 100) || got.DiversionRate != ratio(4, 100) {
 		t.Fatalf("airport = %+v", got)
 	}
 

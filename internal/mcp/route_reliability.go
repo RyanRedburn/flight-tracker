@@ -23,9 +23,6 @@ const (
 	routeReliabilityMinDepTimes = 1
 	routeReliabilityMaxDepTimes = 5
 
-	// routeReliabilitySamePointGap is the on-time gap, in percentage points. A gap under this is about the same.
-	routeReliabilitySamePointGap = 3
-
 	routeNotFoundMessage = "No history for %s %s–%s. Check the airports and carrier."
 
 	msgOutlookSchedule = "Exactly one of date or day_of_week is required."
@@ -60,6 +57,7 @@ type routeDepartureOutlook struct {
 	LikelyDepartureDelayWhenDelayed *float64                  `json:"likely_departure_delay_when_delayed"`
 	MedianDepartureDelayWhenDelayed *float64                  `json:"median_departure_delay_when_delayed"`
 	Weather                         model.RouteOutlookWeather `json:"weather"`
+	onTimeCount                     *int
 }
 
 type routeReliabilityData struct {
@@ -174,6 +172,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			DayOfWeek:            day,
 			DepTime:              dep,
 			DepTimeWindowMinutes: window,
+			DepTimeWindowSet:     in.DepTimeWindowMinutes != nil,
 		}
 
 		outlook, err := s.RouteOutlook(ctx, filter)
@@ -217,9 +216,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 		})
 	}
 
-	summary, confidence := routeReliabilitySummary(carrier, origin, dest, departures)
-
-	return successResult(summary, confidence, &routeReliabilityData{
+	return successResult(routeReliabilitySummary(carrier, origin, dest, departures), "", &routeReliabilityData{
 		Stats:      *stats,
 		Departures: departures,
 	})
@@ -245,6 +242,7 @@ func newRouteDepartureOutlook(out model.RouteOutlook, depTime string, window int
 		LikelyDepartureDelayWhenDelayed: out.LikelyDepartureDelayWhenDelayed,
 		MedianDepartureDelayWhenDelayed: out.MedianDepartureDelayWhenDelayed,
 		Weather:                         out.Weather,
+		onTimeCount:                     out.OnTimeCount,
 	}
 }
 
@@ -287,41 +285,14 @@ func depTimeFailure(err error) *Failure {
 	return invalidInput(err)
 }
 
-func routeReliabilitySummary(carrier, origin, dest string, departures []routeDepartureOutlook) (string, string) {
+func routeReliabilitySummary(carrier, origin, dest string, departures []routeDepartureOutlook) string {
 	route := carrier + " " + origin + "–" + dest
-	confidence := departureConfidence(departures)
 
 	if len(departures) == 1 {
-		return oneDepartureSummary(route, departures[0]), confidence
+		return oneDepartureSummary(route, departures[0])
 	}
 
-	return manyDepartureSummary(route, departures), confidence
-}
-
-func departureConfidence(departures []routeDepartureOutlook) string {
-	ranked := make([]string, 0, len(departures))
-	all := make([]string, len(departures))
-
-	for i, dep := range departures {
-		confidence := outlookConfidence(dep.Analysis)
-		all[i] = confidence
-
-		if confidence != model.ConfidenceHigh {
-			continue
-		}
-
-		if _, ok := outlookOnTimeRate(dep.OnTimeProbability); !ok {
-			continue
-		}
-
-		ranked = append(ranked, confidence)
-	}
-
-	if len(ranked) == 0 {
-		return model.MinConfidence(all...)
-	}
-
-	return model.MinConfidence(ranked...)
+	return manyDepartureSummary(route, departures)
 }
 
 func outlookConfidence(analysis model.Analysis) string {
@@ -331,20 +302,14 @@ func outlookConfidence(analysis model.Analysis) string {
 
 func oneDepartureSummary(route string, dep routeDepartureOutlook) string {
 	label := dep.Filters.DepTime + " on " + route
+	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
 
-	switch outlookConfidence(dep.Analysis) {
-	case model.ConfidenceHigh:
-		rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
-		if !ok {
-			return label + " has no reliable on-time rate."
-		}
-
-		return fmt.Sprintf("%s is on time about %d%% of the time, from %d flights.", label, onTimePercent(rate), dep.Analysis.SampleSize)
-	case model.ConfidenceLow:
-		return fmt.Sprintf("%s has thin data (%d flights), so there is no reliable on-time rate.", label, dep.Analysis.SampleSize)
-	default:
-		return label + " has no data for this day and time."
+	if dep.Analysis.SampleSize > 0 && ok {
+		return fmt.Sprintf("%s is on time about %d%% of the time, %s, from %d flights.",
+			label, onTimePercent(rate), confidencePhrase(outlookConfidence(dep.Analysis)), dep.Analysis.SampleSize)
 	}
+
+	return label + " has no data for this day and time."
 }
 
 func manyDepartureSummary(route string, departures []routeDepartureOutlook) string {
@@ -365,17 +330,13 @@ func departureItem(dep routeDepartureOutlook) scoredItem {
 		confidence: outlookConfidence(dep.Analysis),
 	}
 
-	if item.confidence != model.ConfidenceHigh {
-		return item
-	}
-
 	rate, ok := outlookOnTimeRate(dep.OnTimeProbability)
-	if !ok {
-		item.confidence = ""
-
+	if dep.Analysis.SampleSize <= 0 || !ok {
 		return item
 	}
 
+	item.hasRate = true
+	item.rate = model.ComparisonRate(rate, dep.onTimeCount, dep.Analysis.SampleSize)
 	item.percent = onTimePercent(rate)
 
 	return item

@@ -158,7 +158,7 @@ func TestItineraryOutlookWeatherDoesNotChangeConnection(t *testing.T) {
 	}
 
 	origin := out.Legs[0].Outlook.Weather.Origin
-	if origin.Confidence != model.ConfidenceHigh || origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.25 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.55 || origin.AdverseFlights != 40 {
+	if origin.Confidence != model.ConfidenceMedium || origin.FairOnTimeRate == nil || *origin.FairOnTimeRate != 0.8 || origin.AdverseOnTimeRate == nil || *origin.AdverseOnTimeRate != 0.25 || origin.AdverseDelta == nil || *origin.AdverseDelta != -0.55 || origin.AdverseFlights != 40 {
 		t.Fatalf("leg weather origin = %+v", origin)
 	}
 
@@ -469,7 +469,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 						OnTimeProbability: &zero,
 					},
 				}
-				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+				out.ApplyOutlookSample()
 
 				return out, nil
 			case testDestLAX:
@@ -478,9 +478,10 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 					OutlookResult: model.OutlookResult{
 						Analysis:          model.Analysis{SampleSize: 4},
 						OnTimeProbability: floatPtr(0),
+						Connection:        model.ConnectionGuidanceFromRecommended(45, 60, 120, 180),
 					},
 				}
-				out.ApplyOutlookSample(store.MinOutlookSampleSize)
+				out.ApplyOutlookSample()
 
 				return out, nil
 			default:
@@ -570,7 +571,7 @@ func TestItineraryOutlookSparseSamples(t *testing.T) {
 	}
 
 	thinConn := out.Connections[2]
-	if thinConn.Status != model.ConnectionUnknown || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.SampleReasonInsufficientSample || thinConn.MCTSource != nil || thinConn.RecommendedMinutes != nil || thinConn.LooseMinutes != nil {
+	if thinConn.Status != model.ConnectionOK || thinConn.Confidence != model.ConfidenceLow || thinConn.Reason != model.ConnectionReasonEvaluated || thinConn.RecommendedMinutes == nil || *thinConn.RecommendedMinutes != 45 {
 		t.Fatalf("thin connection = %+v", thinConn)
 	}
 }

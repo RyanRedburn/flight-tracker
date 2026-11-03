@@ -71,3 +71,32 @@ func TestItineraryOutlookLegNotFoundVsHardError(t *testing.T) {
 		}
 	})
 }
+
+func TestItineraryLegRouteOutlookFilterWindow(t *testing.T) {
+	window := 45
+
+	set := store.ItineraryLegRouteOutlookFilter(model.ItineraryLeg{
+		Origin:               "ORD",
+		Dest:                 "LAX",
+		Carrier:              "UA",
+		Date:                 "2026-10-06",
+		DepTime:              "0700",
+		ArrTime:              "0900",
+		DepTimeWindowMinutes: &window,
+	})
+	if !set.DepTimeWindowSet || set.DepTimeWindowMinutes != window {
+		t.Fatalf("explicit window = %+v", set)
+	}
+
+	def := store.ItineraryLegRouteOutlookFilter(model.ItineraryLeg{
+		Origin:  "ORD",
+		Dest:    "LAX",
+		Carrier: "UA",
+		Date:    "2026-10-06",
+		DepTime: "0700",
+		ArrTime: "0900",
+	})
+	if def.DepTimeWindowSet || def.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes {
+		t.Fatalf("default window = %+v", def)
+	}
+}
