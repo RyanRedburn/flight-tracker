@@ -68,17 +68,12 @@ func checkItineraryInputSchema() *jsonschema.Schema {
 }
 
 func addCheckItinerary(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
-	closedWorld := false
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
-		Name:        toolCheckItinerary,
-		Description: "Historical outlook and connection risk for a 2–4 leg itinerary. Use when the traveler asks whether a connection is safe or how reliable a multi-leg trip is.",
-		InputSchema: checkItineraryInputSchema(),
-		Annotations: &mcpsdk.ToolAnnotations{
-			Title:         "Check itinerary",
-			ReadOnlyHint:  true,
-			OpenWorldHint: &closedWorld,
-		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
+	mcpsdk.AddTool(server, readOnlyTool(
+		toolCheckItinerary,
+		"Check itinerary",
+		"Historical outlook and connection risk for a 2–4 leg itinerary. Use when the traveler asks whether a connection is safe or how reliable a multi-leg trip is.",
+		checkItineraryInputSchema(),
+	), func(ctx context.Context, _ *mcpsdk.CallToolRequest, in checkItineraryInput) (*mcpsdk.CallToolResult, Result[checkItineraryData], error) {
 		return checkItinerary(ctx, s, logger, in)
 	})
 }

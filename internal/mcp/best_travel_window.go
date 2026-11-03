@@ -60,17 +60,12 @@ func bestTravelWindowInputSchema() *jsonschema.Schema {
 }
 
 func addBestTravelWindow(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
-	closedWorld := false
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
-		Name:        toolBestTravelWindow,
-		Description: "Typical-year on-time rates by month for a route. Use when choosing which time of year to fly. Departure-time comparison belongs in route_reliability.",
-		InputSchema: bestTravelWindowInputSchema(),
-		Annotations: &mcpsdk.ToolAnnotations{
-			Title:         "Best travel window",
-			ReadOnlyHint:  true,
-			OpenWorldHint: &closedWorld,
-		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in bestTravelWindowInput) (*mcpsdk.CallToolResult, Result[bestTravelWindowData], error) {
+	mcpsdk.AddTool(server, readOnlyTool(
+		toolBestTravelWindow,
+		"Best travel window",
+		"Typical-year on-time rates by month for a route. Use when choosing which time of year to fly. Departure-time comparison belongs in route_reliability.",
+		bestTravelWindowInputSchema(),
+	), func(ctx context.Context, _ *mcpsdk.CallToolRequest, in bestTravelWindowInput) (*mcpsdk.CallToolResult, Result[bestTravelWindowData], error) {
 		return bestTravelWindow(ctx, s, logger, in)
 	})
 }

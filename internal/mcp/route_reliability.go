@@ -93,17 +93,12 @@ func routeReliabilityInputSchema() *jsonschema.Schema {
 }
 
 func addRouteReliability(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
-	closedWorld := false
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
-		Name:        toolRouteReliability,
-		Description: "Route performance stats and booking outlook for one or more departure times on the same day. Stats use the same dates as the outlook. Use when comparing which flight time is more reliable.",
-		InputSchema: routeReliabilityInputSchema(),
-		Annotations: &mcpsdk.ToolAnnotations{
-			Title:         "Route reliability",
-			ReadOnlyHint:  true,
-			OpenWorldHint: &closedWorld,
-		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in routeReliabilityInput) (*mcpsdk.CallToolResult, Result[routeReliabilityData], error) {
+	mcpsdk.AddTool(server, readOnlyTool(
+		toolRouteReliability,
+		"Route reliability",
+		"Route performance stats and booking outlook for one or more departure times on the same day. Stats use the same dates as the outlook. Use when comparing which flight time is more reliable.",
+		routeReliabilityInputSchema(),
+	), func(ctx context.Context, _ *mcpsdk.CallToolRequest, in routeReliabilityInput) (*mcpsdk.CallToolResult, Result[routeReliabilityData], error) {
 		return routeReliability(ctx, s, logger, in)
 	})
 }
