@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
@@ -10,22 +9,15 @@ import (
 
 // RebuildTravelWindowsHandler queues a full travel-window rollup rebuild.
 type RebuildTravelWindowsHandler struct {
-	store store.Store
-}
-
-// RebuildTravelWindowsResponse is returned after queueing a travel-window rebuild.
-type RebuildTravelWindowsResponse struct {
-	Job QueuedJobResponse `json:"job"`
-}
-
-// RebuildTravelWindowsConflictResponse is returned when a rebuild job is already pending.
-type RebuildTravelWindowsConflictResponse struct {
-	Error   string        `json:"error"`
-	JobType model.JobType `json:"job_type,omitempty"`
+	rollupRebuild
 }
 
 func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler {
-	return &RebuildTravelWindowsHandler{store: s}
+	return &RebuildTravelWindowsHandler{rollupRebuild{
+		store:   s,
+		jobType: model.JobTypeRebuildRouteTravelWindows,
+		create:  s.CreateRebuildRouteTravelWindowsJob,
+	}}
 }
 
 // Create queues a full rebuild of travel-window rollups from flight_performance.
@@ -34,60 +26,15 @@ func NewRebuildTravelWindowsHandler(s store.Store) *RebuildTravelWindowsHandler 
 //	@Description	Queues a full replace of route_travel_window_scopes and route_travel_window_buckets from flight_performance. The body must be empty. Returns 409 when a rebuild of this type is already pending. A running rebuild does not block a new pending job.
 //	@Tags			rebuild,internal
 //	@Produce		json
-//	@Success		201	{object}	RebuildTravelWindowsResponse
+//	@Success		201	{object}	RebuildJobResponse
 //	@Failure		400	{object}	ErrorResponse
 //	@Failure		401	{object}	ErrorResponse
 //	@Failure		403	{object}	ErrorResponse
-//	@Failure		409	{object}	RebuildTravelWindowsConflictResponse
+//	@Failure		409	{object}	RebuildJobConflictResponse
 //	@Failure		429	{object}	ErrorResponse
 //	@Failure		500	{object}	ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/rebuild/travel-windows [post]
 func (h *RebuildTravelWindowsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if err := decodeJSONBody(r.Body, &struct{}{}, jsonBodyOptions{disallowUnknown: true, rejectTrailing: true}); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
-		return
-	}
-
-	ctx := r.Context()
-
-	active, err := h.store.PendingIngestJob(ctx, model.JobTypeRebuildRouteTravelWindows)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveRebuild})
-		return
-	}
-
-	if active {
-		writeJSON(w, http.StatusConflict, rebuildTravelWindowsConflict())
-
-		return
-	}
-
-	job, err := h.store.CreateRebuildRouteTravelWindowsJob(ctx)
-	if err != nil {
-		if errors.Is(err, store.ErrActiveIngestConflict) {
-			writeJSON(w, http.StatusConflict, rebuildTravelWindowsConflict())
-
-			return
-		}
-
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateRebuildJob})
-
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, RebuildTravelWindowsResponse{
-		Job: QueuedJobResponse{
-			ID:     job.ID,
-			Type:   job.Type,
-			Status: job.Status,
-		},
-	})
-}
-
-func rebuildTravelWindowsConflict() RebuildTravelWindowsConflictResponse {
-	return RebuildTravelWindowsConflictResponse{
-		Error:   errActiveRebuildJob,
-		JobType: model.JobTypeRebuildRouteTravelWindows,
-	}
+	h.serve(w, r)
 }

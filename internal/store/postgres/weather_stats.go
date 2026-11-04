@@ -58,29 +58,14 @@ func (s *Store) queryWeatherCategoryCounts(ctx context.Context, query string, ar
 // xact lock serializes replicas; the rebuild is a full truncate+insert, so
 // repeating it is idempotent.
 func (s *Store) RebuildRouteWeatherStats(ctx context.Context) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, store.WeatherStatsRebuildLockKey, 0); err != nil {
-		return fmt.Errorf("advisory lock: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryTruncateRouteWeatherStats); err != nil {
-		return fmt.Errorf("truncate route weather stats: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryInsertRouteWeatherStats); err != nil {
-		return fmt.Errorf("insert route weather stats: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
+	return s.rebuildRollup(
+		ctx,
+		store.WeatherStatsRebuildLockKey,
+		store.QueryTruncateRouteWeatherStats,
+		store.QueryInsertRouteWeatherStats,
+		"truncate route weather stats",
+		"insert route weather stats",
+	)
 }
 
 func buildRouteWeatherStatsQuery(filter store.RouteStatsFilter) (string, []any) {

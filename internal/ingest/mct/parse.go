@@ -30,8 +30,6 @@ const (
 	colSourceUpdatedOn                 = "source_updated_on"
 	maxMCTMinutes                      = 24 * 60
 	iataLength                         = 3
-	jsonKeyDataset                     = "dataset"
-	jsonKeyRows                        = "rows_imported"
 )
 
 var (

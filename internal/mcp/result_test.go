@@ -12,43 +12,6 @@ import (
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func TestResultJSON(t *testing.T) {
-	body, err := json.Marshal(Result[struct{}]{
-		Summary:    "UA is steadier on this route, but the sample is thin.",
-		Confidence: model.ConfidenceLow,
-		Error: &Failure{
-			Code:    CodeAirportNotFound,
-			Message: "No airport has IATA code \"ORX\".",
-			Matches: []model.Airport{{IATACode: testCodeORD, Name: testNameOHare}},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
-	var got map[string]any
-	if err := json.Unmarshal(body, &got); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-
-	for _, key := range []string{"summary", "confidence", "error"} {
-		if _, ok := got[key]; !ok {
-			t.Errorf("missing %s in %s", key, body)
-		}
-	}
-
-	errObj, ok := got["error"].(map[string]any)
-	if !ok {
-		t.Fatalf("error = %#v", got["error"])
-	}
-
-	for _, key := range []string{"code", "message", "matches"} {
-		if _, ok := errObj[key]; !ok {
-			t.Errorf("missing error.%s in %s", key, body)
-		}
-	}
-}
-
 func TestCallToolTextMatchesStructuredContent(t *testing.T) {
 	successStub := &storetest.Stub{
 		SearchAirportsFn: func(context.Context, string, int) ([]model.Airport, error) {

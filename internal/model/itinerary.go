@@ -2,9 +2,7 @@ package model
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -95,7 +93,7 @@ func (r *ItineraryOutlookRequest) Validate() error {
 	normalizeItinerary(r)
 
 	if err := itineraryValidate.Struct(r); err != nil {
-		return formatItineraryValidationError(err)
+		return JoinValidationErrors(err, formatItineraryFieldError)
 	}
 
 	return nil
@@ -114,43 +112,8 @@ func normalizeItinerary(r *ItineraryOutlookRequest) {
 }
 
 func validateItineraryHHMM(fl validator.FieldLevel) bool {
-	_, ok := itineraryHHMMMinutes(fl.Field().String())
+	_, ok := HHMMToMinutes(fl.Field().String())
 	return ok
-}
-
-func itineraryHHMMMinutes(hhmm string) (int, bool) {
-	hhmm = strings.TrimSpace(hhmm)
-	if hhmm == "" {
-		return 0, false
-	}
-
-	n, err := strconv.Atoi(hhmm)
-	if err != nil || n < 0 || n > 2359 {
-		return 0, false
-	}
-
-	h := n / 100
-
-	m := n % 100
-	if h > 23 || m > 59 {
-		return 0, false
-	}
-
-	return h*60 + m, true
-}
-
-func formatItineraryValidationError(err error) error {
-	var validationErrs validator.ValidationErrors
-	if !errors.As(err, &validationErrs) {
-		return err
-	}
-
-	messages := make([]string, 0, len(validationErrs))
-	for _, fieldErr := range validationErrs {
-		messages = append(messages, formatItineraryFieldError(fieldErr))
-	}
-
-	return fmt.Errorf("%s", strings.Join(messages, "; "))
 }
 
 func formatItineraryFieldError(fieldErr validator.FieldError) string {

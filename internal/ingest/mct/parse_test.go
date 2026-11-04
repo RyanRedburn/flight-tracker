@@ -1,7 +1,6 @@
 package mct
 
 import (
-	"encoding/json"
 	"os"
 	"strconv"
 	"testing"
@@ -173,24 +172,4 @@ func readPage(t *testing.T, path string) Page {
 	}
 
 	return page
-}
-
-func TestImportResultJSON(t *testing.T) {
-	payload, err := ImportResult{Dataset: "airport_mct", RowsImported: 4}.MarshalJSON()
-	if err != nil {
-		t.Fatalf("MarshalJSON() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if decoded[jsonKeyDataset] != "airport_mct" {
-		t.Errorf("dataset = %v", decoded[jsonKeyDataset])
-	}
-
-	if decoded[jsonKeyRows] != float64(4) {
-		t.Errorf("rows_imported = %v", decoded[jsonKeyRows])
-	}
 }

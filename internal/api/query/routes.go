@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/go-playground/validator/v10"
@@ -177,7 +178,7 @@ func reportDateSpan(sl validator.StructLevel, start, end time.Time) {
 }
 
 func validateHHMM(fl validator.FieldLevel) bool {
-	_, ok := store.HHMMToMinutes(fl.Field().String())
+	_, ok := model.HHMMToMinutes(fl.Field().String())
 	return ok
 }
 

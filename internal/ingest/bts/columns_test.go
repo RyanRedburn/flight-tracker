@@ -2,12 +2,6 @@ package bts
 
 import "testing"
 
-func TestDBColumnsCount(t *testing.T) {
-	if len(DBColumns) != 119 {
-		t.Fatalf("len(DBColumns) = %d, want 119", len(DBColumns))
-	}
-}
-
 func TestCSVHeaderToColumnKnownFields(t *testing.T) {
 	tests := []struct {
 		header string

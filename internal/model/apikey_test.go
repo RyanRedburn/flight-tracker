@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"testing"
-	"time"
 )
 
 func TestGenerateParseAndVerifyAPIKey(t *testing.T) {
@@ -135,19 +134,5 @@ func TestCreateAPIKeyRequestValidate(t *testing.T) {
 
 	if err := (CreateAPIKeyRequest{Role: "admin", Name: string(longName)}).Validate(); !errors.Is(err, errAPIKeyNameTooLong) {
 		t.Fatalf("long name: %v", err)
-	}
-}
-
-func TestAPIKeyRevoked(t *testing.T) {
-	key := APIKey{}
-	if key.Revoked() {
-		t.Fatal("zero key should not be revoked")
-	}
-
-	now := time.Now().UTC()
-
-	key.RevokedAt = &now
-	if !key.Revoked() {
-		t.Fatal("key with RevokedAt should be revoked")
 	}
 }

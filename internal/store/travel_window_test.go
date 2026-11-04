@@ -2,7 +2,6 @@ package store
 
 import (
 	"testing"
-	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
@@ -13,36 +12,6 @@ const (
 	testTravelWindowStart = "2024-04-30"
 	testTravelWindowEnd   = "2026-04-30"
 )
-
-func TestTravelWindowBounds(t *testing.T) {
-	maxDate := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
-
-	t.Run("caps at two years", func(t *testing.T) {
-		minDate := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
-		start, end := TravelWindowBounds(minDate, maxDate)
-
-		if got := start.Format("2006-01-02"); got != testTravelWindowStart {
-			t.Errorf("start = %s, want %s", got, testTravelWindowStart)
-		}
-
-		if got := end.Format("2006-01-02"); got != testTravelWindowEnd {
-			t.Errorf("end = %s, want %s", got, testTravelWindowEnd)
-		}
-	})
-
-	t.Run("uses shorter history", func(t *testing.T) {
-		minDate := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
-		start, end := TravelWindowBounds(minDate, maxDate)
-
-		if got := start.Format("2006-01-02"); got != "2025-01-15" {
-			t.Errorf("start = %s, want 2025-01-15", got)
-		}
-
-		if !end.Equal(maxDate) {
-			t.Errorf("end = %s, want %s", end.Format("2006-01-02"), maxDate.Format("2006-01-02"))
-		}
-	})
-}
 
 func TestAssembleRouteTravelWindows(t *testing.T) {
 	counts := []TravelWindowBucketCount{

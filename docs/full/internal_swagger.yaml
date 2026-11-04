@@ -151,26 +151,14 @@ definitions:
       type:
         $ref: '#/definitions/model.JobType'
     type: object
-  handlers.RebuildTravelWindowsConflictResponse:
+  handlers.RebuildJobConflictResponse:
     properties:
       error:
         type: string
       job_type:
         $ref: '#/definitions/model.JobType'
     type: object
-  handlers.RebuildTravelWindowsResponse:
-    properties:
-      job:
-        $ref: '#/definitions/handlers.QueuedJobResponse'
-    type: object
-  handlers.RebuildWeatherStatsConflictResponse:
-    properties:
-      error:
-        type: string
-      job_type:
-        $ref: '#/definitions/model.JobType'
-    type: object
-  handlers.RebuildWeatherStatsResponse:
+  handlers.RebuildJobResponse:
     properties:
       job:
         $ref: '#/definitions/handlers.QueuedJobResponse'
@@ -1706,7 +1694,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.RebuildTravelWindowsResponse'
+            $ref: '#/definitions/handlers.RebuildJobResponse'
         "400":
           description: Bad Request
           schema:
@@ -1722,7 +1710,7 @@ paths:
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/handlers.RebuildTravelWindowsConflictResponse'
+            $ref: '#/definitions/handlers.RebuildJobConflictResponse'
         "429":
           description: Too Many Requests
           schema:
@@ -1749,7 +1737,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.RebuildWeatherStatsResponse'
+            $ref: '#/definitions/handlers.RebuildJobResponse'
         "400":
           description: Bad Request
           schema:
@@ -1765,7 +1753,7 @@ paths:
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/handlers.RebuildWeatherStatsConflictResponse'
+            $ref: '#/definitions/handlers.RebuildJobConflictResponse'
         "429":
           description: Too Many Requests
           schema:

@@ -27,8 +27,6 @@ const (
 
 var dummyAPIKeyHash = make([]byte, 32)
 
-type identityContextKey struct{}
-
 type Identity struct {
 	KeyID string
 	Role  model.APIKeyRole
@@ -67,11 +65,6 @@ func NewProtector(s store.Store, cfg ProtectorConfig) *Protector {
 	}
 }
 
-func IdentityFromContext(ctx context.Context) Identity {
-	id, _ := ctx.Value(identityContextKey{}).(Identity)
-	return id
-}
-
 var (
 	ExternalRoles = []model.APIKeyRole{
 		model.APIKeyRoleConsumer,
@@ -94,8 +87,6 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 				handlers.WriteError(w, http.StatusInternalServerError, handlers.ErrAuthUnavailable)
 				return
 			}
-
-			r = r.WithContext(context.WithValue(r.Context(), identityContextKey{}, identity))
 
 			if !identity.Valid {
 				if !p.applyRateLimit(w, r, identity, store.RateLimitSurfaceAuthFail) {

@@ -1,11 +1,12 @@
 package query
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -29,24 +30,10 @@ func init() {
 
 func Validate(s any) error {
 	if err := validate.Struct(s); err != nil {
-		return formatValidationError(err)
+		return model.JoinValidationErrors(err, formatValidationFieldError)
 	}
 
 	return nil
-}
-
-func formatValidationError(err error) error {
-	var validationErrs validator.ValidationErrors
-	if !errors.As(err, &validationErrs) {
-		return err
-	}
-
-	messages := make([]string, 0, len(validationErrs))
-	for _, fieldErr := range validationErrs {
-		messages = append(messages, formatValidationFieldError(fieldErr))
-	}
-
-	return fmt.Errorf("%s", strings.Join(messages, "; "))
 }
 
 func formatValidationFieldError(fieldErr validator.FieldError) string {

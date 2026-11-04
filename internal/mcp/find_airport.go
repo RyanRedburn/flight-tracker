@@ -46,17 +46,12 @@ func findAirportInputSchema() *jsonschema.Schema {
 }
 
 func addFindAirport(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
-	closedWorld := false
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
-		Name:        toolFindAirport,
-		Description: "Look up airports by IATA code, city, or name. Returns ranked matches. Use this when the user names a city or airport instead of a code.",
-		InputSchema: findAirportInputSchema(),
-		Annotations: &mcpsdk.ToolAnnotations{
-			Title:         "Find airport",
-			ReadOnlyHint:  true,
-			OpenWorldHint: &closedWorld,
-		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in findAirportInput) (*mcpsdk.CallToolResult, Result[findAirportData], error) {
+	mcpsdk.AddTool(server, readOnlyTool(
+		toolFindAirport,
+		"Find airport",
+		"Look up airports by IATA code, city, or name. Returns ranked matches. Use this when the user names a city or airport instead of a code.",
+		findAirportInputSchema(),
+	), func(ctx context.Context, _ *mcpsdk.CallToolRequest, in findAirportInput) (*mcpsdk.CallToolResult, Result[findAirportData], error) {
 		return findAirport(ctx, s, logger, in)
 	})
 }

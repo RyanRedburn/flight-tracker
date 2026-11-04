@@ -81,7 +81,7 @@ func (f RouteOutlookFilter) Validate() error {
 		return ErrInvalidWeekday
 	}
 
-	if _, ok := HHMMToMinutes(f.DepTime); !ok {
+	if _, ok := model.HHMMToMinutes(f.DepTime); !ok {
 		return ErrInvalidHHMM
 	}
 
@@ -134,27 +134,6 @@ func ExceedsMaxStatsSpan(start, end time.Time) bool {
 	}
 
 	return int(end.Sub(start).Hours()/24)+1 > MaxStatsSpanDays
-}
-
-func HHMMToMinutes(hhmm string) (int, bool) {
-	hhmm = strings.TrimSpace(hhmm)
-	if hhmm == "" {
-		return 0, false
-	}
-	// Accept 1–4 digit hhmm (e.g. "559", "0559", "700").
-	n, err := strconv.Atoi(hhmm)
-	if err != nil || n < 0 || n > 2359 {
-		return 0, false
-	}
-
-	h := n / 100
-
-	m := n % 100
-	if h > 23 || m > 59 {
-		return 0, false
-	}
-
-	return h*60 + m, true
 }
 
 func FormatHHMM(raw string) string {

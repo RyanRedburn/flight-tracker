@@ -57,17 +57,12 @@ func compareCarriersInputSchema() *jsonschema.Schema {
 }
 
 func addCompareCarriers(server *mcpsdk.Server, s store.Store, logger *slog.Logger) {
-	closedWorld := false
-	mcpsdk.AddTool(server, &mcpsdk.Tool{
-		Name:        toolCompareCarriers,
-		Description: "On-time comparison of marketing carriers on one route. Use when choosing which airline is more reliable on that route. Dates are optional and default to the trailing year ending at the route's latest flight.",
-		InputSchema: compareCarriersInputSchema(),
-		Annotations: &mcpsdk.ToolAnnotations{
-			Title:         "Compare carriers",
-			ReadOnlyHint:  true,
-			OpenWorldHint: &closedWorld,
-		},
-	}, func(ctx context.Context, _ *mcpsdk.CallToolRequest, in compareCarriersInput) (*mcpsdk.CallToolResult, Result[compareCarriersData], error) {
+	mcpsdk.AddTool(server, readOnlyTool(
+		toolCompareCarriers,
+		"Compare carriers",
+		"On-time comparison of marketing carriers on one route. Use when choosing which airline is more reliable on that route. Dates are optional and default to the trailing year ending at the route's latest flight.",
+		compareCarriersInputSchema(),
+	), func(ctx context.Context, _ *mcpsdk.CallToolRequest, in compareCarriersInput) (*mcpsdk.CallToolResult, Result[compareCarriersData], error) {
 		return compareCarriers(ctx, s, logger, in)
 	})
 }

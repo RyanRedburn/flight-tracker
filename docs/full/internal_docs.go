@@ -998,7 +998,7 @@ const docTemplateinternal = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RebuildTravelWindowsResponse"
+                            "$ref": "#/definitions/handlers.RebuildJobResponse"
                         }
                     },
                     "400": {
@@ -1022,7 +1022,7 @@ const docTemplateinternal = `{
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RebuildTravelWindowsConflictResponse"
+                            "$ref": "#/definitions/handlers.RebuildJobConflictResponse"
                         }
                     },
                     "429": {
@@ -1060,7 +1060,7 @@ const docTemplateinternal = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RebuildWeatherStatsResponse"
+                            "$ref": "#/definitions/handlers.RebuildJobResponse"
                         }
                     },
                     "400": {
@@ -1084,7 +1084,7 @@ const docTemplateinternal = `{
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/handlers.RebuildWeatherStatsConflictResponse"
+                            "$ref": "#/definitions/handlers.RebuildJobConflictResponse"
                         }
                     },
                     "429": {
@@ -2001,7 +2001,7 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "handlers.RebuildTravelWindowsConflictResponse": {
+        "handlers.RebuildJobConflictResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -2012,26 +2012,7 @@ const docTemplateinternal = `{
                 }
             }
         },
-        "handlers.RebuildTravelWindowsResponse": {
-            "type": "object",
-            "properties": {
-                "job": {
-                    "$ref": "#/definitions/handlers.QueuedJobResponse"
-                }
-            }
-        },
-        "handlers.RebuildWeatherStatsConflictResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
-                },
-                "job_type": {
-                    "$ref": "#/definitions/model.JobType"
-                }
-            }
-        },
-        "handlers.RebuildWeatherStatsResponse": {
+        "handlers.RebuildJobResponse": {
             "type": "object",
             "properties": {
                 "job": {

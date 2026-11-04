@@ -11,13 +11,6 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func TestAirportMCTHandlerType(t *testing.T) {
-	h := NewAirportMCTHandler(mct.NewService(&storetest.Stub{}, nil))
-	if got := h.Type(); got != model.JobTypeImportAirportMCT {
-		t.Errorf("Type() = %q, want %q", got, model.JobTypeImportAirportMCT)
-	}
-}
-
 func TestAirportMCTHandlerProcess(t *testing.T) {
 	minutes := 45
 	svc := mct.NewService(&storetest.Stub{

@@ -2,11 +2,11 @@ package ourairports
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 
+	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -31,17 +31,7 @@ func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
 	return s
 }
 
-type ImportResult struct {
-	Dataset      store.ReferenceDataset `json:"dataset"`
-	RowsImported int                    `json:"rows_imported"`
-}
-
-func (r ImportResult) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{
-		jsonKeyDataset: string(r.Dataset),
-		jsonKeyRows:    r.RowsImported,
-	})
-}
+type ImportResult = ingest.DatasetImportResult
 
 func (s *Service) Import(ctx context.Context, dataset store.ReferenceDataset) (ImportResult, error) {
 	csvPath, cleanup, err := s.openCSVFile(ctx, dataset)

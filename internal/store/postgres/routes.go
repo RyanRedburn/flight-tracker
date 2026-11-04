@@ -130,7 +130,7 @@ func (s *Store) fillOutlookSlot(ctx context.Context, out *model.RouteOutlook, fi
 	out.Analysis.Start = analysisStart
 	out.Analysis.End = end
 
-	targetMin, ok := store.HHMMToMinutes(filter.DepTime)
+	targetMin, ok := model.HHMMToMinutes(filter.DepTime)
 	if !ok {
 		return nil
 	}

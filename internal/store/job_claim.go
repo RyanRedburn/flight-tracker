@@ -15,24 +15,6 @@ var rebuildClaimJobTypes = []model.JobType{
 	model.JobTypeRebuildRouteWeatherStats,
 }
 
-func jobClaimRank(jobType model.JobType) int {
-	for _, rebuildType := range rebuildClaimJobTypes {
-		if jobType == rebuildType {
-			return 1
-		}
-	}
-
-	return 0
-}
-
-func jobClaimLess(a, b model.Job) bool {
-	if rankA, rankB := jobClaimRank(a.Type), jobClaimRank(b.Type); rankA != rankB {
-		return rankA < rankB
-	}
-
-	return a.CreatedAt.Before(b.CreatedAt)
-}
-
 // ClaimNextPendingJobQuery is QueryClaimNextPendingJobSelect with the rebuild
 // type list filled in. $1 is pending and $2 is running. A pending rebuild whose
 // type already has a running row is left for a later claim.

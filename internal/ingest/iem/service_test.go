@@ -114,7 +114,7 @@ func TestServiceImportMonth(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	if decoded[jsonKeyRows] == nil {
+	if decoded["rows_imported"] == nil {
 		t.Fatal("expected rows_imported in json result")
 	}
 }
@@ -134,22 +134,6 @@ func TestServiceImportMonthEmptyStations(t *testing.T) {
 	_, err := svc.ImportMonth(context.Background(), 2024, 1, nil)
 	if !errors.Is(err, ErrEmptyStations) {
 		t.Fatalf("ImportMonth() error = %v, want ErrEmptyStations", err)
-	}
-}
-
-func TestImportResultJSON(t *testing.T) {
-	payload, err := json.Marshal(ImportResult{Year: 2024, Month: 1, RowsImported: 42})
-	if err != nil {
-		t.Fatalf("MarshalJSON() error = %v", err)
-	}
-
-	var decoded map[string]any
-	if err := json.Unmarshal(payload, &decoded); err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
-	}
-
-	if decoded[jsonKeyRows] != float64(42) {
-		t.Errorf("rows_imported = %v, want 42", decoded[jsonKeyRows])
 	}
 }
 

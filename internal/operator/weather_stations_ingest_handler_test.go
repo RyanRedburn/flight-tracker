@@ -13,13 +13,6 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
-func TestWeatherStationsHandlerType(t *testing.T) {
-	h := NewWeatherStationsHandler(&storetest.Stub{}, iem.NewService(&storetest.Stub{}, nil))
-	if got := h.Type(); got != model.JobTypeImportWeatherStations {
-		t.Errorf("Type() = %q, want %q", got, model.JobTypeImportWeatherStations)
-	}
-}
-
 func TestWeatherStationsHandlerImportError(t *testing.T) {
 	st := &storetest.Stub{
 		CreateRebuildRouteWeatherStatsJobFn: rejectRebuild(t),

@@ -80,27 +80,12 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 // replicas serialize; the rebuild is a full truncate+insert, so repeating it
 // is idempotent.
 func (s *Store) RebuildRouteTravelWindows(ctx context.Context) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, store.TravelWindowRebuildLockKey, 0); err != nil {
-		return fmt.Errorf("advisory lock: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryTruncateRouteTravelWindows); err != nil {
-		return fmt.Errorf("truncate travel windows: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, store.QueryInsertRouteTravelWindows); err != nil {
-		return fmt.Errorf("insert travel windows: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
-	}
-
-	return nil
+	return s.rebuildRollup(
+		ctx,
+		store.TravelWindowRebuildLockKey,
+		store.QueryTruncateRouteTravelWindows,
+		store.QueryInsertRouteTravelWindows,
+		"truncate travel windows",
+		"insert travel windows",
+	)
 }

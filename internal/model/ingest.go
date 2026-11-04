@@ -1,18 +1,11 @@
 package model
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 )
-
-const MinFlightPerformanceIngestYear = 2018
-
-// MinWeatherIngestYear matches BTS flight-performance coverage.
-const MinWeatherIngestYear = 2018
 
 var ingestValidate = validator.New()
 
@@ -57,7 +50,7 @@ type WeatherIngestRequest struct {
 
 func (r IngestRequest) Validate() error {
 	if err := ingestValidate.Struct(r); err != nil {
-		return formatIngestValidationError(err)
+		return JoinValidationErrors(err, formatIngestFieldError)
 	}
 
 	return nil
@@ -67,7 +60,7 @@ func (r *WeatherIngestRequest) Validate() error {
 	normalizeWeatherStations(r)
 
 	if err := ingestValidate.Struct(r); err != nil {
-		return formatIngestValidationError(err)
+		return JoinValidationErrors(err, formatIngestFieldError)
 	}
 
 	return nil
@@ -122,20 +115,6 @@ func validateWeatherIngestRequest(sl validator.StructLevel) {
 	if (req.EndYear == nil) != (req.EndMonth == nil) {
 		sl.ReportError(req.EndYear, "EndYear", "end_year", "end_pair", "")
 	}
-}
-
-func formatIngestValidationError(err error) error {
-	var validationErrs validator.ValidationErrors
-	if !errors.As(err, &validationErrs) {
-		return err
-	}
-
-	messages := make([]string, 0, len(validationErrs))
-	for _, fieldErr := range validationErrs {
-		messages = append(messages, formatIngestFieldError(fieldErr))
-	}
-
-	return fmt.Errorf("%s", strings.Join(messages, "; "))
 }
 
 func formatIngestFieldError(fieldErr validator.FieldError) string {
