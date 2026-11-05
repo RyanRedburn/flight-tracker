@@ -6,6 +6,11 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
+const (
+	testTravelOrigin = "ORD"
+	testTravelDest   = "LAX"
+)
+
 func TestAssembleRouteWeatherStatsBothSides(t *testing.T) {
 	t.Parallel()
 

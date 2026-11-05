@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -88,7 +89,7 @@ func TestItineraryOutlookOKAndTight(t *testing.T) {
 
 			assertNestedOutlookResults(t, rec.Body.Bytes(), 0)
 
-			if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Filters.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes || out.Legs[1].Outlook == nil || out.Legs[1].Outlook.Filters.DepTimeWindowMinutes != 45 {
+			if out.Legs[0].Outlook == nil || out.Legs[0].Outlook.Filters.DepTimeWindowMinutes != domain.DefaultDepTimeWindowMinutes || out.Legs[1].Outlook == nil || out.Legs[1].Outlook.Filters.DepTimeWindowMinutes != 45 {
 				t.Fatalf("windows = %+v %+v", out.Legs[0].Outlook, out.Legs[1].Outlook)
 			}
 

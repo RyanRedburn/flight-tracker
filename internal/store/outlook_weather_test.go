@@ -152,6 +152,10 @@ func TestAssembleRouteOutlookWeatherCountsEveryAdverseCategory(t *testing.T) {
 	}
 }
 
+func floatPtr(v float64) *float64 {
+	return &v
+}
+
 func assertOutlookWeatherSide(t *testing.T, name string, got model.RouteOutlookWeatherSide, fair, adverse, delta *float64, flights int, confidence string) {
 	t.Helper()
 

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"reflect"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -95,7 +96,7 @@ func compareCarriers(ctx context.Context, s store.Store, logger *slog.Logger, in
 
 		var ok bool
 
-		start, end, ok = store.TrailingOutlookWindow(latest)
+		start, end, ok = domain.TrailingOutlookWindow(latest)
 		if !ok {
 			logger.Error(toolCompareCarriers, "stage", "window", "date", latest)
 

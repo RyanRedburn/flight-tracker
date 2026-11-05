@@ -26,6 +26,7 @@ In-process Go HTTP API plus poll-based background workers. Handlers queue jobs; 
 | `internal/api` | Chi router, handlers, query parsing, middleware |
 | `internal/operator` | Worker loop, job processor, per-type `JobHandler` (ingest, plus `rebuild_route_travel_windows` and `rebuild_route_weather_stats`) |
 | `internal/ingest` | Month-range expansion; shared CSV/HTTP helpers; provider adapters (`bts`, `iem`, `ourairports`, `mct`) |
+| `internal/domain` | Response assembly with no database access: connections, itineraries, travel windows, outlook windows, carrier ranking |
 | `internal/store` | `Store` interface, SQL constants, query filters |
 | `internal/store/postgres` | pgx implementation, COPY replace |
 | `internal/store/storetest` | Scenario stub used by unit tests |
@@ -38,6 +39,7 @@ In-process Go HTTP API plus poll-based background workers. Handlers queue jobs; 
 ## Dependency rules
 
 - Handlers and operator code depend on `store.Store`, never on `internal/store/postgres`.
+- `internal/domain` does not import `internal/store`. Store and postgres call domain for assembly.
 - SQL lives in `internal/store/queries.go`. Query construction may live in `internal/store/postgres`. Handlers do not embed SQL.
 - HTTP stays in `internal/api`. Ingest download/parse stays in `internal/ingest/<provider>`. Job claim/complete stays in `internal/operator`.
 - `cmd/server` is the composition root. New long-lived collaborators are constructed there and passed in.

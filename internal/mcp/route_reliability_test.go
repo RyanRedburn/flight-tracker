@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -359,7 +360,7 @@ func TestRouteReliabilitySetsDepTimeWindow(t *testing.T) {
 		wantSet  bool
 		wantMins int
 	}{
-		{name: "default window is not caller-set", wantSet: false, wantMins: store.DefaultDepTimeWindowMinutes},
+		{name: "default window is not caller-set", wantSet: false, wantMins: domain.DefaultDepTimeWindowMinutes},
 		{name: "explicit window is caller-set", minutes: &window, wantSet: true, wantMins: window},
 	}
 
@@ -791,7 +792,7 @@ func TestRouteReliabilityInputSchema(t *testing.T) {
 	}
 
 	window := schema.Properties["dep_time_window_minutes"]
-	if window == nil || window.Minimum == nil || *window.Minimum != 1 || window.Maximum == nil || *window.Maximum != float64(store.MaxDepTimeWindowMinutes) {
+	if window == nil || window.Minimum == nil || *window.Minimum != 1 || window.Maximum == nil || *window.Maximum != float64(domain.MaxDepTimeWindowMinutes) {
 		t.Fatalf("window schema = %#v", window)
 	}
 

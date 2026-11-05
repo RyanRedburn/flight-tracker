@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -152,7 +153,7 @@ func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
 		t.Fatal("placeholders should be replaced")
 	}
 
-	wantHaving := "HAVING COUNT(*) >= " + strconv.Itoa(store.CarrierRankMinSampleSize)
+	wantHaving := "HAVING COUNT(*) >= " + strconv.Itoa(domain.CarrierRankMinSampleSize)
 	if strings.Count(query, wantHaving) != 2 {
 		t.Fatalf("having clauses = %d, want 2", strings.Count(query, wantHaving))
 	}
@@ -208,7 +209,7 @@ func TestUnmarshalCarrierOnTime(t *testing.T) {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
 
-	if got[0].Carrier != "UA" || got[0].Flights != 6 || got[0].OnTimeCount == nil || *got[0].OnTimeCount != 5 || got[0].OnTimeRate != store.CarrierOnTimeFromCounts("UA", 5, 6).OnTimeRate {
+	if got[0].Carrier != "UA" || got[0].Flights != 6 || got[0].OnTimeCount == nil || *got[0].OnTimeCount != 5 || got[0].OnTimeRate != domain.CarrierOnTimeFromCounts("UA", 5, 6).OnTimeRate {
 		t.Errorf("first = %+v", got[0])
 	}
 

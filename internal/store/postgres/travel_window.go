@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -49,10 +50,10 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 	}
 	defer rows.Close()
 
-	counts := make([]store.TravelWindowBucketCount, 0)
+	counts := make([]domain.TravelWindowBucketCount, 0)
 
 	for rows.Next() {
-		var count store.TravelWindowBucketCount
+		var count domain.TravelWindowBucketCount
 		if err := rows.Scan(&count.Grain, &count.Bucket, &count.OnTimeCount, &count.Flights); err != nil {
 			return nil, err
 		}
@@ -64,7 +65,7 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 		return nil, err
 	}
 
-	return store.AssembleRouteTravelWindows(
+	return domain.AssembleRouteTravelWindows(
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -62,7 +63,7 @@ func checkItineraryInputSchema() *jsonschema.Schema {
 	legProps["flight_number"].MaxLength = jsonschema.Ptr(store.FlightNumberRawMaxLen)
 	legProps["flight_number"].Pattern = store.FlightNumberPattern
 	legProps["dep_time_window_minutes"].Minimum = jsonschema.Ptr(1.0)
-	legProps["dep_time_window_minutes"].Maximum = jsonschema.Ptr(float64(store.MaxDepTimeWindowMinutes))
+	legProps["dep_time_window_minutes"].Maximum = jsonschema.Ptr(float64(domain.MaxDepTimeWindowMinutes))
 
 	return schema
 }
@@ -115,7 +116,7 @@ func checkItinerary(ctx context.Context, s store.Store, logger *slog.Logger, in 
 			continue
 		}
 
-		window := store.ResolveDepTimeWindowMinutes(legIn.DepTimeWindowMinutes)
+		window := domain.ResolveDepTimeWindowMinutes(legIn.DepTimeWindowMinutes)
 
 		origin, dest, _, fail := resolveRouteFromFlightNumber(ctx, s, logger, toolCheckItinerary,
 			legIn.Carrier, legIn.FlightNumber, []string{legIn.DepTime}, legIn.Origin, legIn.Dest, window)
@@ -162,17 +163,17 @@ func prepareItineraryLeg(in checkItineraryLegInput) (model.ItineraryLeg, bool, *
 	}
 
 	if in.DepTimeWindowMinutes != nil {
-		if err := store.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
+		if err := domain.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
 			return model.ItineraryLeg{}, false, invalidInput(err)
 		}
 	}
 
-	if _, ok := store.ISOWeekdayFromDate(in.Date); !ok {
-		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidDate)
+	if _, ok := domain.ISOWeekdayFromDate(in.Date); !ok {
+		return model.ItineraryLeg{}, false, invalidInput(domain.ErrInvalidDate)
 	}
 
 	if _, ok := model.HHMMToMinutes(in.DepTime); !ok {
-		return model.ItineraryLeg{}, false, invalidInput(store.ErrInvalidHHMM)
+		return model.ItineraryLeg{}, false, invalidInput(domain.ErrInvalidHHMM)
 	}
 
 	if _, ok := model.HHMMToMinutes(in.ArrTime); !ok {

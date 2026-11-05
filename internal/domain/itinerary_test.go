@@ -1,4 +1,4 @@
-package store
+package domain
 
 import (
 	"encoding/json"
@@ -19,6 +19,7 @@ const (
 	testTime1100   = "1100"
 	testConnOrigin = "PHL"
 	testAirportBOS = "BOS"
+	testAirportLAX = "LAX"
 	testLHR        = "LHR"
 	testCDG        = "CDG"
 )
@@ -485,7 +486,7 @@ func TestBuildItineraryOutlookMissingLeg(t *testing.T) {
 		},
 	}
 
-	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{nil, outlook}, []string{ItineraryLegOutlookNotFound, ""}, map[string]string{
+	got := BuildItineraryOutlook(legs, []*model.RouteOutlook{nil, outlook}, []string{"route outlook not found", ""}, map[string]string{
 		testAirportBOS:   "US",
 		testTravelOrigin: "US",
 		testAirportLAX:   "US",

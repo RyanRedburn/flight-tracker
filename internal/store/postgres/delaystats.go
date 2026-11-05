@@ -3,8 +3,8 @@ package postgres
 import (
 	"database/sql"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 type delayStatsScan struct {
@@ -115,7 +115,7 @@ func applyDelayStats(row delayStatsScan, dst delayStatFields) {
 		Security:     nullFloat(row.causeSecurity),
 		LateAircraft: nullFloat(row.causeLate),
 	}
-	*dst.share = store.DelayCausesShareFromCounts(
+	*dst.share = domain.DelayCausesShareFromCounts(
 		row.delayed,
 		row.shareCarrier,
 		row.shareWeather,

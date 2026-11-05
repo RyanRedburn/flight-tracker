@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -99,7 +100,7 @@ func resolveRouteFromFlightNumber(
 // near is empty when no time could be parsed. matchedTimes are the given times that hit a route.
 func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, windowMinutes int) ([]model.FlightNumberRoute, string, []string) {
 	if windowMinutes <= 0 {
-		windowMinutes = store.DefaultDepTimeWindowMinutes
+		windowMinutes = domain.DefaultDepTimeWindowMinutes
 	}
 
 	targets := make([]int, 0, len(depTimes))
@@ -112,7 +113,7 @@ func routesNearDepTimes(routes []model.FlightNumberRoute, depTimes []string, win
 		}
 
 		targets = append(targets, target)
-		labels = append(labels, store.FormatHHMM(dep))
+		labels = append(labels, domain.FormatHHMM(dep))
 	}
 
 	if len(targets) == 0 {

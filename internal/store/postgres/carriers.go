@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -36,7 +37,7 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 	}
 
 	if filter.StartDate == "" && filter.EndDate == "" {
-		start, end, ok := store.CarrierStatsWindow(analysisEnd.String)
+		start, end, ok := domain.CarrierStatsWindow(analysisEnd.String)
 		if !ok {
 			return nil, fmt.Errorf("parse carrier stats max flight date %q", analysisEnd.String)
 		}
@@ -98,8 +99,8 @@ func (s *Store) applyCarrierAggregates(ctx context.Context, filter store.Carrier
 		return fmt.Errorf("decode carrier airports: %w", err)
 	}
 
-	stats.BestRoutes, stats.WorstRoutes = store.RankCarrierRoutes(routes)
-	stats.BestAirports, stats.WorstAirports = store.RankCarrierAirports(airports)
+	stats.BestRoutes, stats.WorstRoutes = domain.RankCarrierRoutes(routes)
+	stats.BestAirports, stats.WorstAirports = domain.RankCarrierAirports(airports)
 
 	return nil
 }
@@ -171,7 +172,7 @@ func buildCarrierStatsQuery(template string, filter store.CarrierStatsFilter) (s
 	query := strings.Replace(template, carrierStatsExtraPlaceholder, extra, 1)
 	query = strings.Replace(query, carrierStatsOriginAirportPlaceholder, originAirport, 1)
 	query = strings.Replace(query, carrierStatsDestAirportPlaceholder, destAirport, 1)
-	query = strings.ReplaceAll(query, carrierStatsMinSamplePlaceholder, strconv.Itoa(store.CarrierRankMinSampleSize))
+	query = strings.ReplaceAll(query, carrierStatsMinSamplePlaceholder, strconv.Itoa(domain.CarrierRankMinSampleSize))
 
 	return query, args
 }

@@ -14,6 +14,7 @@ Also follow [development-practices](../development-practices/SKILL.md).
 | `internal/store/store.go` | `Store` interface |
 | `internal/store/queries.go` | Raw SQL string constants (`Query*`) |
 | `internal/store/*_agg.go`, `flight_date.go`, … | Filter structs and shared query helpers used by the interface |
+| `internal/domain` | Response assembly. No SQL and no import of `store` |
 | `internal/store/postgres` | Execution, transactions, COPY, dynamic `WHERE` builders |
 | `internal/store/storetest/stub.go` | Test stub — every interface method |
 | `migrations/postgres` | Schema changes |
@@ -44,7 +45,7 @@ Do not row-by-row `INSERT` for ingest loads.
 
 Keep templates in `queries.go`. Optional filters are applied in `postgres` builders (see `buildRouteStatsQuery` / `buildCarrierStatsQuery`): replace a placeholder, append args, never interpolate values into SQL.
 
-Stats/outlook aggregation belongs in SQL (or small helpers in `store`/`postgres`), not in HTTP handlers.
+Stats/outlook aggregation belongs in SQL. Response assembly after the query lives in `internal/domain`, not in HTTP handlers.
 
 Sentinels: `store.ErrNotFound`, `store.ErrJobStatusConflict`. Map `sql.ErrNoRows` to `ErrNotFound` at the postgres boundary.
 

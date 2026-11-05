@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -19,7 +20,7 @@ const latestCarrierDate = "2026-04-01"
 func TestCompareCarriersSummaries(t *testing.T) {
 	minFlights := model.CarrierLowSampleBelow
 
-	windowStart, windowEnd, ok := store.TrailingOutlookWindow(latestCarrierDate)
+	windowStart, windowEnd, ok := domain.TrailingOutlookWindow(latestCarrierDate)
 	if !ok || windowEnd != latestCarrierDate {
 		t.Fatalf("window = %s %s ok=%v", windowStart, windowEnd, ok)
 	}

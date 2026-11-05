@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -356,7 +357,7 @@ func TestCheckItineraryInputSchema(t *testing.T) {
 	}
 
 	window := props["dep_time_window_minutes"]
-	if window == nil || window.Minimum == nil || *window.Minimum != 1 || window.Maximum == nil || *window.Maximum != float64(store.MaxDepTimeWindowMinutes) {
+	if window == nil || window.Minimum == nil || *window.Minimum != 1 || window.Maximum == nil || *window.Maximum != float64(domain.MaxDepTimeWindowMinutes) {
 		t.Fatalf("window schema = %#v", window)
 	}
 

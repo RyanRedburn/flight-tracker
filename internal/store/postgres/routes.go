@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -57,7 +58,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 		}
 
 		stats.CarrierOnTime = rows
-		stats.CarrierComparison = store.CarrierComparison(rows)
+		stats.CarrierComparison = domain.CarrierComparison(rows)
 	}
 
 	stats.RoundForResponse()
@@ -101,7 +102,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 
 	var p90Arr sql.NullFloat64
 
-	err = store.ApplyOutlookLookback(out, filter.DepTimeWindowSet, func(lookbackDays int) error {
+	err = domain.ApplyOutlookLookback(out, filter.DepTimeWindowSet, func(lookbackDays int) error {
 		return s.fillOutlookSlot(ctx, out, filter, analysisEnd.String, lookbackDays, &p90Arr)
 	})
 	if err != nil {
@@ -122,7 +123,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 }
 
 func (s *Store) fillOutlookSlot(ctx context.Context, out *model.RouteOutlook, filter store.RouteOutlookFilter, end string, lookbackDays int, p90Arr *sql.NullFloat64) error {
-	analysisStart, _, ok := store.TrailingOutlookWindowDays(end, lookbackDays)
+	analysisStart, _, ok := domain.TrailingOutlookWindowDays(end, lookbackDays)
 	if !ok {
 		return fmt.Errorf("parse route outlook max flight date %q", end)
 	}
@@ -233,7 +234,7 @@ func (s *Store) attachOutlookWeather(ctx context.Context, out *model.RouteOutloo
 func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOutlook, p90 sql.NullFloat64) error {
 	var (
 		delay *float64
-		mct   *store.AirportConnectionMCT
+		mct   *domain.AirportConnectionMCT
 	)
 
 	if p90.Valid {
@@ -248,12 +249,12 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 		mct = loaded
 	}
 
-	store.FinishOutlookConnection(out, delay, mct)
+	domain.FinishOutlookConnection(out, delay, mct)
 
 	return nil
 }
 
-func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*store.AirportConnectionMCT, error) {
+func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*domain.AirportConnectionMCT, error) {
 	var dd, di, id, ii sql.NullInt64
 
 	err := s.db.QueryRowContext(ctx, store.QueryAirportMCTMinutes, iata).Scan(&dd, &di, &id, &ii)
@@ -265,7 +266,7 @@ func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*store.A
 		return nil, err
 	}
 
-	return &store.AirportConnectionMCT{
+	return &domain.AirportConnectionMCT{
 		DomesticToDomestic:           nullIntPtr(dd),
 		DomesticToInternational:      nullIntPtr(di),
 		InternationalToDomestic:      nullIntPtr(id),
@@ -386,10 +387,10 @@ func unmarshalCarrierOnTime(raw []byte) ([]model.CarrierOnTime, error) {
 	out := make([]model.CarrierOnTime, 0, len(rows))
 
 	for _, row := range rows {
-		out = append(out, store.CarrierOnTimeFromCounts(row.Carrier, row.OnTime, row.Flights))
+		out = append(out, domain.CarrierOnTimeFromCounts(row.Carrier, row.OnTime, row.Flights))
 	}
 
-	store.SortCarrierOnTime(out)
+	domain.SortCarrierOnTime(out)
 
 	return out, nil
 }

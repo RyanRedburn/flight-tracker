@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -13,7 +14,7 @@ func (s *Store) FlightNumberRoutes(ctx context.Context, filter store.FlightNumbe
 	rows, err := s.db.QueryContext(ctx, store.QueryFlightNumberRoutes,
 		filter.Carrier,
 		filter.FlightNumber,
-		store.OutlookLookbackDays,
+		domain.OutlookLookbackDays,
 	)
 	if err != nil {
 		return nil, err
@@ -34,7 +35,7 @@ func (s *Store) FlightNumberRoutes(ctx context.Context, filter store.FlightNumbe
 		}
 
 		if medianMins.Valid {
-			route.UsualDepTime = store.MinutesToHHMM(int(medianMins.Float64))
+			route.UsualDepTime = domain.MinutesToHHMM(int(medianMins.Float64))
 		}
 
 		out = append(out, route)
