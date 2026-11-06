@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -186,7 +187,7 @@ func TestFreshnessGetStoreError(t *testing.T) {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 
-	var body ErrorResponse
+	var body respond.ErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

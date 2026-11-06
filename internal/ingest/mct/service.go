@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -56,7 +57,7 @@ func (s *Service) Import(ctx context.Context) (ImportResult, error) {
 	}
 
 	return ImportResult{
-		Dataset:      store.ReferenceAirportMCT,
+		Dataset:      model.ReferenceAirportMCT,
 		RowsImported: len(rows),
 	}, nil
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -75,7 +76,7 @@ func TestGoldenThinSampleKeepsConnection(t *testing.T) {
 	serve := func(filter store.RouteOutlookFilter) *model.RouteOutlook {
 		out := *outlook
 		out.Filters = outlookFilters(filter)
-		store.FinishOutlookConnection(&out, &p90, nil)
+		domain.FinishOutlookConnection(&out, &p90, nil)
 
 		return &out
 	}

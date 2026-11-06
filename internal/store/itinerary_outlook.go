@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
@@ -68,20 +69,20 @@ func ItineraryOutlook(ctx context.Context, s Store, legs []model.ItineraryLeg) (
 		return model.ItineraryOutlookResponse{}, hardErr
 	}
 
-	return BuildItineraryOutlook(legs, outlooks, legErrors, countries), nil
+	return domain.BuildItineraryOutlook(legs, outlooks, legErrors, countries), nil
 }
 
 // ItineraryLegRouteOutlookFilter maps one itinerary leg to a route outlook filter.
 func ItineraryLegRouteOutlookFilter(leg model.ItineraryLeg) RouteOutlookFilter {
-	day, _ := ISOWeekdayFromDate(leg.Date)
+	day, _ := domain.ISOWeekdayFromDate(leg.Date)
 
 	return RouteOutlookFilter{
 		Origin:               leg.Origin,
 		Dest:                 leg.Dest,
 		Carrier:              leg.Carrier,
 		DayOfWeek:            day,
-		DepTime:              FormatHHMM(leg.DepTime),
-		DepTimeWindowMinutes: ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
+		DepTime:              domain.FormatHHMM(leg.DepTime),
+		DepTimeWindowMinutes: domain.ResolveDepTimeWindowMinutes(leg.DepTimeWindowMinutes),
 		DepTimeWindowSet:     leg.DepTimeWindowMinutes != nil,
 	}
 }

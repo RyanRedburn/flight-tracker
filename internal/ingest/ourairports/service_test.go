@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -23,7 +23,7 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 
 	d := NewDownloader(server.URL, time.Second)
 
-	path, cleanup, err := d.DownloadCSV(context.Background(), store.ReferenceCountries)
+	path, cleanup, err := d.DownloadCSV(context.Background(), model.ReferenceCountries)
 	if err != nil {
 		t.Fatalf("DownloadCSV() error = %v", err)
 	}
@@ -42,33 +42,33 @@ func TestDownloaderDownloadsCSV(t *testing.T) {
 func TestServiceImportDatasets(t *testing.T) {
 	ctx := context.Background()
 
-	datasets := []store.ReferenceDataset{
-		store.ReferenceCountries,
-		store.ReferenceRegions,
-		store.ReferenceAirports,
+	datasets := []model.ReferenceDataset{
+		model.ReferenceCountries,
+		model.ReferenceRegions,
+		model.ReferenceAirports,
 	}
 
 	for _, dataset := range datasets {
 		t.Run(string(dataset), func(t *testing.T) {
-			var replaced store.ReferenceDataset
+			var replaced model.ReferenceDataset
 
 			var gotRows int
 
 			st := &storetest.Stub{
 				ReplaceCountriesFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.ReferenceCountries
+					replaced = model.ReferenceCountries
 					gotRows = len(rows)
 
 					return nil
 				},
 				ReplaceRegionsFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.ReferenceRegions
+					replaced = model.ReferenceRegions
 					gotRows = len(rows)
 
 					return nil
 				},
 				ReplaceAirportsFn: func(_ context.Context, _ []string, rows [][]string) error {
-					replaced = store.ReferenceAirports
+					replaced = model.ReferenceAirports
 					gotRows = len(rows)
 
 					return nil
@@ -99,7 +99,7 @@ func TestServiceImportDatasets(t *testing.T) {
 func TestServiceImportWithoutDownloader(t *testing.T) {
 	svc := NewService(&storetest.Stub{}, nil)
 
-	_, err := svc.Import(context.Background(), store.ReferenceCountries)
+	_, err := svc.Import(context.Background(), model.ReferenceCountries)
 	if err == nil {
 		t.Fatal("Import() expected error without downloader or opener")
 	}

@@ -1,10 +1,16 @@
-package store
+package domain
 
 import (
 	"strconv"
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
+)
+
+const (
+	testFlightDate20260401 = "2026-04-01"
+	testAirportAAA         = "AAA"
+	testAirportBBB         = "BBB"
 )
 
 func TestDelayCausesShareFromCounts(t *testing.T) {

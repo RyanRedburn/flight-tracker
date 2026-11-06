@@ -21,7 +21,7 @@ func (s *Store) CreateAPIKey(ctx context.Context, key *model.APIKey) error {
 		revokedAt = sql.NullTime{Time: key.RevokedAt.UTC(), Valid: true}
 	}
 
-	_, err := s.db.ExecContext(ctx, store.QueryCreateAPIKey,
+	_, err := s.db.ExecContext(ctx, QueryCreateAPIKey,
 		key.ID,
 		key.Prefix,
 		key.KeyHash,
@@ -42,7 +42,7 @@ func (s *Store) CreateAPIKey(ctx context.Context, key *model.APIKey) error {
 }
 
 func (s *Store) LookupAPIKeyByPrefix(ctx context.Context, prefix string) (*model.APIKey, error) {
-	key, err := scanAPIKey(s.db.QueryRowContext(ctx, store.QueryLookupAPIKeyByPrefix, prefix))
+	key, err := scanAPIKey(s.db.QueryRowContext(ctx, QueryLookupAPIKeyByPrefix, prefix))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("api key prefix %q: %w", prefix, store.ErrNotFound)
 	}
@@ -55,7 +55,7 @@ func (s *Store) LookupAPIKeyByPrefix(ctx context.Context, prefix string) (*model
 }
 
 func (s *Store) GetAPIKey(ctx context.Context, id string) (*model.APIKey, error) {
-	key, err := scanAPIKey(s.db.QueryRowContext(ctx, store.QueryGetAPIKey, id))
+	key, err := scanAPIKey(s.db.QueryRowContext(ctx, QueryGetAPIKey, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("api key %q: %w", id, store.ErrNotFound)
 	}
@@ -68,7 +68,7 @@ func (s *Store) GetAPIKey(ctx context.Context, id string) (*model.APIKey, error)
 }
 
 func (s *Store) ListAPIKeys(ctx context.Context) ([]*model.APIKey, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryListAPIKeys)
+	rows, err := s.db.QueryContext(ctx, QueryListAPIKeys)
 	if err != nil {
 		return nil, fmt.Errorf("list api keys: %w", err)
 	}
@@ -93,7 +93,7 @@ func (s *Store) ListAPIKeys(ctx context.Context) ([]*model.APIKey, error) {
 }
 
 func (s *Store) RevokeAPIKey(ctx context.Context, id string, revokedAt time.Time) error {
-	res, err := s.db.ExecContext(ctx, store.QueryRevokeAPIKey, revokedAt.UTC(), id)
+	res, err := s.db.ExecContext(ctx, QueryRevokeAPIKey, revokedAt.UTC(), id)
 	if err != nil {
 		return fmt.Errorf("revoke api key: %w", err)
 	}
@@ -116,7 +116,7 @@ func (s *Store) RevokeAPIKey(ctx context.Context, id string, revokedAt time.Time
 
 func (s *Store) CountAPIKeys(ctx context.Context) (int64, error) {
 	var n int64
-	if err := s.db.QueryRowContext(ctx, store.QueryCountAPIKeys).Scan(&n); err != nil {
+	if err := s.db.QueryRowContext(ctx, QueryCountAPIKeys).Scan(&n); err != nil {
 		return 0, fmt.Errorf("count api keys: %w", err)
 	}
 

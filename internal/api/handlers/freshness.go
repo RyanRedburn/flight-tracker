@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -52,20 +53,20 @@ func NewFreshnessHandler(s store.Store) *FreshnessHandler {
 //	@Tags			freshness,internal
 //	@Produce		json
 //	@Success		200	{object}	DataFreshnessResponse
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/data-freshness [get]
 func (h *FreshnessHandler) Get(w http.ResponseWriter, r *http.Request) {
 	freshness, err := h.store.DataFreshness(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load data freshness"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to load data freshness"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toDataFreshnessResponse(freshness))
+	respond.WriteJSON(w, http.StatusOK, toDataFreshnessResponse(freshness))
 }
 
 func toDataFreshnessResponse(in model.DataFreshness) DataFreshnessResponse {

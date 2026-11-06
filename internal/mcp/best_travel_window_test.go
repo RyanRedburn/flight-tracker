@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -348,15 +349,15 @@ func TestBestTravelWindowSummaries(t *testing.T) {
 }
 
 func TestBestTravelWindowAgreesWithMonthLists(t *testing.T) {
-	leading := store.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 200, []store.TravelWindowBucketCount{
-		{Grain: store.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 54, Flights: 60},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 6, OnTimeCount: 200, Flights: 400},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 4, OnTimeCount: 20, Flights: 40},
+	leading := domain.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 200, []domain.TravelWindowBucketCount{
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 54, Flights: 60},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 6, OnTimeCount: 200, Flights: 400},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 4, OnTimeCount: 20, Flights: 40},
 	})
-	tied := store.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 200, []store.TravelWindowBucketCount{
-		{Grain: store.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 97, Flights: 110},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 2550, Flights: 3000},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 2460, Flights: 3000},
+	tied := domain.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 200, []domain.TravelWindowBucketCount{
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 97, Flights: 110},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 2550, Flights: 3000},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 2460, Flights: 3000},
 	})
 
 	tests := []struct {
@@ -419,10 +420,10 @@ func TestBestTravelWindowAgreesWithMonthLists(t *testing.T) {
 }
 
 func TestBestTravelWindowListsDoNotOverlap(t *testing.T) {
-	windows := store.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 6060, []store.TravelWindowBucketCount{
-		{Grain: store.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 2700, Flights: 3000},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 2580, Flights: 3000},
-		{Grain: store.TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 51, Flights: 60},
+	windows := domain.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 6060, []domain.TravelWindowBucketCount{
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 1, OnTimeCount: 2700, Flights: 3000},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 2, OnTimeCount: 2580, Flights: 3000},
+		{Grain: domain.TravelWindowGrainMonth, Bucket: 3, OnTimeCount: 51, Flights: 60},
 	})
 
 	stub := &storetest.Stub{
@@ -757,17 +758,17 @@ func monthBucket(month int, rate float64, flights int, confidence, reliability s
 }
 
 func testWindows(months []model.TravelWindowMonthBucket) *model.RouteTravelWindows {
-	counts := make([]store.TravelWindowBucketCount, 0, len(months))
+	counts := make([]domain.TravelWindowBucketCount, 0, len(months))
 	for _, month := range months {
-		counts = append(counts, store.TravelWindowBucketCount{
-			Grain:       store.TravelWindowGrainMonth,
+		counts = append(counts, domain.TravelWindowBucketCount{
+			Grain:       domain.TravelWindowGrainMonth,
 			Bucket:      month.Month,
 			OnTimeCount: int(math.Round(month.OnTimeRate * float64(month.Flights))),
 			Flights:     month.Flights,
 		})
 	}
 
-	windows := store.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 4242, counts)
+	windows := domain.AssembleRouteTravelWindows(testCodeORD, testCodeLAX, "", testStatsStart, testStatsEnd, 4242, counts)
 	planted := make(map[int]model.TravelWindowMonthBucket, len(months))
 
 	for _, month := range months {

@@ -23,22 +23,23 @@ In-process Go HTTP API plus poll-based background workers. Handlers queue jobs; 
 | Path | Owns |
 | --- | --- |
 | `cmd/server` | Process wiring only (config, store, ingest services, processor, worker, HTTP server) |
-| `internal/api` | Chi router, handlers, query parsing, middleware |
+| `internal/api` | Chi router, handlers, shared JSON responses (`respond`), query parsing, middleware |
 | `internal/operator` | Worker loop, job processor, per-type `JobHandler` (ingest, plus `rebuild_route_travel_windows` and `rebuild_route_weather_stats`) |
 | `internal/ingest` | Month-range expansion; shared CSV/HTTP helpers; provider adapters (`bts`, `iem`, `ourairports`, `mct`) |
-| `internal/store` | `Store` interface, SQL constants, query filters |
-| `internal/store/postgres` | pgx implementation, COPY replace |
+| `internal/domain` | Response assembly with no database access: connections, itineraries, travel windows, outlook windows, carrier ranking |
+| `internal/store` | `Store` interface and query filters |
+| `internal/store/postgres` | pgx implementation, SQL constants, COPY replace |
 | `internal/store/storetest` | Scenario stub used by unit tests |
-| `internal/model` | Domain types and JSON request validation |
+| `internal/model` | Domain types, job types, and JSON request validation |
 | `internal/config` | Environment variables |
-| `internal/database` | Driver factory (`postgres` only) |
 | `migrations/postgres` | golang-migrate SQL |
 | `docs/external`, `docs/full` | Generated OpenAPI — never edit by hand |
 
 ## Dependency rules
 
 - Handlers and operator code depend on `store.Store`, never on `internal/store/postgres`.
-- SQL lives in `internal/store/queries.go`. Query construction may live in `internal/store/postgres`. Handlers do not embed SQL.
+- `internal/domain` does not import `internal/store`. Store and postgres call domain for assembly.
+- SQL lives in `internal/store/postgres`. Handlers do not embed SQL. `cmd/server` is the only caller of `postgres.Open`.
 - HTTP stays in `internal/api`. Ingest download/parse stays in `internal/ingest/<provider>`. Job claim/complete stays in `internal/operator`.
 - `cmd/server` is the composition root. New long-lived collaborators are constructed there and passed in.
 - Prefer extending an existing package over adding a new top-level `internal/` package.

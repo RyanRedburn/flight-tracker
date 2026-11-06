@@ -373,11 +373,11 @@ docs/external/        Generated OpenAPI (user-facing / external Swagger)
 docs/full/            Generated OpenAPI (full / internal Swagger)
 internal/api/         HTTP server, handlers, middleware, query parsing
 internal/config/      Environment configuration
-internal/database/    Store factory (driver selection)
+internal/domain/      Response assembly (no database)
 internal/ingest/      Ingest range expansion; provider adapters (BTS, IEM, OurAirports, MCT) download/parse/load
-internal/model/       Domain types
+internal/model/       Domain types and job types
 internal/operator/    Background worker and job processor
-internal/store/       Store interface, queries, Postgres implementation, test stub
+internal/store/       Store interface, Postgres implementation (SQL), test stub
 docker/migrate/       Migrate sidecar (Dockerfile + Makefile for up/down/force/psql)
 migrations/           SQL migrations (postgres/)
 ```

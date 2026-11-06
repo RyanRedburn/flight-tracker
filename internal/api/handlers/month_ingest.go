@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -54,12 +55,12 @@ func queueMonthIngestJobs(
 
 	activeMonths, err := active(ctx, months)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCheckActiveIngest})
 		return nil, false
 	}
 
 	if len(activeMonths) > 0 {
-		writeJSON(w, http.StatusConflict, MonthIngestConflictResponse{
+		respond.WriteJSON(w, http.StatusConflict, MonthIngestConflictResponse{
 			Error:              errActiveIngestMonths,
 			ActiveIngestMonths: activeMonths,
 		})
@@ -70,12 +71,12 @@ func queueMonthIngestJobs(
 	if !in.force {
 		existingMonths, err := existing(ctx, months)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: existingCheckErr})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: existingCheckErr})
 			return nil, false
 		}
 
 		if len(existingMonths) > 0 {
-			writeJSON(w, http.StatusConflict, MonthIngestConflictResponse{
+			respond.WriteJSON(w, http.StatusConflict, MonthIngestConflictResponse{
 				Error:              existingDataErr,
 				ExistingDataMonths: existingMonths,
 			})
@@ -90,7 +91,7 @@ func queueMonthIngestJobs(
 		job, err := create(ctx, ym.Year, ym.Month)
 		if err != nil {
 			if errors.Is(err, store.ErrActiveIngestConflict) {
-				writeJSON(w, http.StatusConflict, MonthIngestConflictResponse{
+				respond.WriteJSON(w, http.StatusConflict, MonthIngestConflictResponse{
 					Error:              errActiveIngestMonths,
 					ActiveIngestMonths: []model.YearMonth{ym},
 				})
@@ -98,7 +99,7 @@ func queueMonthIngestJobs(
 				return nil, false
 			}
 
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateIngestJob})
 
 			return nil, false
 		}

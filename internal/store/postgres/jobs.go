@@ -14,9 +14,9 @@ import (
 )
 
 func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, month int) (*model.Job, error) {
-	return s.insertPendingMonthJob(ctx, model.JobTypeImportFlightPerformance, year, month, store.QueryActiveFlightPerformanceIngestMonths,
+	return s.insertPendingMonthJob(ctx, model.JobTypeImportFlightPerformance, year, month, QueryActiveFlightPerformanceIngestMonths,
 		func(ctx context.Context, exec sqlExecContext, jobID string) error {
-			if _, err := exec.ExecContext(ctx, store.QueryCreateFlightPerformanceIngestJob, jobID, year, month); err != nil {
+			if _, err := exec.ExecContext(ctx, QueryCreateFlightPerformanceIngestJob, jobID, year, month); err != nil {
 				return fmt.Errorf("insert flight_performance_ingest_jobs: %w", err)
 			}
 
@@ -28,7 +28,7 @@ func (s *Store) CreateFlightPerformanceIngestJob(ctx context.Context, year, mont
 func (s *Store) GetFlightPerformanceIngestJob(ctx context.Context, jobID string) (*model.FlightPerformanceIngestJob, error) {
 	var detail model.FlightPerformanceIngestJob
 
-	err := s.db.QueryRowContext(ctx, store.QueryGetFlightPerformanceIngestJob, jobID).Scan(
+	err := s.db.QueryRowContext(ctx, QueryGetFlightPerformanceIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
@@ -54,9 +54,9 @@ func (s *Store) CreateWeatherIngestJob(ctx context.Context, year, month int, sta
 		return nil, fmt.Errorf("marshal stations: %w", err)
 	}
 
-	return s.insertPendingMonthJob(ctx, model.JobTypeImportWeatherObservations, year, month, store.QueryActiveWeatherIngestMonths,
+	return s.insertPendingMonthJob(ctx, model.JobTypeImportWeatherObservations, year, month, QueryActiveWeatherIngestMonths,
 		func(ctx context.Context, exec sqlExecContext, jobID string) error {
-			if _, err := exec.ExecContext(ctx, store.QueryCreateWeatherIngestJob, jobID, year, month, stationsJSON); err != nil {
+			if _, err := exec.ExecContext(ctx, QueryCreateWeatherIngestJob, jobID, year, month, stationsJSON); err != nil {
 				return fmt.Errorf("insert weather_ingest_jobs: %w", err)
 			}
 
@@ -70,7 +70,7 @@ func (s *Store) GetWeatherIngestJob(ctx context.Context, jobID string) (*model.W
 
 	var stationsJSON []byte
 
-	err := s.db.QueryRowContext(ctx, store.QueryGetWeatherIngestJob, jobID).Scan(
+	err := s.db.QueryRowContext(ctx, QueryGetWeatherIngestJob, jobID).Scan(
 		&detail.JobID,
 		&detail.Year,
 		&detail.Month,
@@ -98,7 +98,7 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	row := tx.QueryRowContext(ctx, store.ClaimNextPendingJobQuery(),
+	row := tx.QueryRowContext(ctx, ClaimNextPendingJobQuery(),
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
 	)
@@ -119,7 +119,7 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 		leaseExpires = leaseUntil.UTC()
 	}
 
-	res, err := tx.ExecContext(ctx, store.QueryClaimNextPendingJobUpdate,
+	res, err := tx.ExecContext(ctx, QueryClaimNextPendingJobUpdate,
 		string(model.JobStatusRunning),
 		now,
 		now,
@@ -154,7 +154,7 @@ func (s *Store) ClaimNextPendingJob(ctx context.Context, leaseUntil time.Time) (
 func (s *Store) CompleteJob(ctx context.Context, id string, result json.RawMessage) error {
 	now := time.Now().UTC()
 
-	res, err := s.db.ExecContext(ctx, store.QueryCompleteJob,
+	res, err := s.db.ExecContext(ctx, QueryCompleteJob,
 		string(model.JobStatusCompleted),
 		nullJSON(result),
 		nil,
@@ -173,7 +173,7 @@ func (s *Store) CompleteJob(ctx context.Context, id string, result json.RawMessa
 func (s *Store) FailJob(ctx context.Context, id, errMsg string) error {
 	now := time.Now().UTC()
 
-	res, err := s.db.ExecContext(ctx, store.QueryFailJob,
+	res, err := s.db.ExecContext(ctx, QueryFailJob,
 		string(model.JobStatusFailed),
 		errMsg,
 		now,
@@ -191,7 +191,7 @@ func (s *Store) FailJob(ctx context.Context, id, errMsg string) error {
 func (s *Store) HeartbeatJob(ctx context.Context, id string, leaseUntil time.Time) error {
 	now := time.Now().UTC()
 
-	res, err := s.db.ExecContext(ctx, store.QueryHeartbeatJob,
+	res, err := s.db.ExecContext(ctx, QueryHeartbeatJob,
 		leaseUntil.UTC(),
 		now,
 		id,
@@ -207,7 +207,7 @@ func (s *Store) HeartbeatJob(ctx context.Context, id string, leaseUntil time.Tim
 func (s *Store) ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Time) (int64, error) {
 	now := time.Now().UTC()
 
-	res, err := s.db.ExecContext(ctx, store.QueryResetStaleRunningJobs,
+	res, err := s.db.ExecContext(ctx, QueryResetStaleRunningJobs,
 		string(model.JobStatusPending),
 		now,
 		string(model.JobStatusRunning),
@@ -221,11 +221,11 @@ func (s *Store) ResetStaleRunningJobs(ctx context.Context, expiredBefore time.Ti
 }
 
 func (s *Store) ActiveFlightPerformanceIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	return s.activeIngestMonths(ctx, store.QueryActiveFlightPerformanceIngestMonths, months)
+	return s.activeIngestMonths(ctx, QueryActiveFlightPerformanceIngestMonths, months)
 }
 
 func (s *Store) ActiveWeatherIngestMonths(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	return s.activeIngestMonths(ctx, store.QueryActiveWeatherIngestMonths, months)
+	return s.activeIngestMonths(ctx, QueryActiveWeatherIngestMonths, months)
 }
 
 func (s *Store) activeIngestMonths(ctx context.Context, query string, months []model.YearMonth) ([]model.YearMonth, error) {
@@ -248,7 +248,7 @@ func (s *Store) activeIngestMonths(ctx context.Context, query string, months []m
 func (s *Store) ActiveIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
 	var exists int
 
-	err := s.db.QueryRowContext(ctx, store.QueryActiveIngestJob,
+	err := s.db.QueryRowContext(ctx, QueryActiveIngestJob,
 		jobType,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
@@ -267,7 +267,7 @@ func (s *Store) ActiveIngestJob(ctx context.Context, jobType model.JobType) (boo
 func (s *Store) PendingIngestJob(ctx context.Context, jobType model.JobType) (bool, error) {
 	var exists int
 
-	err := s.db.QueryRowContext(ctx, store.QueryPendingJobByType,
+	err := s.db.QueryRowContext(ctx, QueryPendingJobByType,
 		jobType,
 		string(model.JobStatusPending),
 	).Scan(&exists)
@@ -283,11 +283,11 @@ func (s *Store) PendingIngestJob(ctx context.Context, jobType model.JobType) (bo
 }
 
 func (s *Store) MonthsWithFlightPerformanceData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	return s.monthsWithData(ctx, store.QueryMonthsWithFlightPerformanceData, months)
+	return s.monthsWithData(ctx, QueryMonthsWithFlightPerformanceData, months)
 }
 
 func (s *Store) MonthsWithWeatherData(ctx context.Context, months []model.YearMonth) ([]model.YearMonth, error) {
-	return s.monthsWithData(ctx, store.QueryMonthsWithWeatherData, months)
+	return s.monthsWithData(ctx, QueryMonthsWithWeatherData, months)
 }
 
 const (
@@ -312,7 +312,7 @@ func buildListJobsQuery(filter store.JobListFilter) (string, []any) {
 
 	args = append(args, filter.Limit)
 
-	query := strings.Replace(store.QueryListJobs, listJobsOpenStatusPlaceholder, statusSQL, 1)
+	query := strings.Replace(QueryListJobs, listJobsOpenStatusPlaceholder, statusSQL, 1)
 	query = strings.Replace(query, listJobsLimitPlaceholder, limitParam, 1)
 
 	return query, args
@@ -416,7 +416,7 @@ func execCreateJob(ctx context.Context, exec sqlExecContext, job *model.Job) err
 		errMsg = sql.NullString{String: job.Error, Valid: true}
 	}
 
-	_, err := exec.ExecContext(ctx, store.QueryCreateJob,
+	_, err := exec.ExecContext(ctx, QueryCreateJob,
 		job.ID,
 		job.Type,
 		string(job.Status),

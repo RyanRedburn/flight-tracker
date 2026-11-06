@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -25,30 +26,30 @@ func NewItinerariesHandler(s store.Store) *ItinerariesHandler {
 //	@Produce		json
 //	@Param			body	body		model.ItineraryOutlookRequest	true	"Ordered legs"
 //	@Success		200		{object}	model.ItineraryOutlookResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/itineraries/outlook [post]
 func (h *ItinerariesHandler) ItineraryOutlook(w http.ResponseWriter, r *http.Request) {
 	var req model.ItineraryOutlookRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	out, err := store.ItineraryOutlook(r.Context(), h.store, req.Legs)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedItineraryOutlook})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedItineraryOutlook})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, out)
+	respond.WriteJSON(w, http.StatusOK, out)
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -67,23 +68,23 @@ type WeatherIngestResponse struct {
 //	@Produce		json
 //	@Param			body	body		model.WeatherIngestRequest	true	"Ingest range and optional stations"
 //	@Success		201		{object}	WeatherIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	MonthIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/weather [post]
 func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.WeatherIngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -138,7 +139,7 @@ func (h *WeatherIngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusCreated, WeatherIngestResponse{
+	respond.WriteJSON(w, http.StatusCreated, WeatherIngestResponse{
 		Jobs:               jobs,
 		MonthsRequested:    len(jobs),
 		UnresolvedAirports: unmatched,
@@ -158,9 +159,9 @@ func (h *WeatherIngestHandler) writeResolveError(w http.ResponseWriter, err erro
 	case errors.Is(err, iem.ErrNoFlightAirports),
 		errors.Is(err, iem.ErrNoMatchedStations),
 		errors.Is(err, iem.ErrNoWeatherStationMapping):
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 	default:
 		h.logger.Error("resolve weather stations", "error", err)
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to resolve weather stations"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to resolve weather stations"})
 	}
 }

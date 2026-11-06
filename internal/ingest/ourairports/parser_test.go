@@ -4,17 +4,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
 func TestParseCountriesCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.ReferenceCountries))
+	file, err := os.Open(testdataCSVPath(t, model.ReferenceCountries))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	columns, rows, err := ParseCSV(file, store.ReferenceCountries)
+	columns, rows, err := ParseCSV(file, model.ReferenceCountries)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -33,13 +33,13 @@ func TestParseCountriesCSV(t *testing.T) {
 }
 
 func TestParseRegionsCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.ReferenceRegions))
+	file, err := os.Open(testdataCSVPath(t, model.ReferenceRegions))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	_, rows, err := ParseCSV(file, store.ReferenceRegions)
+	_, rows, err := ParseCSV(file, model.ReferenceRegions)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -50,13 +50,13 @@ func TestParseRegionsCSV(t *testing.T) {
 }
 
 func TestParseAirportsCSV(t *testing.T) {
-	file, err := os.Open(testdataCSVPath(t, store.ReferenceAirports))
+	file, err := os.Open(testdataCSVPath(t, model.ReferenceAirports))
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
 	defer file.Close()
 
-	_, rows, err := ParseCSV(file, store.ReferenceAirports)
+	_, rows, err := ParseCSV(file, model.ReferenceAirports)
 	if err != nil {
 		t.Fatalf("ParseCSV() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestParseAirportsCSV(t *testing.T) {
 }
 
 func TestParseCSVInvalidDataset(t *testing.T) {
-	_, _, err := ParseCSV(nil, store.ReferenceDataset("invalid"))
+	_, _, err := ParseCSV(nil, model.ReferenceDataset("invalid"))
 	if err == nil {
 		t.Fatal("expected error for invalid dataset")
 	}

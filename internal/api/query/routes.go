@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -94,7 +95,7 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		return store.RouteOutlookFilter{}, err
 	}
 
-	window := store.ResolveDepTimeWindowMinutes(q.DepTimeWindowMinutes)
+	window := domain.ResolveDepTimeWindowMinutes(q.DepTimeWindowMinutes)
 
 	date := ""
 	if !q.Date.IsZero() {
@@ -106,7 +107,7 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		dayOfWeek = *q.DayOfWeek
 	}
 
-	day, err := store.ParseOutlookDay(date, dayOfWeek)
+	day, err := domain.ParseOutlookDay(date, dayOfWeek)
 	if err != nil {
 		return store.RouteOutlookFilter{}, err
 	}
@@ -116,7 +117,7 @@ func ParseRouteOutlook(r *http.Request) (store.RouteOutlookFilter, error) {
 		Dest:                 q.Dest,
 		Carrier:              q.Carrier,
 		DayOfWeek:            day,
-		DepTime:              store.FormatHHMM(q.DepTime),
+		DepTime:              domain.FormatHHMM(q.DepTime),
 		DepTimeWindowMinutes: window,
 		DepTimeWindowSet:     q.DepTimeWindowMinutes != nil,
 	}
@@ -164,17 +165,17 @@ func validateRouteOutlookSchedule(sl validator.StructLevel) {
 		day = *q.DayOfWeek
 	}
 
-	if _, err := store.ParseOutlookDay(date, day); errors.Is(err, store.ErrOutlookSchedule) {
+	if _, err := domain.ParseOutlookDay(date, day); errors.Is(err, domain.ErrOutlookSchedule) {
 		sl.ReportError(q.Date, "Date", "date", "outlook_schedule", "")
 	}
 }
 
 func reportDateSpan(sl validator.StructLevel, start, end time.Time) {
-	if !store.ExceedsMaxStatsSpan(start, end) {
+	if !domain.ExceedsMaxStatsSpan(start, end) {
 		return
 	}
 
-	sl.ReportError(end, "EndDate", "end_date", "date_span", strconv.Itoa(store.MaxStatsSpanDays))
+	sl.ReportError(end, "EndDate", "end_date", "date_span", strconv.Itoa(domain.MaxStatsSpanDays))
 }
 
 func validateHHMM(fl validator.FieldLevel) bool {

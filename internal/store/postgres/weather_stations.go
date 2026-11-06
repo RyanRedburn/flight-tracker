@@ -17,13 +17,13 @@ func (s *Store) ReplaceWeatherStations(
 ) error {
 	return s.replaceTables(ctx,
 		tableReplace{
-			deleteQuery: store.QueryDeleteAllAirportWeatherStations,
+			deleteQuery: QueryDeleteAllAirportWeatherStations,
 			table:       "airport_weather_stations",
 			columns:     mappingColumns,
 			rows:        mappingRows,
 		},
 		tableReplace{
-			deleteQuery: store.QueryDeleteAllWeatherStations,
+			deleteQuery: QueryDeleteAllWeatherStations,
 			table:       "weather_stations",
 			columns:     stationColumns,
 			rows:        stationRows,
@@ -34,7 +34,7 @@ func (s *Store) ReplaceWeatherStations(
 func (s *Store) HasWeatherStationsData(ctx context.Context) (bool, error) {
 	var exists int
 
-	err := s.db.QueryRowContext(ctx, store.QueryHasWeatherStationsData).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, QueryHasWeatherStationsData).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
@@ -47,7 +47,7 @@ func (s *Store) HasWeatherStationsData(ctx context.Context) (bool, error) {
 }
 
 func (s *Store) ListAirportWeatherStations(ctx context.Context) ([]store.AirportWeatherStation, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryListAirportWeatherStations)
+	rows, err := s.db.QueryContext(ctx, QueryListAirportWeatherStations)
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -116,8 +117,8 @@ func TestParseRouteOutlook(t *testing.T) {
 		t.Errorf("dep_time = %q, want 0700", filter.DepTime)
 	}
 
-	if filter.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes {
-		t.Errorf("window = %d, want %d", filter.DepTimeWindowMinutes, store.DefaultDepTimeWindowMinutes)
+	if filter.DepTimeWindowMinutes != domain.DefaultDepTimeWindowMinutes {
+		t.Errorf("window = %d, want %d", filter.DepTimeWindowMinutes, domain.DefaultDepTimeWindowMinutes)
 	}
 
 	if filter.DepTimeWindowSet {

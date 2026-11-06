@@ -7,10 +7,11 @@ import (
 	"os"
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
-type CSVOpener func(ctx context.Context, dataset store.ReferenceDataset) (csvPath string, cleanup func(), err error)
+type CSVOpener func(ctx context.Context, dataset model.ReferenceDataset) (csvPath string, cleanup func(), err error)
 
 type Service struct {
 	store      store.Store
@@ -33,7 +34,7 @@ func (s *Service) WithCSVOpener(opener CSVOpener) *Service {
 
 type ImportResult = ingest.DatasetImportResult
 
-func (s *Service) Import(ctx context.Context, dataset store.ReferenceDataset) (ImportResult, error) {
+func (s *Service) Import(ctx context.Context, dataset model.ReferenceDataset) (ImportResult, error) {
 	csvPath, cleanup, err := s.openCSVFile(ctx, dataset)
 	if err != nil {
 		return ImportResult{}, err
@@ -61,7 +62,7 @@ func (s *Service) Import(ctx context.Context, dataset store.ReferenceDataset) (I
 	}, nil
 }
 
-func (s *Service) openCSVFile(ctx context.Context, dataset store.ReferenceDataset) (string, func(), error) {
+func (s *Service) openCSVFile(ctx context.Context, dataset model.ReferenceDataset) (string, func(), error) {
 	if s.openCSV != nil {
 		path, cleanup, err := s.openCSV(ctx, dataset)
 
@@ -75,15 +76,15 @@ func (s *Service) openCSVFile(ctx context.Context, dataset store.ReferenceDatase
 	return s.downloader.DownloadCSV(ctx, dataset)
 }
 
-func (s *Service) replaceDataset(ctx context.Context, dataset store.ReferenceDataset, columns []string, rows [][]string) error {
+func (s *Service) replaceDataset(ctx context.Context, dataset model.ReferenceDataset, columns []string, rows [][]string) error {
 	switch dataset {
-	case store.ReferenceCountries:
+	case model.ReferenceCountries:
 		return s.store.ReplaceCountries(ctx, columns, rows)
-	case store.ReferenceRegions:
+	case model.ReferenceRegions:
 		return s.store.ReplaceRegions(ctx, columns, rows)
-	case store.ReferenceAirports:
+	case model.ReferenceAirports:
 		return s.store.ReplaceAirports(ctx, columns, rows)
 	default:
-		return fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
+		return fmt.Errorf("%w: %q", model.ErrInvalidReferenceDataset, dataset)
 	}
 }

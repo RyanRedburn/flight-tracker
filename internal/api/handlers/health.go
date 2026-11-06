@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -25,7 +24,7 @@ func NewHealthHandler(s store.Store) *HealthHandler {
 //	@Success		200	{object}	StatusResponse
 //	@Router			/health [get]
 func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, StatusResponse{Status: "ok"})
+	respond.WriteJSON(w, http.StatusOK, StatusResponse{Status: "ok"})
 }
 
 // Readiness reports whether the service can accept traffic.
@@ -35,15 +34,15 @@ func (h *HealthHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 //	@Tags			health,internal
 //	@Produce		json
 //	@Success		200	{object}	StatusResponse
-//	@Failure		503	{object}	ErrorResponse
+//	@Failure		503	{object}	respond.ErrorResponse
 //	@Router			/ready [get]
 func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.Ping(r.Context()); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, ErrorResponse{Error: "database unavailable"})
+		respond.WriteJSON(w, http.StatusServiceUnavailable, respond.ErrorResponse{Error: "database unavailable"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, StatusResponse{Status: "ready"})
+	respond.WriteJSON(w, http.StatusOK, StatusResponse{Status: "ready"})
 }
 
 // DatabaseVersion returns the applied migration version.
@@ -53,27 +52,18 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 //	@Tags			health,internal
 //	@Produce		json
 //	@Success		200	{object}	store.MigrationVersion
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/db/version [get]
 func (h *HealthHandler) DatabaseVersion(w http.ResponseWriter, r *http.Request) {
 	version, err := h.store.MigrationVersion(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "database version unavailable"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "database version unavailable"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, version)
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		slog.Error("encode json response", "error", err, "status", status)
-	}
+	respond.WriteJSON(w, http.StatusOK, version)
 }

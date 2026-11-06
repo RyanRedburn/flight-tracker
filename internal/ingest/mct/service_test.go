@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -36,7 +36,7 @@ func TestServiceImport(t *testing.T) {
 		t.Fatalf("Import() error = %v", err)
 	}
 
-	if result.Dataset != store.ReferenceAirportMCT || result.RowsImported != 1 {
+	if result.Dataset != model.ReferenceAirportMCT || result.RowsImported != 1 {
 		t.Fatalf("result = %+v", result)
 	}
 

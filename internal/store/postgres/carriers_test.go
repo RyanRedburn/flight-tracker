@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
@@ -68,14 +68,14 @@ func TestUnmarshalCarrierRoutesMatchesCountedRates(t *testing.T) {
 		t.Fatalf("routes = %+v, want rates from counts %+v", routes, built)
 	}
 
-	best, worst := store.RankCarrierRoutes(routes)
-	wantBest, wantWorst := store.RankCarrierRoutes(built)
+	best, worst := domain.RankCarrierRoutes(routes)
+	wantBest, wantWorst := domain.RankCarrierRoutes(built)
 
 	if !reflect.DeepEqual(best, wantBest) || !reflect.DeepEqual(worst, wantWorst) {
 		t.Fatalf("best=%+v worst=%+v", best, worst)
 	}
 
-	if len(best) != store.CarrierStatsTopN || len(worst) != 2 {
+	if len(best) != domain.CarrierStatsTopN || len(worst) != 2 {
 		t.Fatalf("best=%d worst=%d", len(best), len(worst))
 	}
 
@@ -127,7 +127,7 @@ func TestUnmarshalCarrierAirportsMatchesCountedRates(t *testing.T) {
 		t.Fatalf("airport = %+v", got)
 	}
 
-	best, worst := store.RankCarrierAirports(airports)
+	best, worst := domain.RankCarrierAirports(airports)
 	if len(best) != 1 || best[0].Airport != "AAA" || len(worst) != 0 {
 		t.Fatalf("best=%+v worst=%+v", best, worst)
 	}

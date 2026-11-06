@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -96,7 +97,7 @@ func TestItineraryLegRouteOutlookFilterWindow(t *testing.T) {
 		DepTime: "0700",
 		ArrTime: "0900",
 	})
-	if def.DepTimeWindowSet || def.DepTimeWindowMinutes != store.DefaultDepTimeWindowMinutes {
+	if def.DepTimeWindowSet || def.DepTimeWindowMinutes != domain.DefaultDepTimeWindowMinutes {
 		t.Fatalf("default window = %+v", def)
 	}
 }

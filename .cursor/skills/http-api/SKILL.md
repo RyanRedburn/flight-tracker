@@ -11,7 +11,7 @@ Also follow [development-practices](../development-practices/SKILL.md). After an
 
 1. **Route** — register consumer routes in `internal/api/server.go` under `/api/v1`. Register admin routes (ingest, jobs, freshness, rebuilds, keys) under `/api/internal` with no version segment. Health stays top-level. `/api/db/version` is admin-only and unversioned.
 2. **Parse** — query strings in `internal/api/query` (`query` struct tags + `BindQuery` + `Validate`). JSON bodies on `internal/model` with `Validate()`.
-3. **Handler** — thin: parse → store call → `writeJSON`. No SQL, no remote downloads.
+3. **Handler** — thin: parse → store call → `respond.WriteJSON`. No SQL, no remote downloads.
 4. **Swagger** — comment annotations on the handler. Visibility is the swag tag list.
 
 Constructor wiring: add the handler in `newRouter` (`internal/api/server.go`). If it needs a new collaborator, thread it from `cmd/server` → `api.NewServer` → `newRouter`.
@@ -25,7 +25,7 @@ Copy `internal/api/query/routes.go` / `carriers.go` / `jobs.go`:
 - Custom messages belong in `formatValidationFieldError` (`internal/api/query/validate.go`).
 - Dates are `time.Time` decoded as `YYYY-MM-DD`.
 - Comma-separated `days_of_week` is expanded in `BindQuery` — add other comma lists there if needed.
-- Handlers map parse errors to **400** with `ErrorResponse{Error: err.Error()}`.
+- Handlers map parse errors to **400** with `respond.ErrorResponse{Error: err.Error()}`.
 
 ## JSON bodies
 
@@ -50,7 +50,7 @@ Protected routes use four shared surfaces: `external` (consumer, subscriber, or 
 
 **500** messages must be generic (`failed to compute route stats`). Conflict bodies use the typed structs in `internal/api/handlers/swagger_models.go` (`active_ingest_months`, `existing_data_months`, `job_type`, `dataset`).
 
-Always `writeJSON` (`internal/api/handlers/health.go`). Do not invent a second encoder.
+Always `respond.WriteJSON` (`internal/api/respond`). Do not invent a second encoder.
 
 ## Swagger
 
@@ -61,7 +61,7 @@ Two generated specs from `cmd/server/main.go` `go:generate`:
 
 Include both the domain tag (`routes`, `ingest`, `jobs`, …) and `external` or `internal`. New user-facing reads should be `external`; ingest/ops remain `internal`.
 
-Annotate every exported handler. Response types must be exported so swag can see them. Reuse `ErrorResponse` and the conflict structs.
+Annotate every exported handler. Response types must be exported so swag can see them. Reuse `respond.ErrorResponse` and the conflict structs.
 
 `/mcp` is not a Swagger route. New MCP tools follow [mcp-tools](../mcp-tools/SKILL.md).
 

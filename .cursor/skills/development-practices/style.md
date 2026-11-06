@@ -24,13 +24,13 @@ Cuddle `if err != nil` with the assignment it checks. Keep an empty line between
 ## Errors
 
 - Wrap with `fmt.Errorf("verb: %w", err)` at package boundaries.
-- HTTP **500** bodies use stable, client-safe strings (see `internal/api/handlers/errors.go`). Do not leak driver/internal details.
+- HTTP **500** bodies use stable, client-safe strings (see `internal/api/handlers/errors.go` and `internal/api/respond`). Do not leak driver/internal details.
 - Sentinel errors live next to the package that owns them (`store.ErrNotFound`, `ingest.ErrRangeTooLarge`, …). Handlers use `errors.Is`.
 
 ## Naming
 
 - JSON and query params are `snake_case`.
-- Store SQL constants are `Query*` in `internal/store/queries.go`.
+- Store SQL constants are `Query*` in `internal/store/postgres`.
 - Job types are `import_*` strings on `internal/model`.
 - Avoid magic strings that `goconst` will flag; lift repeats into package-level consts (see `handlers/errors.go`, ingest column names).
 

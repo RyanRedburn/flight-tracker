@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -87,7 +88,7 @@ func routeReliabilityInputSchema() *jsonschema.Schema {
 	depTimes.MaxItems = jsonschema.Ptr(routeReliabilityMaxDepTimes)
 
 	schema.Properties["dep_time_window_minutes"].Minimum = jsonschema.Ptr(1.0)
-	schema.Properties["dep_time_window_minutes"].Maximum = jsonschema.Ptr(float64(store.MaxDepTimeWindowMinutes))
+	schema.Properties["dep_time_window_minutes"].Maximum = jsonschema.Ptr(float64(domain.MaxDepTimeWindowMinutes))
 
 	return schema
 }
@@ -120,17 +121,17 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 	}
 
 	if in.DepTimeWindowMinutes != nil {
-		if err := store.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
+		if err := domain.DepTimeWindowError(*in.DepTimeWindowMinutes); err != nil {
 			return failureResult[routeReliabilityData](invalidInput(err))
 		}
 	}
 
-	day, err := store.ParseOutlookDay(in.Date, in.DayOfWeek)
+	day, err := domain.ParseOutlookDay(in.Date, in.DayOfWeek)
 	if err != nil {
 		return failureResult[routeReliabilityData](invalidInput(err))
 	}
 
-	window := store.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
+	window := domain.ResolveDepTimeWindowMinutes(in.DepTimeWindowMinutes)
 	depTimes := make([]string, 0, len(in.DepTimes))
 	seenDep := make(map[string]struct{}, len(in.DepTimes))
 
@@ -140,7 +141,7 @@ func routeReliability(ctx context.Context, s store.Store, logger *slog.Logger, i
 			return failureResult[routeReliabilityData](depTimeFailure(err))
 		}
 
-		dep = store.FormatHHMM(dep)
+		dep = domain.FormatHHMM(dep)
 		if _, ok := seenDep[dep]; ok {
 			return failureResult[routeReliabilityData](&Failure{
 				Code:    CodeInvalidInput,
@@ -247,13 +248,13 @@ func invalidInput(err error) *Failure {
 
 func validationMessage(err error) string {
 	switch {
-	case errors.Is(err, store.ErrOutlookSchedule):
+	case errors.Is(err, domain.ErrOutlookSchedule):
 		return msgOutlookSchedule
-	case errors.Is(err, store.ErrInvalidDate):
+	case errors.Is(err, domain.ErrInvalidDate):
 		return "date must be a valid date (YYYY-MM-DD)."
-	case errors.Is(err, store.ErrInvalidWeekday):
+	case errors.Is(err, domain.ErrInvalidWeekday):
 		return "day_of_week must be from 1 to 7."
-	case errors.Is(err, store.ErrInvalidHHMM):
+	case errors.Is(err, domain.ErrInvalidHHMM):
 		return "dep_time must be a valid local time (hhmm)."
 	default:
 		return finishSentence(err.Error())
@@ -270,7 +271,7 @@ func finishSentence(msg string) string {
 }
 
 func depTimeFailure(err error) *Failure {
-	if errors.Is(err, store.ErrInvalidHHMM) {
+	if errors.Is(err, domain.ErrInvalidHHMM) {
 		return &Failure{
 			Code:    CodeInvalidInput,
 			Message: "Each dep_times entry must be a valid local time (hhmm).",

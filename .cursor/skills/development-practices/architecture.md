@@ -14,7 +14,7 @@ Worker goroutines (internal/operator)
         → ingest/<provider>.Service     (download, parse, load)
             → store.Store               (Replace* / COPY)
 
-cmd/server wires: config → database.NewStore → ingest services → operator.Processor/Worker → api.NewServer
+cmd/server wires: config → postgres.Open → ingest services → operator.Processor/Worker → api.NewServer
 ```
 
 ## Request vs job

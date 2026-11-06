@@ -34,7 +34,7 @@ func (s *Store) DataFreshness(ctx context.Context) (model.DataFreshness, error) 
 		mctCount                  int64
 	)
 
-	err := s.db.QueryRowContext(ctx, store.QueryDataFreshness,
+	err := s.db.QueryRowContext(ctx, QueryDataFreshness,
 		string(model.JobStatusCompleted),
 		model.JobTypeImportFlightPerformance,
 		model.JobTypeImportWeatherObservations,
