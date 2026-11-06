@@ -3,8 +3,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 func (s *Store) rebuildRollup(ctx context.Context, lockKey, truncateQuery, insertQuery, truncateErr, insertErr string) error {
@@ -14,7 +12,7 @@ func (s *Store) rebuildRollup(ctx context.Context, lockKey, truncateQuery, inser
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, lockKey, 0); err != nil {
+	if _, err := tx.ExecContext(ctx, QueryAdvisoryXactLock, lockKey, 0); err != nil {
 		return fmt.Errorf("advisory lock: %w", err)
 	}
 

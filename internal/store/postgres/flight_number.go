@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Store) FlightNumberRoutes(ctx context.Context, filter store.FlightNumberRoutesFilter) ([]model.FlightNumberRoute, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryFlightNumberRoutes,
+	rows, err := s.db.QueryContext(ctx, QueryFlightNumberRoutes,
 		filter.Carrier,
 		filter.FlightNumber,
 		domain.OutlookLookbackDays,

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -43,7 +42,7 @@ type ReferenceIngestResponse struct {
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/countries [post]
 func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
-	h.createReference(w, r, store.ReferenceCountries)
+	h.createReference(w, r, model.ReferenceCountries)
 }
 
 // CreateRegions queues a regions reference data ingest job.
@@ -64,7 +63,7 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/regions [post]
 func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
-	h.createReference(w, r, store.ReferenceRegions)
+	h.createReference(w, r, model.ReferenceRegions)
 }
 
 // CreateAirports queues an airports reference data ingest job.
@@ -85,7 +84,7 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/airports [post]
 func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
-	h.createReference(w, r, store.ReferenceAirports)
+	h.createReference(w, r, model.ReferenceAirports)
 }
 
 // CreateAirportMCT queues an airport minimum-connection-time ingest job.
@@ -106,8 +105,8 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/mct [post]
 func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http.Request) {
-	h.create(w, r, model.JobTypeImportAirportMCT, string(store.ReferenceAirportMCT), func(ctx context.Context) (bool, error) {
-		return h.store.HasReferenceData(ctx, store.ReferenceAirportMCT)
+	h.create(w, r, model.JobTypeImportAirportMCT, string(model.ReferenceAirportMCT), func(ctx context.Context) (bool, error) {
+		return h.store.HasReferenceData(ctx, model.ReferenceAirportMCT)
 	})
 }
 
@@ -132,8 +131,8 @@ func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r 
 	h.create(w, r, model.JobTypeImportWeatherStations, datasetWeatherStations, h.store.HasWeatherStationsData)
 }
 
-func (h *ReferenceIngestHandler) createReference(w http.ResponseWriter, r *http.Request, dataset store.ReferenceDataset) {
-	jobType, err := ourairports.JobType(dataset)
+func (h *ReferenceIngestHandler) createReference(w http.ResponseWriter, r *http.Request, dataset model.ReferenceDataset) {
+	jobType, err := dataset.JobType()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "invalid dataset"})
 		return

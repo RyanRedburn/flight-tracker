@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 func TestExpandMonthsIn(t *testing.T) {
-	query, args := expandMonthsIn(store.QueryMonthsWithFlightPerformanceData, []model.YearMonth{
+	query, args := expandMonthsIn(QueryMonthsWithFlightPerformanceData, []model.YearMonth{
 		{Year: 2024, Month: 1},
 		{Year: 2024, Month: 2},
 	})

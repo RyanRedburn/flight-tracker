@@ -61,8 +61,8 @@ func (s *Store) RebuildRouteWeatherStats(ctx context.Context) error {
 	return s.rebuildRollup(
 		ctx,
 		store.WeatherStatsRebuildLockKey,
-		store.QueryTruncateRouteWeatherStats,
-		store.QueryInsertRouteWeatherStats,
+		QueryTruncateRouteWeatherStats,
+		QueryInsertRouteWeatherStats,
 		"truncate route weather stats",
 		"insert route weather stats",
 	)
@@ -94,7 +94,7 @@ func buildRouteWeatherStatsQuery(filter store.RouteStatsFilter) (string, []any) 
 		args = append(args, filter.DaysOfWeek)
 	}
 
-	query := strings.Replace(store.QueryRouteWeatherStats, weatherStatsExtraPlaceholder, extra.String(), 1)
+	query := strings.Replace(QueryRouteWeatherStats, weatherStatsExtraPlaceholder, extra.String(), 1)
 
 	return query, args
 }

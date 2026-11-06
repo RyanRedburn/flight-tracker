@@ -21,7 +21,7 @@ func referenceSuccessStub() *storetest.Stub {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
-		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+		HasReferenceDataFn: func(context.Context, model.ReferenceDataset) (bool, error) {
 			return false, nil
 		},
 		HasWeatherStationsDataFn: func(context.Context) (bool, error) {
@@ -162,7 +162,7 @@ func TestReferenceIngestExistingDataConflict(t *testing.T) {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
-		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+		HasReferenceDataFn: func(context.Context, model.ReferenceDataset) (bool, error) {
 			return true, nil
 		},
 	})
@@ -180,7 +180,7 @@ func TestReferenceIngestExistingDataConflict(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 
-	if body["dataset"] != string(store.ReferenceCountries) {
+	if body["dataset"] != string(model.ReferenceCountries) {
 		t.Errorf("dataset = %v, want countries", body["dataset"])
 	}
 }
@@ -371,7 +371,7 @@ func TestAirportMCTIngestActiveJobConflictIgnoresForce(t *testing.T) {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return true, nil
 		},
-		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+		HasReferenceDataFn: func(context.Context, model.ReferenceDataset) (bool, error) {
 			sawForceCheck = true
 
 			return false, nil
@@ -406,9 +406,9 @@ func TestAirportMCTIngestExistingDataConflict(t *testing.T) {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
-		HasReferenceDataFn: func(_ context.Context, dataset store.ReferenceDataset) (bool, error) {
-			if dataset != store.ReferenceAirportMCT {
-				t.Errorf("dataset = %q, want %q", dataset, store.ReferenceAirportMCT)
+		HasReferenceDataFn: func(_ context.Context, dataset model.ReferenceDataset) (bool, error) {
+			if dataset != model.ReferenceAirportMCT {
+				t.Errorf("dataset = %q, want %q", dataset, model.ReferenceAirportMCT)
 			}
 
 			return true, nil
@@ -425,8 +425,8 @@ func TestAirportMCTIngestExistingDataConflict(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 
-	if body.Dataset != string(store.ReferenceAirportMCT) {
-		t.Errorf("dataset = %q, want %q", body.Dataset, store.ReferenceAirportMCT)
+	if body.Dataset != string(model.ReferenceAirportMCT) {
+		t.Errorf("dataset = %q, want %q", body.Dataset, model.ReferenceAirportMCT)
 	}
 
 	if body.JobType != "" {
@@ -439,7 +439,7 @@ func TestAirportMCTIngestForceReimport(t *testing.T) {
 		ActiveIngestJobFn: func(context.Context, model.JobType) (bool, error) {
 			return false, nil
 		},
-		HasReferenceDataFn: func(context.Context, store.ReferenceDataset) (bool, error) {
+		HasReferenceDataFn: func(context.Context, model.ReferenceDataset) (bool, error) {
 			t.Fatal("force=true must skip the exists-data check")
 
 			return true, nil

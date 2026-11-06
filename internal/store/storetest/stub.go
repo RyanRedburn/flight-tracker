@@ -31,7 +31,7 @@ type Stub struct {
 	CreateReferenceIngestJobFn            func(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJobFn  func(ctx context.Context) (*model.Job, error)
 	CreateRebuildRouteWeatherStatsJobFn   func(ctx context.Context) (*model.Job, error)
-	HasReferenceDataFn                    func(ctx context.Context, dataset store.ReferenceDataset) (bool, error)
+	HasReferenceDataFn                    func(ctx context.Context, dataset model.ReferenceDataset) (bool, error)
 	ReplaceCountriesFn                    func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegionsFn                      func(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceAirportsFn                     func(ctx context.Context, columns []string, rows [][]string) error
@@ -216,7 +216,7 @@ func (s *Stub) CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Jo
 	return s.CreateRebuildRouteWeatherStatsJobFn(ctx)
 }
 
-func (s *Stub) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {
+func (s *Stub) HasReferenceData(ctx context.Context, dataset model.ReferenceDataset) (bool, error) {
 	if s.HasReferenceDataFn == nil {
 		panic("unexpected call: HasReferenceData")
 	}

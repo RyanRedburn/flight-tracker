@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -31,7 +30,7 @@ type tableReplace struct {
 
 func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	return s.replaceTables(ctx, tableReplace{
-		deleteQuery: store.QueryDeleteFlightPerformanceByMonth,
+		deleteQuery: QueryDeleteFlightPerformanceByMonth,
 		deleteArgs: []any{
 			strconv.Itoa(year),
 			strconv.Itoa(month),
@@ -46,7 +45,7 @@ func (s *Store) ReplaceFlightPerformanceByMonth(ctx context.Context, year, month
 
 func (s *Store) ReplaceWeatherObservationsByMonth(ctx context.Context, year, month int, columns []string, rows [][]string) error {
 	return s.replaceTables(ctx, tableReplace{
-		deleteQuery: store.QueryDeleteWeatherObservationsByMonth,
+		deleteQuery: QueryDeleteWeatherObservationsByMonth,
 		deleteArgs: []any{
 			strconv.Itoa(year),
 			strconv.Itoa(month),
@@ -87,7 +86,7 @@ func (s *Store) replaceTables(ctx context.Context, ops ...tableReplace) error {
 			continue
 		}
 
-		if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, op.lockKey, op.lockID); err != nil {
+		if _, err := tx.ExecContext(ctx, QueryAdvisoryXactLock, op.lockKey, op.lockID); err != nil {
 			return fmt.Errorf("advisory lock: %w", err)
 		}
 	}

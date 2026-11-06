@@ -37,6 +37,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -47,12 +48,13 @@ import (
 	"github.com/RyanRedburn/flight-tracker/internal/api"
 	"github.com/RyanRedburn/flight-tracker/internal/api/middleware"
 	"github.com/RyanRedburn/flight-tracker/internal/config"
-	"github.com/RyanRedburn/flight-tracker/internal/database"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/bts"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/iem"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/mct"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/operator"
+	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/store/postgres"
 )
 
 func main() {
@@ -71,7 +73,7 @@ func run() int {
 
 	ctx := context.Background()
 
-	st, err := database.NewStore(ctx, cfg)
+	st, err := openStore(ctx, cfg)
 	if err != nil {
 		logger.Error("open store", "error", err)
 		return 1
@@ -192,4 +194,13 @@ func run() int {
 	}
 
 	return 0
+}
+
+func openStore(ctx context.Context, cfg config.Config) (store.Store, error) {
+	switch cfg.DatabaseDriver {
+	case "postgres":
+		return postgres.Open(ctx, cfg.DatabaseURL, cfg.MigrationsPath)
+	default:
+		return nil, fmt.Errorf("unsupported DATABASE_DRIVER: %q", cfg.DatabaseDriver)
+	}
 }

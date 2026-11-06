@@ -46,7 +46,7 @@ type Store interface {
 	CreateReferenceIngestJob(ctx context.Context, jobType model.JobType) (*model.Job, error)
 	CreateRebuildRouteTravelWindowsJob(ctx context.Context) (*model.Job, error)
 	CreateRebuildRouteWeatherStatsJob(ctx context.Context) (*model.Job, error)
-	HasReferenceData(ctx context.Context, dataset ReferenceDataset) (bool, error)
+	HasReferenceData(ctx context.Context, dataset model.ReferenceDataset) (bool, error)
 	ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error
 	ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error

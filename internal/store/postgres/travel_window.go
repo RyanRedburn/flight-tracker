@@ -21,7 +21,7 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 
 	err := s.db.QueryRowContext(
 		ctx,
-		store.QueryRouteTravelWindowScope,
+		QueryRouteTravelWindowScope,
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,
@@ -40,7 +40,7 @@ func (s *Store) RouteTravelWindows(ctx context.Context, filter store.RouteTravel
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		store.QueryRouteTravelWindowBuckets,
+		QueryRouteTravelWindowBuckets,
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,
@@ -84,8 +84,8 @@ func (s *Store) RebuildRouteTravelWindows(ctx context.Context) error {
 	return s.rebuildRollup(
 		ctx,
 		store.TravelWindowRebuildLockKey,
-		store.QueryTruncateRouteTravelWindows,
-		store.QueryInsertRouteTravelWindows,
+		QueryTruncateRouteTravelWindows,
+		QueryInsertRouteTravelWindows,
 		"truncate travel windows",
 		"insert travel windows",
 	)

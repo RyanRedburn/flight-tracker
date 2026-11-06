@@ -63,7 +63,7 @@ func (s *Store) MigrationVersion(ctx context.Context) (store.MigrationVersion, e
 		dirty   bool
 	)
 
-	err := s.db.QueryRowContext(ctx, store.QueryMigrationVersion).Scan(&version, &dirty)
+	err := s.db.QueryRowContext(ctx, QueryMigrationVersion).Scan(&version, &dirty)
 	if errors.Is(err, sql.ErrNoRows) {
 		return store.MigrationVersion{}, nil
 	}
@@ -76,7 +76,7 @@ func (s *Store) MigrationVersion(ctx context.Context) (store.MigrationVersion, e
 }
 
 func (s *Store) GetJob(ctx context.Context, id string) (*model.Job, error) {
-	row := s.db.QueryRowContext(ctx, store.QueryGetJob, id)
+	row := s.db.QueryRowContext(ctx, QueryGetJob, id)
 	job, err := scanJob(row)
 
 	if errors.Is(err, sql.ErrNoRows) {

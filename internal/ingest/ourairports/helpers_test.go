@@ -7,12 +7,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/RyanRedburn/flight-tracker/internal/store"
+	"github.com/RyanRedburn/flight-tracker/internal/model"
 )
 
 const testdataRowCount = 2
 
-func testdataCSVPath(t *testing.T, dataset store.ReferenceDataset) string {
+func testdataCSVPath(t *testing.T, dataset model.ReferenceDataset) string {
 	t.Helper()
 
 	filename, err := CSVFilename(dataset)
@@ -42,7 +42,7 @@ func testdataCSVPath(t *testing.T, dataset store.ReferenceDataset) string {
 func fixtureCSVOpener(t *testing.T) CSVOpener {
 	t.Helper()
 
-	return func(_ context.Context, dataset store.ReferenceDataset) (string, func(), error) {
+	return func(_ context.Context, dataset model.ReferenceDataset) (string, func(), error) {
 		return testdataCSVPath(t, dataset), func() {}, nil
 	}
 }

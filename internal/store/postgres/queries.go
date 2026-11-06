@@ -1,4 +1,6 @@
-package store
+package postgres
+
+import "github.com/RyanRedburn/flight-tracker/internal/store"
 
 const (
 	QueryCreateJob = `
@@ -860,7 +862,7 @@ const (
 					WHEN f.day_of_week BETWEEN 1 AND 7 THEN f.day_of_week
 					ELSE EXTRACT(ISODOW FROM f.flight_date)::int
 				END AS day_of_week,
-				COALESCE(NULLIF(btrim(f.flight_number_marketing_airline), ''), '` + MissingFlightNumber + `') AS flight_number,
+				COALESCE(NULLIF(btrim(f.flight_number_marketing_airline), ''), '` + store.MissingFlightNumber + `') AS flight_number,
 				f.crs_dep_time,
 				f.crs_elapsed_time,
 				` + sqlIsOnTime + ` AS is_on_time

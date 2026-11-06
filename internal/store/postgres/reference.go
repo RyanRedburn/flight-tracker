@@ -22,7 +22,7 @@ func (s *Store) CreateReferenceIngestJob(ctx context.Context, jobType model.JobT
 		ctx,
 		jobType,
 		string(jobType),
-		store.QueryActiveIngestJob,
+		QueryActiveIngestJob,
 		jobType,
 		string(model.JobStatusPending),
 		string(model.JobStatusRunning),
@@ -45,7 +45,7 @@ func (s *Store) insertPendingRebuildJob(ctx context.Context, jobType model.JobTy
 		ctx,
 		jobType,
 		lockKey,
-		store.QueryPendingJobByType,
+		QueryPendingJobByType,
 		jobType,
 		string(model.JobStatusPending),
 	)
@@ -76,7 +76,7 @@ func (s *Store) insertPendingTypeJob(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, lockKey, 0); err != nil {
+	if _, err := tx.ExecContext(ctx, QueryAdvisoryXactLock, lockKey, 0); err != nil {
 		return nil, fmt.Errorf("advisory lock: %w", err)
 	}
 
@@ -127,7 +127,7 @@ func (s *Store) insertPendingMonthJob(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if _, err := tx.ExecContext(ctx, store.QueryAdvisoryXactLock, string(jobType), year*100+month); err != nil {
+	if _, err := tx.ExecContext(ctx, QueryAdvisoryXactLock, string(jobType), year*100+month); err != nil {
 		return nil, fmt.Errorf("advisory lock: %w", err)
 	}
 
@@ -167,7 +167,7 @@ func (s *Store) insertPendingMonthJob(
 	return job, nil
 }
 
-func (s *Store) HasReferenceData(ctx context.Context, dataset store.ReferenceDataset) (bool, error) {
+func (s *Store) HasReferenceData(ctx context.Context, dataset model.ReferenceDataset) (bool, error) {
 	query, err := hasReferenceDataQuery(dataset)
 	if err != nil {
 		return false, err
@@ -188,29 +188,29 @@ func (s *Store) HasReferenceData(ctx context.Context, dataset store.ReferenceDat
 }
 
 func (s *Store) ReplaceCountries(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceReferenceTable(ctx, store.ReferenceCountries, store.QueryDeleteAllCountries, columns, rows)
+	return s.replaceReferenceTable(ctx, model.ReferenceCountries, QueryDeleteAllCountries, columns, rows)
 }
 
 func (s *Store) ReplaceRegions(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceReferenceTable(ctx, store.ReferenceRegions, store.QueryDeleteAllRegions, columns, rows)
+	return s.replaceReferenceTable(ctx, model.ReferenceRegions, QueryDeleteAllRegions, columns, rows)
 }
 
 func (s *Store) ReplaceAirports(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceReferenceTable(ctx, store.ReferenceAirports, store.QueryDeleteAllAirports, columns, rows)
+	return s.replaceReferenceTable(ctx, model.ReferenceAirports, QueryDeleteAllAirports, columns, rows)
 }
 
 func (s *Store) ReplaceAirportMCT(ctx context.Context, columns []string, rows [][]string) error {
-	return s.replaceReferenceTable(ctx, store.ReferenceAirportMCT, store.QueryDeleteAllAirportMCT, columns, rows)
+	return s.replaceReferenceTable(ctx, model.ReferenceAirportMCT, QueryDeleteAllAirportMCT, columns, rows)
 }
 
 func (s *Store) replaceReferenceTable(
 	ctx context.Context,
-	dataset store.ReferenceDataset,
+	dataset model.ReferenceDataset,
 	deleteQuery string,
 	columns []string,
 	rows [][]string,
 ) error {
-	table, err := dataset.Table()
+	table, err := referenceTable(dataset)
 	if err != nil {
 		return err
 	}
@@ -236,17 +236,32 @@ func isReferenceJobType(jobType model.JobType) bool {
 	}
 }
 
-func hasReferenceDataQuery(dataset store.ReferenceDataset) (string, error) {
+func referenceTable(dataset model.ReferenceDataset) (string, error) {
 	switch dataset {
-	case store.ReferenceCountries:
-		return store.QueryHasCountriesData, nil
-	case store.ReferenceRegions:
-		return store.QueryHasRegionsData, nil
-	case store.ReferenceAirports:
-		return store.QueryHasAirportsData, nil
-	case store.ReferenceAirportMCT:
-		return store.QueryHasAirportMCTData, nil
+	case model.ReferenceCountries:
+		return "countries", nil
+	case model.ReferenceRegions:
+		return "regions", nil
+	case model.ReferenceAirports:
+		return "airports", nil
+	case model.ReferenceAirportMCT:
+		return "airport_mct", nil
 	default:
-		return "", fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
+		return "", fmt.Errorf("%w: %q", model.ErrInvalidReferenceDataset, dataset)
+	}
+}
+
+func hasReferenceDataQuery(dataset model.ReferenceDataset) (string, error) {
+	switch dataset {
+	case model.ReferenceCountries:
+		return QueryHasCountriesData, nil
+	case model.ReferenceRegions:
+		return QueryHasRegionsData, nil
+	case model.ReferenceAirports:
+		return QueryHasAirportsData, nil
+	case model.ReferenceAirportMCT:
+		return QueryHasAirportMCTData, nil
+	default:
+		return "", fmt.Errorf("%w: %q", model.ErrInvalidReferenceDataset, dataset)
 	}
 }

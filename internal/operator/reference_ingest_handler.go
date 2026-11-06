@@ -6,30 +6,29 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/ourairports"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 type ReferenceIngestHandler struct {
 	ingest  *ourairports.Service
-	dataset store.ReferenceDataset
+	dataset model.ReferenceDataset
 	jobType model.JobType
 }
 
 func NewCountriesHandler(ingest *ourairports.Service) *ReferenceIngestHandler {
-	return newReferenceIngestHandler(ingest, store.ReferenceCountries, model.JobTypeImportCountries)
+	return newReferenceIngestHandler(ingest, model.ReferenceCountries, model.JobTypeImportCountries)
 }
 
 func NewRegionsHandler(ingest *ourairports.Service) *ReferenceIngestHandler {
-	return newReferenceIngestHandler(ingest, store.ReferenceRegions, model.JobTypeImportRegions)
+	return newReferenceIngestHandler(ingest, model.ReferenceRegions, model.JobTypeImportRegions)
 }
 
 func NewAirportsHandler(ingest *ourairports.Service) *ReferenceIngestHandler {
-	return newReferenceIngestHandler(ingest, store.ReferenceAirports, model.JobTypeImportAirports)
+	return newReferenceIngestHandler(ingest, model.ReferenceAirports, model.JobTypeImportAirports)
 }
 
 func newReferenceIngestHandler(
 	ingest *ourairports.Service,
-	dataset store.ReferenceDataset,
+	dataset model.ReferenceDataset,
 	jobType model.JobType,
 ) *ReferenceIngestHandler {
 	return &ReferenceIngestHandler{

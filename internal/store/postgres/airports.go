@@ -8,13 +8,12 @@ import (
 	"unicode/utf8"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 func (s *Store) SearchAirports(ctx context.Context, query string, limit int) ([]model.Airport, error) {
 	contains, prefix := airportSearchPatterns(query)
 
-	rows, err := s.db.QueryContext(ctx, store.QuerySearchAirports, query, contains, prefix, limit)
+	rows, err := s.db.QueryContext(ctx, QuerySearchAirports, query, contains, prefix, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search airports: %w", err)
 	}
@@ -28,7 +27,7 @@ func (s *Store) SearchAirports(ctx context.Context, query string, limit int) ([]
 		return found, nil
 	}
 
-	rows, err = s.db.QueryContext(ctx, store.QuerySearchSimilarAirportCodes, query, limit)
+	rows, err = s.db.QueryContext(ctx, QuerySearchSimilarAirportCodes, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search similar airport codes: %w", err)
 	}

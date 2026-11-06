@@ -7,7 +7,6 @@ import (
 
 	"github.com/RyanRedburn/flight-tracker/internal/ingest/mct"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
 )
 
@@ -31,7 +30,7 @@ func TestAirportMCTHandlerProcess(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	if result.Dataset != store.ReferenceAirportMCT || result.RowsImported != 1 {
+	if result.Dataset != model.ReferenceAirportMCT || result.RowsImported != 1 {
 		t.Fatalf("result = %+v", result)
 	}
 }

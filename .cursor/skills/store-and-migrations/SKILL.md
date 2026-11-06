@@ -12,22 +12,21 @@ Also follow [development-practices](../development-practices/SKILL.md).
 | Location | Put |
 | --- | --- |
 | `internal/store/store.go` | `Store` interface |
-| `internal/store/queries.go` | Raw SQL string constants (`Query*`) |
 | `internal/store/*_agg.go`, `flight_date.go`, … | Filter structs and shared query helpers used by the interface |
 | `internal/domain` | Response assembly. No SQL and no import of `store` |
-| `internal/store/postgres` | Execution, transactions, COPY, dynamic `WHERE` builders |
+| `internal/store/postgres` | SQL constants (`Query*`), execution, transactions, COPY, dynamic `WHERE` builders |
 | `internal/store/storetest/stub.go` | Test stub — every interface method |
 | `migrations/postgres` | Schema changes |
 
-Handlers and ingest services call the interface. Only `internal/database` and `postgres.Open` construct the concrete type.
+Handlers and ingest services call the interface. Only `cmd/server` calls `postgres.Open`.
 
 ## Adding a store method
 
 1. Add the method to `store.Store`.
-2. Add `Query*` SQL (parameterized `$1`, `$2`, … — no string-concatenated user input).
+2. Add `Query*` SQL in `internal/store/postgres` (parameterized `$1`, `$2`, … — no string-concatenated user input).
 3. Implement on `postgres.Store`.
 4. Add `FooFn` + method on `storetest.Stub`. Unset Fn must `panic("unexpected call: Foo")`.
-5. Tests: stub consumers in handler/operator tests; query-builder tests in `postgres` if SQL is assembled dynamically. Do not unit-test static `Query*` string literals (`strings.Contains` on constants in `queries.go`); test dynamic builders and behavior instead.
+5. Tests: stub consumers in handler/operator tests; query-builder tests in `postgres` if SQL is assembled dynamically. Do not unit-test static `Query*` string literals (`strings.Contains` on constants); test dynamic builders and behavior instead.
 
 `var _ store.Store = (*Stub)(nil)` must keep compiling.
 
@@ -43,7 +42,7 @@ Do not row-by-row `INSERT` for ingest loads.
 
 ## Read queries
 
-Keep templates in `queries.go`. Optional filters are applied in `postgres` builders (see `buildRouteStatsQuery` / `buildCarrierStatsQuery`): replace a placeholder, append args, never interpolate values into SQL.
+Keep templates next to the postgres implementation. Optional filters are applied in `postgres` builders (see `buildRouteStatsQuery` / `buildCarrierStatsQuery`): replace a placeholder, append args, never interpolate values into SQL.
 
 Stats/outlook aggregation belongs in SQL. Response assembly after the query lives in `internal/domain`, not in HTTP handlers.
 

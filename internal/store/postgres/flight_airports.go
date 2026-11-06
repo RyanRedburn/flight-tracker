@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Store) DistinctFlightAirportCodes(ctx context.Context) ([]string, error) {
-	rows, err := s.db.QueryContext(ctx, store.QueryDistinctFlightAirportCodes)
+	rows, err := s.db.QueryContext(ctx, QueryDistinctFlightAirportCodes)
 	if err != nil {
 		return nil, fmt.Errorf("query distinct flight airports: %w", err)
 	}
@@ -38,7 +38,7 @@ func (s *Store) ListAirportIdentifiersByIATA(ctx context.Context, codes []string
 		return out, nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, store.QueryListAirportIdentifiersByIATA, normalized)
+	rows, err := s.db.QueryContext(ctx, QueryListAirportIdentifiersByIATA, normalized)
 	if err != nil {
 		return nil, fmt.Errorf("query airport identifiers: %w", err)
 	}
@@ -88,7 +88,7 @@ func (s *Store) ListAirportCountriesByIATA(ctx context.Context, codes []string) 
 		return out, nil
 	}
 
-	rows, err := s.db.QueryContext(ctx, store.QueryListAirportCountriesByIATA, normalized)
+	rows, err := s.db.QueryContext(ctx, QueryListAirportCountriesByIATA, normalized)
 	if err != nil {
 		return nil, fmt.Errorf("query airport countries: %w", err)
 	}

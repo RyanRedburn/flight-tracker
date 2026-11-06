@@ -28,7 +28,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 
 	stats := emptyRouteStats(filter)
 
-	query, args := buildRouteStatsQuery(store.QueryRouteStats, filter)
+	query, args := buildRouteStatsQuery(QueryRouteStats, filter)
 
 	var (
 		scanned       delayStatsScan
@@ -70,7 +70,7 @@ func (s *Store) RouteStats(ctx context.Context, filter store.RouteStatsFilter) (
 func (s *Store) RouteLatestFlightDate(ctx context.Context, origin, dest string) (string, error) {
 	var maxDate sql.NullString
 
-	err := s.db.QueryRowContext(ctx, store.QueryRouteMaxFlightDate, origin, dest).Scan(&maxDate)
+	err := s.db.QueryRowContext(ctx, QueryRouteMaxFlightDate, origin, dest).Scan(&maxDate)
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +87,7 @@ func (s *Store) RouteOutlook(ctx context.Context, filter store.RouteOutlookFilte
 
 	var analysisEnd sql.NullString
 
-	err := s.db.QueryRowContext(ctx, store.QueryRouteOutlookMaxDate,
+	err := s.db.QueryRowContext(ctx, QueryRouteOutlookMaxDate,
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,
@@ -152,7 +152,7 @@ func (s *Store) fillOutlookSlot(ctx context.Context, out *model.RouteOutlook, fi
 		p90              sql.NullFloat64
 	)
 
-	err := s.db.QueryRowContext(ctx, store.QueryRouteOutlook,
+	err := s.db.QueryRowContext(ctx, QueryRouteOutlook,
 		filter.Origin,
 		filter.Dest,
 		filter.Carrier,
@@ -257,7 +257,7 @@ func (s *Store) setRecommendedConnection(ctx context.Context, out *model.RouteOu
 func (s *Store) airportConnectionMCT(ctx context.Context, iata string) (*domain.AirportConnectionMCT, error) {
 	var dd, di, id, ii sql.NullInt64
 
-	err := s.db.QueryRowContext(ctx, store.QueryAirportMCTMinutes, iata).Scan(&dd, &di, &id, &ii)
+	err := s.db.QueryRowContext(ctx, QueryAirportMCTMinutes, iata).Scan(&dd, &di, &id, &ii)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -289,10 +289,10 @@ func (s *Store) ensureRouteIdentity(ctx context.Context, origin, dest, carrier s
 
 func routeIdentityQuery(origin, dest, carrier string) (string, []any) {
 	if carrier == "" {
-		return store.QueryRouteIdentity, []any{origin, dest}
+		return QueryRouteIdentity, []any{origin, dest}
 	}
 
-	return store.QueryRouteCarrierIdentity, []any{origin, dest, carrier}
+	return QueryRouteCarrierIdentity, []any{origin, dest, carrier}
 }
 
 func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (string, []any) {
@@ -323,7 +323,7 @@ func buildRouteStatsQuery(template string, filter store.RouteStatsFilter) (strin
 
 	carrierOnTime := "NULL::json"
 	if filter.Carrier == "" {
-		carrierOnTime = store.RouteStatsCarrierOnTimeJSON
+		carrierOnTime = RouteStatsCarrierOnTimeJSON
 	}
 
 	query := strings.Replace(template, routeStatsExtraPlaceholder, extra.String(), 1)

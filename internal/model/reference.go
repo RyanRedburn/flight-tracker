@@ -1,4 +1,4 @@
-package store
+package model
 
 import (
 	"errors"
@@ -16,16 +16,14 @@ const (
 
 var ErrInvalidReferenceDataset = errors.New("invalid reference dataset")
 
-func (d ReferenceDataset) Table() (string, error) {
+func (d ReferenceDataset) JobType() (JobType, error) {
 	switch d {
 	case ReferenceCountries:
-		return "countries", nil
+		return JobTypeImportCountries, nil
 	case ReferenceRegions:
-		return "regions", nil
+		return JobTypeImportRegions, nil
 	case ReferenceAirports:
-		return "airports", nil
-	case ReferenceAirportMCT:
-		return "airport_mct", nil
+		return JobTypeImportAirports, nil
 	default:
 		return "", fmt.Errorf("%w: %q", ErrInvalidReferenceDataset, d)
 	}

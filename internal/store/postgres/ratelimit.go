@@ -23,7 +23,7 @@ func (s *Store) ConsumeRateLimit(ctx context.Context, bucketKey string, requests
 		now     time.Time
 	)
 
-	err := s.db.QueryRowContext(ctx, store.QueryConsumeRateLimit, bucketKey, requestsPerMinute).Scan(
+	err := s.db.QueryRowContext(ctx, QueryConsumeRateLimit, bucketKey, requestsPerMinute).Scan(
 		&allowed,
 		&tokens,
 		&now,
@@ -40,7 +40,7 @@ func (s *Store) ConsumeRateLimit(ctx context.Context, bucketKey string, requests
 }
 
 func (s *Store) DeleteStaleRateLimitBuckets(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, store.QueryDeleteStaleRateLimitBuckets, time.Now().UTC().Add(-staleRateLimitTTL)); err != nil {
+	if _, err := s.db.ExecContext(ctx, QueryDeleteStaleRateLimitBuckets, time.Now().UTC().Add(-staleRateLimitTTL)); err != nil {
 		return fmt.Errorf("delete stale rate limit buckets: %w", err)
 	}
 

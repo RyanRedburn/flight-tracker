@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/RyanRedburn/flight-tracker/internal/model"
-	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
 const (
@@ -31,37 +30,24 @@ var (
 	}
 )
 
-func Columns(dataset store.ReferenceDataset) ([]string, error) {
+func Columns(dataset model.ReferenceDataset) ([]string, error) {
 	switch dataset {
-	case store.ReferenceCountries:
+	case model.ReferenceCountries:
 		return append([]string(nil), countryColumns...), nil
-	case store.ReferenceRegions:
+	case model.ReferenceRegions:
 		return append([]string(nil), regionColumns...), nil
-	case store.ReferenceAirports:
+	case model.ReferenceAirports:
 		return append([]string(nil), airportColumns...), nil
 	default:
-		return nil, fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
+		return nil, fmt.Errorf("%w: %q", model.ErrInvalidReferenceDataset, dataset)
 	}
 }
 
-func JobType(dataset store.ReferenceDataset) (model.JobType, error) {
+func CSVFilename(dataset model.ReferenceDataset) (string, error) {
 	switch dataset {
-	case store.ReferenceCountries:
-		return model.JobTypeImportCountries, nil
-	case store.ReferenceRegions:
-		return model.JobTypeImportRegions, nil
-	case store.ReferenceAirports:
-		return model.JobTypeImportAirports, nil
+	case model.ReferenceCountries, model.ReferenceRegions, model.ReferenceAirports, model.ReferenceAirportMCT:
+		return string(dataset) + ".csv", nil
 	default:
-		return "", fmt.Errorf("%w: %q", store.ErrInvalidReferenceDataset, dataset)
+		return "", fmt.Errorf("%w: %q", model.ErrInvalidReferenceDataset, dataset)
 	}
-}
-
-func CSVFilename(dataset store.ReferenceDataset) (string, error) {
-	table, err := dataset.Table()
-	if err != nil {
-		return "", err
-	}
-
-	return table + ".csv", nil
 }

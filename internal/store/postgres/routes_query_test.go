@@ -29,7 +29,7 @@ func TestToPgx5URL(t *testing.T) {
 
 func TestRouteIdentityQuery(t *testing.T) {
 	query, args := routeIdentityQuery(testAirportORD, testAirportLAX, "")
-	if query != store.QueryRouteIdentity {
+	if query != QueryRouteIdentity {
 		t.Fatal("omitted carrier should use origin/dest identity")
 	}
 
@@ -38,7 +38,7 @@ func TestRouteIdentityQuery(t *testing.T) {
 	}
 
 	query, args = routeIdentityQuery(testAirportORD, testAirportLAX, "UA")
-	if query != store.QueryRouteCarrierIdentity {
+	if query != QueryRouteCarrierIdentity {
 		t.Fatal("set carrier should use origin/dest/carrier identity")
 	}
 
@@ -48,7 +48,7 @@ func TestRouteIdentityQuery(t *testing.T) {
 }
 
 func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
-	query, args := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
+	query, args := buildRouteStatsQuery(QueryRouteStats, store.RouteStatsFilter{
 		Origin:       testAirportORD,
 		Dest:         testAirportLAX,
 		StartDate:    testStartDate,
@@ -80,7 +80,7 @@ func TestBuildRouteStatsQueryOptionalFilters(t *testing.T) {
 }
 
 func TestBuildRouteStatsQueryCarrierOnTime(t *testing.T) {
-	unfiltered, args := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
+	unfiltered, args := buildRouteStatsQuery(QueryRouteStats, store.RouteStatsFilter{
 		Origin:     testAirportORD,
 		Dest:       testAirportLAX,
 		StartDate:  testStartDate,
@@ -108,7 +108,7 @@ func TestBuildRouteStatsQueryCarrierOnTime(t *testing.T) {
 		t.Fatalf("len(args) = %d, want 5", len(args))
 	}
 
-	filtered, filteredArgs := buildRouteStatsQuery(store.QueryRouteStats, store.RouteStatsFilter{
+	filtered, filteredArgs := buildRouteStatsQuery(QueryRouteStats, store.RouteStatsFilter{
 		Origin:    testAirportORD,
 		Dest:      testAirportLAX,
 		StartDate: testStartDate,
@@ -141,7 +141,7 @@ func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
 		State:     "IL",
 	}
 
-	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, filter)
+	query, args := buildCarrierStatsQuery(QueryCarrierStats, filter)
 	if !strings.Contains(query, "origin_state = $4 OR dest_state = $4") {
 		t.Fatal("expected state filter in query")
 	}
@@ -176,7 +176,7 @@ func TestBuildCarrierStatsQueryStateFilter(t *testing.T) {
 		EndDate:   testEndDate,
 	}
 
-	noState, args := buildCarrierStatsQuery(store.QueryCarrierStats, noStateFilter)
+	noState, args := buildCarrierStatsQuery(QueryCarrierStats, noStateFilter)
 	if strings.Contains(noState, "origin_state = $4") || strings.Contains(noState, "dest_state = $4") {
 		t.Fatal("state filter should be omitted")
 	}

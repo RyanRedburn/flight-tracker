@@ -30,7 +30,7 @@ Cuddle `if err != nil` with the assignment it checks. Keep an empty line between
 ## Naming
 
 - JSON and query params are `snake_case`.
-- Store SQL constants are `Query*` in `internal/store/queries.go`.
+- Store SQL constants are `Query*` in `internal/store/postgres`.
 - Job types are `import_*` strings on `internal/model`.
 - Avoid magic strings that `goconst` will flag; lift repeats into package-level consts (see `handlers/errors.go`, ingest column names).
 

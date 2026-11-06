@@ -27,7 +27,7 @@ func (s *Store) CarrierStats(ctx context.Context, filter store.CarrierStatsFilte
 	// filters are applied later and may still yield an empty success.
 	var analysisEnd sql.NullString
 
-	err := s.db.QueryRowContext(ctx, store.QueryCarrierStatsMaxDate, filter.Carrier).Scan(&analysisEnd)
+	err := s.db.QueryRowContext(ctx, QueryCarrierStatsMaxDate, filter.Carrier).Scan(&analysisEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func emptyCarrierStats(filter store.CarrierStatsFilter) *model.CarrierStats {
 }
 
 func (s *Store) applyCarrierAggregates(ctx context.Context, filter store.CarrierStatsFilter, stats *model.CarrierStats) error {
-	query, args := buildCarrierStatsQuery(store.QueryCarrierStats, filter)
+	query, args := buildCarrierStatsQuery(QueryCarrierStats, filter)
 
 	var (
 		scanned      delayStatsScan

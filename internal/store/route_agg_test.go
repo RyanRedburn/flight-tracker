@@ -148,10 +148,6 @@ func containsFloat(values []float64, want float64) bool {
 	return false
 }
 
-// classifyRouteStatsOnTime reports 1 when the flight is on time: not cancelled,
-// then not diverted, then arr_del15 < 1. Cancelled takes priority over diverted,
-// and diverted takes priority over delayed.
-
 // percentileCont matches PostgreSQL percentile_cont: RN = 1 + p*(N-1), interpolating.
 func percentileCont(p float64, values []float64) float64 {
 	sorted := append([]float64(nil), values...)

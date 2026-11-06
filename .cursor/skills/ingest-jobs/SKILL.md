@@ -49,7 +49,7 @@ Work through this list; skip steps that already exist for an extension of a curr
 
 1. **Constant** — `internal/model` `JobTypeImport…` string (`import_snake_case`).
 2. **Schema** — job detail table if the job has parameters (year/month/stations). Migration pair under `migrations/postgres`.
-3. **Store** — `Create*Job`, active-job check, exists-data check, `Replace*`. SQL in `internal/store/queries.go`. Update `storetest.Stub`.
+3. **Store** — `Create*Job`, active-job check, exists-data check, `Replace*`. SQL in `internal/store/postgres`. Update `storetest.Stub`.
 4. **Adapter** — `internal/ingest/<provider>`:
    - `Downloader` with injectable base URL + timeout (config env vars)
    - Canonical `DBColumns` + header mapper
