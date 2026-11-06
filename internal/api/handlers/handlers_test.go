@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -386,7 +387,7 @@ func TestJobsListInvalidOpenJobsOnly(t *testing.T) {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 
-	var body ErrorResponse
+	var body respond.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}

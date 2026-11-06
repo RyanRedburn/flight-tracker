@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/ingest"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -42,23 +43,23 @@ type IngestResponse struct {
 //	@Produce		json
 //	@Param			body	body		model.IngestRequest	true	"Ingest range"
 //	@Success		201		{object}	IngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	MonthIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/flight-performance [post]
 func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.IngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -88,7 +89,7 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		jobs = append(jobs, IngestJobResponse(job))
 	}
 
-	writeJSON(w, http.StatusCreated, IngestResponse{
+	respond.WriteJSON(w, http.StatusCreated, IngestResponse{
 		Jobs:            jobs,
 		MonthsRequested: len(jobs),
 	})
@@ -97,14 +98,14 @@ func (h *IngestHandler) Create(w http.ResponseWriter, r *http.Request) {
 func writeIngestRangeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ingest.ErrRangeTooLarge):
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{
 			Error: "requested range exceeds maximum allowed months",
 		})
 	case errors.Is(err, ingest.ErrEndBeforeStart):
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{
 			Error: "end date must be on or after start date",
 		})
 	default:
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 	}
 }

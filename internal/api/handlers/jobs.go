@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/query"
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -47,40 +48,40 @@ type JobResponse struct {
 //	@Produce		json
 //	@Param			id	path		string	true	"Job ID"
 //	@Success		200	{object}	JobResponse
-//	@Failure		400	{object}	ErrorResponse
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
-//	@Failure		404	{object}	ErrorResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		400	{object}	respond.ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
+//	@Failure		404	{object}	respond.ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/jobs/{id} [get]
 func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := query.ParseJobID(id); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	job, err := h.store.GetJob(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "job not found"})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: "job not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to get job"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to get job"})
 
 		return
 	}
 
 	resp, err := h.toJobResponse(r.Context(), job)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load job details"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to load job details"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	respond.WriteJSON(w, http.StatusOK, resp)
 }
 
 // List returns recent jobs.
@@ -92,17 +93,17 @@ func (h *JobsHandler) Get(w http.ResponseWriter, r *http.Request) {
 //	@Param			limit			query		int		false	"Max jobs to return (1-500, default 50)"
 //	@Param			open_jobs_only	query		bool	false	"When true, return only pending and running jobs"
 //	@Success		200		{array}		JobResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/jobs [get]
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	params, err := query.ParseJobsList(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -111,12 +112,12 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 		OpenJobsOnly: params.OpenJobsOnly,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to list jobs"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to list jobs"})
 		return
 	}
 
 	if jobs == nil {
-		writeJSON(w, http.StatusOK, []JobResponse{})
+		respond.WriteJSON(w, http.StatusOK, []JobResponse{})
 		return
 	}
 
@@ -124,14 +125,14 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, job := range jobs {
 		resp, err := h.toJobResponse(r.Context(), job)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to load job details"})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to load job details"})
 			return
 		}
 
 		responses = append(responses, resp)
 	}
 
-	writeJSON(w, http.StatusOK, responses)
+	respond.WriteJSON(w, http.StatusOK, responses)
 }
 
 func (h *JobsHandler) toJobResponse(ctx context.Context, job *model.Job) (JobResponse, error) {

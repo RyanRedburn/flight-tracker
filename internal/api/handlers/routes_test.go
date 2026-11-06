@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -871,7 +872,7 @@ func TestRoutesWeatherStatsStoreError(t *testing.T) {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 
-	var resp ErrorResponse
+	var resp respond.ErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -924,7 +925,7 @@ func assertNotFound(t *testing.T, rec *httptest.ResponseRecorder, want string) {
 		t.Fatalf("status = %d, want 404, body = %s", rec.Code, rec.Body.String())
 	}
 
-	var resp ErrorResponse
+	var resp respond.ErrorResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

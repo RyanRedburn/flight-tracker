@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 
@@ -49,22 +50,22 @@ type CreatedAPIKeyResponse struct {
 //	@Produce		json
 //	@Param			body	body		model.CreateAPIKeyRequest	true	"Role and name"
 //	@Success		201		{object}	CreatedAPIKeyResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/keys [post]
 func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -79,7 +80,7 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 	for range maxAPIKeyCreateAttempts {
 		secret, prefix, err := model.GenerateAPIKey()
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateAPIKey})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateAPIKey})
 			return
 		}
 
@@ -101,13 +102,13 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !errors.Is(err, store.ErrConflict) {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateAPIKey})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateAPIKey})
 			return
 		}
 	}
 
 	if created == nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateAPIKey})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateAPIKey})
 		return
 	}
 
@@ -115,7 +116,7 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 		APIKeyResponse: toAPIKeyResponse(created),
 		Key:            plaintext,
 	}
-	writeJSON(w, http.StatusCreated, resp)
+	respond.WriteJSON(w, http.StatusCreated, resp)
 }
 
 // List returns API key metadata (never hashes or plaintext secrets).
@@ -125,16 +126,16 @@ func (h *KeysHandler) Create(w http.ResponseWriter, r *http.Request) {
 //	@Tags			keys,internal
 //	@Produce		json
 //	@Success		200	{array}		APIKeyResponse
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/keys [get]
 func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.store.ListAPIKeys(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedListAPIKeys})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedListAPIKeys})
 		return
 	}
 
@@ -143,7 +144,7 @@ func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 		out = append(out, toAPIKeyResponse(key))
 	}
 
-	writeJSON(w, http.StatusOK, out)
+	respond.WriteJSON(w, http.StatusOK, out)
 }
 
 // Revoke marks an API key unusable. The operation is idempotent if already revoked.
@@ -154,28 +155,28 @@ func (h *KeysHandler) List(w http.ResponseWriter, r *http.Request) {
 //	@Produce		json
 //	@Param			id	path		string	true	"API key ID"
 //	@Success		200	{object}	APIKeyResponse
-//	@Failure		400	{object}	ErrorResponse
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
-//	@Failure		404	{object}	ErrorResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		400	{object}	respond.ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
+//	@Failure		404	{object}	respond.ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/keys/{id}/revoke [post]
 func (h *KeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if strings.TrimSpace(id) == "" {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errAPIKeyIDRequired})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errAPIKeyIDRequired})
 		return
 	}
 
 	if err := h.store.RevokeAPIKey(r.Context(), id, time.Now().UTC()); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: errAPIKeyNotFound})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: errAPIKeyNotFound})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedRevokeAPIKey})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedRevokeAPIKey})
 
 		return
 	}
@@ -183,16 +184,16 @@ func (h *KeysHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	key, err := h.store.GetAPIKey(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: errAPIKeyNotFound})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: errAPIKeyNotFound})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedRevokeAPIKey})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedRevokeAPIKey})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toAPIKeyResponse(key))
+	respond.WriteJSON(w, http.StatusOK, toAPIKeyResponse(key))
 }
 
 func toAPIKeyResponse(key *model.APIKey) APIKeyResponse {

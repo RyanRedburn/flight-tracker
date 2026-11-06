@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -84,7 +84,7 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 
 			identity, err := p.resolveIdentity(r)
 			if err != nil {
-				handlers.WriteError(w, http.StatusInternalServerError, handlers.ErrAuthUnavailable)
+				respond.WriteError(w, http.StatusInternalServerError, respond.ErrAuthUnavailable)
 				return
 			}
 
@@ -93,7 +93,7 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 					return
 				}
 
-				handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrUnauthorized)
+				respond.WriteError(w, http.StatusUnauthorized, respond.ErrUnauthorized)
 
 				return
 			}
@@ -103,7 +103,7 @@ func (p *Protector) Require(allowed []model.APIKeyRole, surface string) func(htt
 			}
 
 			if !model.RolePermits(identity.Role, allowed) {
-				handlers.WriteError(w, http.StatusForbidden, handlers.ErrForbidden)
+				respond.WriteError(w, http.StatusForbidden, respond.ErrForbidden)
 				return
 			}
 
@@ -165,14 +165,14 @@ func (p *Protector) enforceRateLimit(w http.ResponseWriter, r *http.Request, ide
 	if !p.shield.allow(key, now) {
 		// Local flood shed only. Advertised X-RateLimit-* headers come from Postgres.
 		writeRetryAfter(w, shieldRetryAfter)
-		handlers.WriteError(w, http.StatusTooManyRequests, handlers.ErrRateLimitExceeded)
+		respond.WriteError(w, http.StatusTooManyRequests, respond.ErrRateLimitExceeded)
 
 		return false
 	}
 
 	result, err := p.store.ConsumeRateLimit(r.Context(), key, rpm)
 	if err != nil {
-		handlers.WriteError(w, http.StatusInternalServerError, handlers.ErrRateLimitUnavailable)
+		respond.WriteError(w, http.StatusInternalServerError, respond.ErrRateLimitUnavailable)
 		return false
 	}
 
@@ -265,7 +265,7 @@ func writeRateLimited(w http.ResponseWriter, result store.RateLimitResult) {
 	setRateLimitHeaders(w, result)
 	writeRetryAfter(w, result.RetryAfter)
 
-	handlers.WriteError(w, http.StatusTooManyRequests, handlers.ErrRateLimitExceeded)
+	respond.WriteError(w, http.StatusTooManyRequests, respond.ErrRateLimitExceeded)
 }
 
 func writeRetryAfter(w http.ResponseWriter, retryAfter time.Duration) {

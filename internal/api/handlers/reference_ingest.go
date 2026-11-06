@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -33,12 +34,12 @@ type ReferenceIngestResponse struct {
 //	@Produce		json
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/countries [post]
 func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.Request) {
@@ -54,12 +55,12 @@ func (h *ReferenceIngestHandler) CreateCountries(w http.ResponseWriter, r *http.
 //	@Produce		json
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/regions [post]
 func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Request) {
@@ -75,12 +76,12 @@ func (h *ReferenceIngestHandler) CreateRegions(w http.ResponseWriter, r *http.Re
 //	@Produce		json
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/airports [post]
 func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.Request) {
@@ -96,12 +97,12 @@ func (h *ReferenceIngestHandler) CreateAirports(w http.ResponseWriter, r *http.R
 //	@Produce		json
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/mct [post]
 func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +120,12 @@ func (h *ReferenceIngestHandler) CreateAirportMCT(w http.ResponseWriter, r *http
 //	@Produce		json
 //	@Param			body	body		model.ForceIngestRequest	false	"Optional force flag"
 //	@Success		201		{object}	ReferenceIngestResponse
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
 //	@Failure		409		{object}	ReferenceIngestConflictResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/ingest/weather-stations [post]
 func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +135,7 @@ func (h *ReferenceIngestHandler) CreateWeatherStations(w http.ResponseWriter, r 
 func (h *ReferenceIngestHandler) createReference(w http.ResponseWriter, r *http.Request, dataset model.ReferenceDataset) {
 	jobType, err := dataset.JobType()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "invalid dataset"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "invalid dataset"})
 		return
 	}
 
@@ -152,7 +153,7 @@ func (h *ReferenceIngestHandler) create(
 ) {
 	var req model.ForceIngestRequest
 	if err := decodeJSONBody(r.Body, &req, jsonBodyOptions{}); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
@@ -160,12 +161,12 @@ func (h *ReferenceIngestHandler) create(
 
 	active, err := h.store.ActiveIngestJob(ctx, jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveIngest})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCheckActiveIngest})
 		return
 	}
 
 	if active {
-		writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+		respond.WriteJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
 			Error:   errActiveReferenceIngest,
 			JobType: jobType,
 		})
@@ -176,12 +177,12 @@ func (h *ReferenceIngestHandler) create(
 	if !req.Force {
 		hasExisting, err := hasData(ctx)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to check existing data"})
+			respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to check existing data"})
 			return
 		}
 
 		if hasExisting {
-			writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+			respond.WriteJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
 				Error:   "data already exists for this dataset; set force=true to re-import",
 				Dataset: dataset,
 			})
@@ -193,7 +194,7 @@ func (h *ReferenceIngestHandler) create(
 	job, err := h.store.CreateReferenceIngestJob(ctx, jobType)
 	if err != nil {
 		if errors.Is(err, store.ErrActiveIngestConflict) {
-			writeJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
+			respond.WriteJSON(w, http.StatusConflict, ReferenceIngestConflictResponse{
 				Error:   errActiveReferenceIngest,
 				JobType: jobType,
 			})
@@ -201,12 +202,12 @@ func (h *ReferenceIngestHandler) create(
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateIngestJob})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateIngestJob})
 
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, ReferenceIngestResponse{
+	respond.WriteJSON(w, http.StatusCreated, ReferenceIngestResponse{
 		Job: QueuedJobResponse{
 			ID:     job.ID,
 			Type:   job.Type,

@@ -52,11 +52,6 @@ definitions:
       latest_period:
         $ref: '#/definitions/handlers.FreshnessPeriodResponse'
     type: object
-  handlers.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
   handlers.FreshnessPeriodResponse:
     properties:
       as_of:
@@ -1024,6 +1019,11 @@ definitions:
       year:
         type: integer
     type: object
+  respond.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
   store.MigrationVersion:
     properties:
       dirty:
@@ -1054,19 +1054,19 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Database migration version
@@ -1093,19 +1093,19 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Dataset freshness
@@ -1133,15 +1133,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1149,11 +1149,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue airports reference data ingest
@@ -1181,15 +1181,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1197,11 +1197,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue countries reference data ingest
@@ -1231,15 +1231,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1247,11 +1247,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue flight performance data ingest
@@ -1281,15 +1281,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1297,11 +1297,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue airport MCT ingest
@@ -1329,15 +1329,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1345,11 +1345,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue regions reference data ingest
@@ -1381,15 +1381,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1397,11 +1397,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue weather observation data ingest
@@ -1433,15 +1433,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1449,11 +1449,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue weather station mapping ingest
@@ -1485,23 +1485,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List jobs
@@ -1528,27 +1528,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Get job by ID
@@ -1571,19 +1571,19 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List API keys
@@ -1613,23 +1613,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create API key
@@ -1655,27 +1655,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Revoke API key
@@ -1698,15 +1698,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1714,11 +1714,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue travel-window rollup rebuild
@@ -1741,15 +1741,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "409":
           description: Conflict
           schema:
@@ -1757,11 +1757,11 @@ paths:
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Queue route weather-stats rollup rebuild
@@ -1809,27 +1809,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Carrier performance stats
@@ -1859,23 +1859,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Itinerary booking outlook
@@ -1942,27 +1942,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Route booking outlook
@@ -2033,27 +2033,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Route performance stats
@@ -2097,27 +2097,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Route travel windows
@@ -2185,27 +2185,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "429":
           description: Too Many Requests
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Route weather category stats
@@ -2240,7 +2240,7 @@ paths:
         "503":
           description: Service Unavailable
           schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
+            $ref: '#/definitions/respond.ErrorResponse'
       summary: Readiness probe
       tags:
       - health

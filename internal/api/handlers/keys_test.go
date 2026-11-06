@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -109,7 +110,7 @@ func TestKeysCreateRequiresName(t *testing.T) {
 				t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
 			}
 
-			var resp ErrorResponse
+			var resp respond.ErrorResponse
 			if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 				t.Fatalf("decode: %v", err)
 			}

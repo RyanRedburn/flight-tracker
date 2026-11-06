@@ -27,12 +27,12 @@ func NewRebuildWeatherStatsHandler(s store.Store) *RebuildWeatherStatsHandler {
 //	@Tags			rebuild,internal
 //	@Produce		json
 //	@Success		201	{object}	RebuildJobResponse
-//	@Failure		400	{object}	ErrorResponse
-//	@Failure		401	{object}	ErrorResponse
-//	@Failure		403	{object}	ErrorResponse
+//	@Failure		400	{object}	respond.ErrorResponse
+//	@Failure		401	{object}	respond.ErrorResponse
+//	@Failure		403	{object}	respond.ErrorResponse
 //	@Failure		409	{object}	RebuildJobConflictResponse
-//	@Failure		429	{object}	ErrorResponse
-//	@Failure		500	{object}	ErrorResponse
+//	@Failure		429	{object}	respond.ErrorResponse
+//	@Failure		500	{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/internal/rebuild/weather-stats [post]
 func (h *RebuildWeatherStatsHandler) Create(w http.ResponseWriter, r *http.Request) {

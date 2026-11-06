@@ -24,7 +24,7 @@ Cuddle `if err != nil` with the assignment it checks. Keep an empty line between
 ## Errors
 
 - Wrap with `fmt.Errorf("verb: %w", err)` at package boundaries.
-- HTTP **500** bodies use stable, client-safe strings (see `internal/api/handlers/errors.go`). Do not leak driver/internal details.
+- HTTP **500** bodies use stable, client-safe strings (see `internal/api/handlers/errors.go` and `internal/api/respond`). Do not leak driver/internal details.
 - Sentinel errors live next to the package that owns them (`store.ErrNotFound`, `ingest.ErrRangeTooLarge`, …). Handlers use `errors.Is`.
 
 ## Naming

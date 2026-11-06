@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RyanRedburn/flight-tracker/internal/api/handlers"
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 	"github.com/RyanRedburn/flight-tracker/internal/store/storetest"
@@ -270,12 +270,12 @@ func TestProtectorRequire(t *testing.T) {
 					t.Fatalf("Remaining = %q, want 0", rec.Header().Get(headerRateLimitRemaining))
 				}
 
-				var body handlers.ErrorResponse
+				var body respond.ErrorResponse
 				if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 					t.Fatalf("decode: %v", err)
 				}
 
-				if body.Error != handlers.ErrRateLimitExceeded {
+				if body.Error != respond.ErrRateLimitExceeded {
 					t.Fatalf("error = %q", body.Error)
 				}
 			}
@@ -356,12 +356,12 @@ func TestProtectorShieldDenyOmitsSharedHeaders(t *testing.T) {
 		}
 	}
 
-	var body handlers.ErrorResponse
+	var body respond.ErrorResponse
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if body.Error != handlers.ErrRateLimitExceeded {
+	if body.Error != respond.ErrRateLimitExceeded {
 		t.Fatalf("error = %q", body.Error)
 	}
 }

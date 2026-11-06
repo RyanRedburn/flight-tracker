@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/query"
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -27,32 +28,32 @@ func NewCarriersHandler(s store.Store) *CarriersHandler {
 //	@Param			end_date	query		string	false	"Range end (YYYY-MM-DD), on or after start_date; required if start_date is set"	Format(date)
 //	@Param			state		query		string	false	"Origin or dest state code"	minlength(2)	maxlength(2)
 //	@Success		200			{object}	model.CarrierStats
-//	@Failure		400			{object}	ErrorResponse
-//	@Failure		401			{object}	ErrorResponse
-//	@Failure		403			{object}	ErrorResponse
-//	@Failure		404			{object}	ErrorResponse
-//	@Failure		429			{object}	ErrorResponse
-//	@Failure		500			{object}	ErrorResponse
+//	@Failure		400			{object}	respond.ErrorResponse
+//	@Failure		401			{object}	respond.ErrorResponse
+//	@Failure		403			{object}	respond.ErrorResponse
+//	@Failure		404			{object}	respond.ErrorResponse
+//	@Failure		429			{object}	respond.ErrorResponse
+//	@Failure		500			{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/carriers/stats [get]
 func (h *CarriersHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseCarrierStats(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	stats, err := h.store.CarrierStats(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "carrier stats not found"})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: "carrier stats not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute carrier stats"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to compute carrier stats"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	respond.WriteJSON(w, http.StatusOK, stats)
 }

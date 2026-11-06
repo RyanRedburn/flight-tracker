@@ -23,7 +23,7 @@ In-process Go HTTP API plus poll-based background workers. Handlers queue jobs; 
 | Path | Owns |
 | --- | --- |
 | `cmd/server` | Process wiring only (config, store, ingest services, processor, worker, HTTP server) |
-| `internal/api` | Chi router, handlers, query parsing, middleware |
+| `internal/api` | Chi router, handlers, shared JSON responses (`respond`), query parsing, middleware |
 | `internal/operator` | Worker loop, job processor, per-type `JobHandler` (ingest, plus `rebuild_route_travel_windows` and `rebuild_route_weather_stats`) |
 | `internal/ingest` | Month-range expansion; shared CSV/HTTP helpers; provider adapters (`bts`, `iem`, `ourairports`, `mct`) |
 | `internal/domain` | Response assembly with no database access: connections, itineraries, travel windows, outlook windows, carrier ranking |

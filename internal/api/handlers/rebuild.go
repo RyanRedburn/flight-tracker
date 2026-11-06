@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
@@ -28,7 +29,7 @@ type rollupRebuild struct {
 
 func (h rollupRebuild) serve(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSONBody(r.Body, &struct{}{}, jsonBodyOptions{disallowUnknown: true, rejectTrailing: true}); err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: errInvalidJSONBody})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: errInvalidJSONBody})
 		return
 	}
 
@@ -36,12 +37,12 @@ func (h rollupRebuild) serve(w http.ResponseWriter, r *http.Request) {
 
 	active, err := h.store.PendingIngestJob(ctx, h.jobType)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCheckActiveRebuild})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCheckActiveRebuild})
 		return
 	}
 
 	if active {
-		writeJSON(w, http.StatusConflict, h.conflict())
+		respond.WriteJSON(w, http.StatusConflict, h.conflict())
 
 		return
 	}
@@ -49,17 +50,17 @@ func (h rollupRebuild) serve(w http.ResponseWriter, r *http.Request) {
 	job, err := h.create(ctx)
 	if err != nil {
 		if errors.Is(err, store.ErrActiveIngestConflict) {
-			writeJSON(w, http.StatusConflict, h.conflict())
+			respond.WriteJSON(w, http.StatusConflict, h.conflict())
 
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: errFailedCreateRebuildJob})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: errFailedCreateRebuildJob})
 
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, RebuildJobResponse{
+	respond.WriteJSON(w, http.StatusCreated, RebuildJobResponse{
 		Job: QueuedJobResponse{
 			ID:     job.ID,
 			Type:   job.Type,

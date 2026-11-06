@@ -12,7 +12,7 @@ Also follow [development-practices](../development-practices/SKILL.md).
 | Location | Put |
 | --- | --- |
 | `internal/store/store.go` | `Store` interface |
-| `internal/store/*_agg.go`, `flight_date.go`, … | Filter structs and shared query helpers used by the interface |
+| `internal/store` (`route_agg.go`, `carrier_agg.go`, `travel_window.go`, …) | Filter structs and shared query helpers used by the interface |
 | `internal/domain` | Response assembly. No SQL and no import of `store` |
 | `internal/store/postgres` | SQL constants (`Query*`), execution, transactions, COPY, dynamic `WHERE` builders |
 | `internal/store/storetest/stub.go` | Test stub — every interface method |

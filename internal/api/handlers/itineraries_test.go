@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/domain"
 	"github.com/RyanRedburn/flight-tracker/internal/model"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
@@ -391,7 +392,7 @@ func TestItineraryOutlookStoreError(t *testing.T) {
 				t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 			}
 
-			var body ErrorResponse
+			var body respond.ErrorResponse
 			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 				t.Fatalf("decode: %v", err)
 			}

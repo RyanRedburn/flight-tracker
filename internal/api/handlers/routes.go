@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/RyanRedburn/flight-tracker/internal/api/query"
+	"github.com/RyanRedburn/flight-tracker/internal/api/respond"
 	"github.com/RyanRedburn/flight-tracker/internal/store"
 )
 
@@ -30,34 +31,34 @@ func NewRoutesHandler(s store.Store) *RoutesHandler {
 //	@Param			flight_number	query		string	false	"Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)"
 //	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
 //	@Success		200				{object}	model.RouteStats
-//	@Failure		400				{object}	ErrorResponse
-//	@Failure		401				{object}	ErrorResponse
-//	@Failure		403				{object}	ErrorResponse
-//	@Failure		404				{object}	ErrorResponse
-//	@Failure		429				{object}	ErrorResponse
-//	@Failure		500				{object}	ErrorResponse
+//	@Failure		400				{object}	respond.ErrorResponse
+//	@Failure		401				{object}	respond.ErrorResponse
+//	@Failure		403				{object}	respond.ErrorResponse
+//	@Failure		404				{object}	respond.ErrorResponse
+//	@Failure		429				{object}	respond.ErrorResponse
+//	@Failure		500				{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/stats [get]
 func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteStats(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	stats, err := h.store.RouteStats(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route stats not found"})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: "route stats not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route stats"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to compute route stats"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	respond.WriteJSON(w, http.StatusOK, stats)
 }
 
 // Outlook returns booking-style probabilities for a specific flight pattern.
@@ -74,34 +75,34 @@ func (h *RoutesHandler) Stats(w http.ResponseWriter, r *http.Request) {
 //	@Param			dep_time					query		string	true	"Scheduled departure time (HHmm)"
 //	@Param			dep_time_window_minutes		query		int		false	"Minutes around dep_time to include (default 60, max 120)"	minimum(1)	maximum(120)
 //	@Success		200							{object}	model.RouteOutlook
-//	@Failure		400							{object}	ErrorResponse
-//	@Failure		401							{object}	ErrorResponse
-//	@Failure		403							{object}	ErrorResponse
-//	@Failure		404							{object}	ErrorResponse
-//	@Failure		429							{object}	ErrorResponse
-//	@Failure		500							{object}	ErrorResponse
+//	@Failure		400							{object}	respond.ErrorResponse
+//	@Failure		401							{object}	respond.ErrorResponse
+//	@Failure		403							{object}	respond.ErrorResponse
+//	@Failure		404							{object}	respond.ErrorResponse
+//	@Failure		429							{object}	respond.ErrorResponse
+//	@Failure		500							{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/outlook [get]
 func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteOutlook(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	outlook, err := h.store.RouteOutlook(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: errRouteOutlookNotFound})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: errRouteOutlookNotFound})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route outlook"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to compute route outlook"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, outlook)
+	respond.WriteJSON(w, http.StatusOK, outlook)
 }
 
 // TravelWindows returns typical-year on-time patterns for a route.
@@ -114,34 +115,34 @@ func (h *RoutesHandler) Outlook(w http.ResponseWriter, r *http.Request) {
 //	@Param			dest	query		string	true	"Destination airport IATA code"	minlength(3)	maxlength(3)
 //	@Param			carrier	query		string	false	"Marketing carrier code"	minlength(2)	maxlength(2)
 //	@Success		200		{object}	model.RouteTravelWindows
-//	@Failure		400		{object}	ErrorResponse
-//	@Failure		401		{object}	ErrorResponse
-//	@Failure		403		{object}	ErrorResponse
-//	@Failure		404		{object}	ErrorResponse
-//	@Failure		429		{object}	ErrorResponse
-//	@Failure		500		{object}	ErrorResponse
+//	@Failure		400		{object}	respond.ErrorResponse
+//	@Failure		401		{object}	respond.ErrorResponse
+//	@Failure		403		{object}	respond.ErrorResponse
+//	@Failure		404		{object}	respond.ErrorResponse
+//	@Failure		429		{object}	respond.ErrorResponse
+//	@Failure		500		{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/travel-windows [get]
 func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteTravelWindows(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	windows, err := h.store.RouteTravelWindows(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route travel windows not found"})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: "route travel windows not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route travel windows"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to compute route travel windows"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, windows)
+	respond.WriteJSON(w, http.StatusOK, windows)
 }
 
 // WeatherStats returns on-time performance by METAR category at each end of a route.
@@ -158,32 +159,32 @@ func (h *RoutesHandler) TravelWindows(w http.ResponseWriter, r *http.Request) {
 //	@Param			flight_number	query		string	false	"Marketing flight number, 1 to 4 digits; leading zeros are ignored (0123 and 123 match)"
 //	@Param			days_of_week	query		[]int	false	"Filter to these weekdays (1=Mon … 7=Sun)"	collectionFormat(multi)	minimum(1)	maximum(7)
 //	@Success		200				{object}	model.RouteWeatherStats
-//	@Failure		400				{object}	ErrorResponse
-//	@Failure		401				{object}	ErrorResponse
-//	@Failure		403				{object}	ErrorResponse
-//	@Failure		404				{object}	ErrorResponse
-//	@Failure		429				{object}	ErrorResponse
-//	@Failure		500				{object}	ErrorResponse
+//	@Failure		400				{object}	respond.ErrorResponse
+//	@Failure		401				{object}	respond.ErrorResponse
+//	@Failure		403				{object}	respond.ErrorResponse
+//	@Failure		404				{object}	respond.ErrorResponse
+//	@Failure		429				{object}	respond.ErrorResponse
+//	@Failure		500				{object}	respond.ErrorResponse
 //	@Security		ApiKeyAuth
 //	@Router			/api/v1/routes/weather-stats [get]
 func (h *RoutesHandler) WeatherStats(w http.ResponseWriter, r *http.Request) {
 	filter, err := query.ParseRouteStats(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		respond.WriteJSON(w, http.StatusBadRequest, respond.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	stats, err := h.store.RouteWeatherStats(r.Context(), filter)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, ErrorResponse{Error: "route weather stats not found"})
+			respond.WriteJSON(w, http.StatusNotFound, respond.ErrorResponse{Error: "route weather stats not found"})
 			return
 		}
 
-		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to compute route weather stats"})
+		respond.WriteJSON(w, http.StatusInternalServerError, respond.ErrorResponse{Error: "failed to compute route weather stats"})
 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	respond.WriteJSON(w, http.StatusOK, stats)
 }
